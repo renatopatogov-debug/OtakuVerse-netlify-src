@@ -1,0 +1,35 @@
+{
+  "name": "OtakuVerse — Animes & Mangás",
+  "short_name": "OtakuVerse",
+  "description": "Animes e mangás em um só lugar: assista com legendas sincronizadas, continue de onde parou e salve seus favoritos — sem login.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#150e18",
+  "theme_color": "#150e18",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["entertainment"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

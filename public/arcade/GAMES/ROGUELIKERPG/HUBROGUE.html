@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roguelike RPG | Acervo Digital</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Hub dos jogos de terror psicológico: versão em pixel art e versão em ASCII.">
+    <style>
+        /* Estilos Base */
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #0f0f12;
+            color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            margin: 50px 0 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            background: linear-gradient(45deg, #00adb5, #00767a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+
+        /* Grid de Cards */
+        .hub-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 25px;
+            width: 90%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        /* Estilo do Card */
+        .game-card {
+            background: #1a1a1e;
+            border: 1px solid #2e2e33;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            border-color: #00adb5;
+            box-shadow: 0 15px 30px rgba(0, 173, 181, 0.1);
+        }
+
+        .game-icon {
+            font-size: 55px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .game-card h2 {
+            margin: 10px 0;
+            font-size: 1.4rem;
+            color: #fff;
+        }
+
+        .game-card p {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            line-height: 1.5;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .badge-game { background: #28a74533; color: #28a745; }
+        .badge-util { background: #007bff33; color: #007bff; }
+        .badge-new { background: #ffc10733; color: #ffc107; }
+
+        @media (max-width: 600px) {
+            .hub-container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+
+    <header>
+        <h1>GAME HUB</h1>
+        <p class="subtitle">Ambos os jogos estão em fase de testes. Obrigado pela compreensão.</p>
+    </header>
+
+    <main class="hub-container">
+        
+        <a href="./asylum_horror_enhanced/asylum_horror_enhanced.html" class="game-card">
+            <span class="badge badge-util">Jogo</span>
+            <span class="game-icon">🏥</span>
+            <h2>Roguelike RPG V2</h2>
+            <p>Jogo de terror psicológico e sobrevivência em pixel art.</p>
+        </a>
+
+        <a href="./RPGROGUELIKE 1/RPGROGUELIKE.html" class="game-card">
+            <span class="badge badge-new">Jogo</span>
+            <span class="game-icon">🕯️</span>
+            <h2>Roguelike RPG</h2>
+            <p>Jogo de terror psicológico e sobrevivência em arte ASCII. Cuidado com as sombras.</p>
+        </a>
+
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "packageId": "com.otakuverse.app",
+  "host": "SEU-DOMINIO.aqui",
+  "name": "OtakuVerse",
+  "launcherName": "OtakuVerse",
+  "display": "standalone",
+  "themeColor": "#09090b",
+  "themeColorDark": "#09090b",
+  "navigationColor": "#09090b",
+  "navigationColorDark": "#09090b",
+  "navigationDividerColor": "#09090b",
+  "navigationDividerColorDark": "#09090b",
+  "backgroundColor": "#09090b",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://SEU-DOMINIO.aqui/icons/icon-512.png",
+  "maskableIconUrl": "https://SEU-DOMINIO.aqui/icons/maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./otakuverse.keystore",
+    "alias": "otakuverse"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "Bubblewrap",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "/",
+  "minSdkVersion": 19,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

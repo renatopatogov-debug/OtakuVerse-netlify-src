@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MANICÔMIO — Experimento B</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Roguelike em pixel art: sobrevivência e terror psicológico no manicômio.">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --verde: #00ff41;
+      --vermelho: #ff2222;
+      --amarelo: #ffee22;
+      --azul: #44aaff;
+      --roxo: #ff44ff;
+      --cinza: #777;
+      --fundo: #020504;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--fundo);
+      color: var(--verde);
+      font-family: 'VT323', 'Courier New', monospace;
+      overflow: hidden;
+      height: 100vh; width: 100vw;
+      user-select: none;
+    }
+
+    /* CRT */
+    #crt {
+      position: fixed; inset: 0;
+      background:
+        linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.22) 50%),
+        linear-gradient(90deg, rgba(255,0,0,0.04), rgba(0,255,0,0.02), rgba(0,0,255,0.04));
+      background-size: 100% 2px, 3px 100%;
+      pointer-events: none; z-index: 100;
+      animation: flicker 10s infinite;
+    }
+    @keyframes flicker {
+      0%,94%,100%{opacity:1} 95%{opacity:0.82} 96%{opacity:1} 97.5%{opacity:0.88} 98%{opacity:1}
+    }
+    .vignette {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 45%, rgba(20,0,0,0.8) 100%);
+      pointer-events: none; z-index: 2;
+    }
+    .danger-pulse {
+      position: fixed; inset: 0;
+      border: 0 solid var(--vermelho);
+      pointer-events: none; z-index: 3;
+      opacity: 0; transition: opacity 0.3s;
+      box-shadow: inset 0 0 80px var(--vermelho);
+    }
+    .danger-pulse.ativo { border-width: 4px; opacity: 0.55; animation: pulseRed 1.2s infinite; }
+    @keyframes pulseRed { 0%,100%{opacity:0.3} 50%{opacity:0.7} }
+
+    /* ============ HOMEPAGE ============ */
+    #homepage {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; position: relative; z-index: 10;
+    }
+    .title-ascii {
+      font-size: clamp(9px, 1.2vw, 13px);
+      line-height: 1.2;
+      letter-spacing: 0;
+      color: var(--verde);
+      text-shadow: 0 0 12px var(--verde);
+      margin-bottom: 4px;
+      white-space: pre;
+      animation: glitchTitle 5s infinite;
+    }
+    @keyframes glitchTitle {
+      0%,88%,100%{transform:none; filter:none}
+      89%{transform:skewX(-3deg) translateX(-6px); filter:hue-rotate(90deg)}
+      90%{transform:skewX(2deg) translateX(5px); filter:hue-rotate(-90deg)}
+      91%{transform:none; filter:none}
+    }
+    .title-sub {
+      font-size: clamp(14px,2vw,20px);
+      letter-spacing: 8px; color: #334;
+      margin-bottom: 48px; text-shadow: none;
+    }
+    .menu-bloco { display: flex; flex-direction: column; align-items: center; }
+    .menu-opt {
+      font-size: clamp(18px,2.2vw,26px);
+      letter-spacing: 4px; padding: 9px 28px; margin: 5px;
+      cursor: pointer; color: var(--cinza);
+      border: 1px solid transparent; transition: all 0.15s;
+    }
+    .menu-opt:hover, .menu-opt.sel {
+      color: var(--verde); border-color: var(--verde);
+      text-shadow: 0 0 10px var(--verde);
+      background: rgba(0,255,65,0.05);
+    }
+    .menu-opt::before { content:'> '; opacity:0; color:var(--vermelho); }
+    .menu-opt:hover::before, .menu-opt.sel::before { opacity:1; animation: blink 0.5s infinite; }
+    @keyframes blink { 50%{opacity:0} }
+    .horror-flavor {
+      position: absolute; bottom: 36px;
+      font-size: clamp(12px,1.4vw,15px); color: #2a2a2a;
+      letter-spacing: 2px; text-align: center; max-width: 520px;
+    }
+    /* Diff menu */
+    .diff-opt {
+      font-size: clamp(15px,1.8vw,22px); letter-spacing: 3px;
+      padding: 8px 24px; margin: 5px; cursor: pointer;
+      border: 1px solid #222; transition: all 0.15s;
+    }
+    .diff-opt.facil  { color: var(--azul); }
+    .diff-opt.normal { color: var(--amarelo); }
+    .diff-opt.pesadelo { color: var(--vermelho); }
+    .diff-opt:hover  { filter:brightness(1.6); border-color:currentColor; background:rgba(255,255,255,0.04); }
+    .diff-opt.ativo  { filter:brightness(1.6); border-color:currentColor; background:rgba(255,255,255,0.06); }
+    .ctrl-row { color:#555; font-size: clamp(14px,1.7vw,19px); line-height:2.1; letter-spacing:2px; text-align:center; }
+    .ctrl-row span { color: var(--verde); }
+
+    /* ============ GAME ============ */
+    #game-wrapper {
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100vh; position: relative; z-index: 10;
+    }
+    #hud {
+      display: flex; flex-wrap: wrap;
+      gap: 10px; align-items: center; justify-content: center;
+      margin-bottom: 6px; font-size: 13px;
+    }
+    .stat-bloco { display:flex; align-items:center; gap:5px; }
+    .bar-label { font-size:11px; letter-spacing:1px; white-space:nowrap; }
+    .bar-track {
+      width: 72px; height: 9px;
+      background:#0a0a0a; border: 1px solid #222; overflow:hidden;
+    }
+    .bar-fill { height:100%; transition: width 0.3s, background 0.3s; }
+    .bar-num { font-size:11px; }
+    #perigo { height:18px; font-size:13px; letter-spacing:3px; color:var(--vermelho); text-align:center; }
+    pre#grid {
+      font-family: 'Courier New', monospace;
+      font-size: clamp(12px,1.7vw,17px);
+      line-height: clamp(12px,1.7vw,17px);
+      letter-spacing: 2px; margin: 6px 0;
+      text-align: left; display: block;
+      /* Fixed dimensions: W=42 chars × H=22 lines — never reflows */
+      width:  calc(42 * (1ch + 2px));
+      height: calc(22 * clamp(12px,1.7vw,17px));
+      overflow: hidden;
+      white-space: pre;
+    }
+    @keyframes shake {
+      0%,100%{transform:translate(0,0)}
+      20%{transform:translate(-5px,2px)} 40%{transform:translate(5px,-3px)}
+      60%{transform:translate(-3px,5px)} 80%{transform:translate(3px,-4px)}
+    }
+    .shaking { animation: shake 0.28s ease; }
+    #log {
+      height: 72px; display:flex; flex-direction:column; justify-content:flex-end;
+      font-size:13px; letter-spacing:1px; text-align:center;
+    }
+    .btn-retro {
+      background:#000; color:var(--verde);
+      border: 1px solid var(--verde);
+      font-family:'VT323',monospace; font-size:17px;
+      padding: 5px 13px; cursor:pointer;
+      text-shadow: 0 0 5px var(--verde); box-shadow: 0 0 5px #00ff4133;
+      margin: 3px; letter-spacing:2px; transition: all 0.12s;
+    }
+    .btn-retro:hover { background:var(--verde); color:#000; text-shadow:none; box-shadow:none; }
+
+    /* Minimap — inline, below HUD */
+    #minimapCanvas {
+      display: block;
+      width: 210px; height: 110px;
+      border: 1px solid #1a3a1a;
+      background: #000;
+      image-rendering: pixelated;
+      margin: 4px auto 2px auto;
+      box-shadow: 0 0 10px #00ff4130, 0 0 2px #00ff4188;
+    }
+
+    /* Overlays */
+    .overlay-screen {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.97); color:var(--verde);
+      flex-direction:column; justify-content:center; align-items:center;
+      z-index:60; padding:20px;
+    }
+    .inv-item {
+      display:flex; justify-content:space-between; align-items:center;
+      width: clamp(280px,50vw,400px); margin:5px 0;
+      border-bottom: 1px dashed #1a1a1a; padding-bottom:4px;
+    }
+    .inv-btn {
+      background:#000; color:var(--verde); border:1px solid var(--verde);
+      cursor:pointer; font-family:'VT323',monospace; font-size:15px; padding:2px 10px;
+    }
+    .inv-btn:hover { background:var(--verde); color:#000; }
+    /* Boss warning */
+    #boss-warning {
+      position:fixed; inset:0; display:none;
+      align-items:center; justify-content:center;
+      z-index:70; background:rgba(0,0,0,0.93);
+    }
+    /* Mobile */
+    #dpad { display:none; position:fixed; bottom:16px; left:16px; z-index:50; }
+    .dpad-row { display:flex; justify-content:center; }
+    .dpad-btn {
+      width:54px; height:54px;
+      background:rgba(0,255,65,0.08); border:1px solid rgba(0,255,65,0.3);
+      color:var(--verde); font-size:22px;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+    }
+    .dpad-btn:active { background:rgba(0,255,65,0.25); }
+    #mob-actions {
+      display:none; position:fixed; bottom:16px; right:16px;
+      flex-direction:column; gap:6px; z-index:50;
+    }
+    .mob-btn {
+      padding:10px 12px; background:rgba(0,0,0,0.85);
+      border:1px solid var(--verde); color:var(--verde);
+      font-family:'VT323',monospace; font-size:15px;
+      cursor:pointer; letter-spacing:1px;
+      -webkit-tap-highlight-color:transparent;
+    }
+    /* Colors */
+    .verde   { color:var(--verde); }
+    .vermelho{ color:var(--vermelho); text-shadow:0 0 8px var(--vermelho); }
+    .cinza   { color:var(--cinza); text-shadow:none; }
+    .amarelo { color:var(--amarelo); text-shadow:0 0 8px var(--amarelo); }
+    .azul    { color:var(--azul); text-shadow:0 0 8px var(--azul); }
+    .roxo    { color:var(--roxo); text-shadow:0 0 8px var(--roxo); }
+    .laranja { color:#ff8800; text-shadow:0 0 8px #ff8800; }
+
+    /* ── SCREEN TINT (HP / SAN) ── */
+    #tint-layer {
+      position: fixed; inset: 0; pointer-events: none; z-index: 4;
+      transition: background 1.2s, opacity 1.2s;
+      opacity: 0;
+    }
+
+    /* ── HEARTBEAT ── */
+    @keyframes heartbeat {
+      0%,100%{transform:scale(1)}  10%{transform:scale(1.08)}
+      20%{transform:scale(1)}       30%{transform:scale(1.05)}
+      40%{transform:scale(1)}
+    }
+    .beat { animation: heartbeat var(--hb-speed,1.2s) infinite; }
+
+    /* ── BLEED INDICATOR ── */
+    #bleed-indicator {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      font-size: 72px; color: var(--vermelho);
+      text-shadow: 0 0 40px var(--vermelho);
+      pointer-events: none; z-index: 8;
+      opacity: 0; transition: opacity 0.4s;
+      letter-spacing: 0;
+    }
+    #bleed-indicator.show { opacity: 0.7; }
+
+    /* ── BLOOD on map ── */
+    .blood { color: #550000; text-shadow: none; }
+
+    /* ── SANITY GLITCH on grid ── */
+    @keyframes sanGlitch {
+      0%,90%,100%{transform:none;filter:none}
+      91%{transform:skewX(-2deg);filter:hue-rotate(120deg) brightness(1.5)}
+      93%{transform:skewX(1deg) translateX(3px);filter:hue-rotate(-90deg)}
+      95%{transform:none;filter:none}
+    }
+    .san-glitch { animation: sanGlitch 0.8s infinite; }
+
+    /* ── WHISPER log entry ── */
+    .whisper { color: #1a3a1a; font-style: italic; letter-spacing: 3px; }
+  </style>
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+  <div class="vignette"></div>
+  <div class="danger-pulse" id="danger-pulse"></div>
+  <div id="tint-layer"></div>
+  <div id="bleed-indicator">✦</div>
+  <div id="crt"></div>
+
+  <!-- ===== HOMEPAGE ===== -->
+  <div id="homepage">
+    <pre class="title-ascii" id="ascii-title">
+ ███╗   ███╗ █████╗ ███╗  ██╗██╗ ██████╗ ██████╗ ███╗   ███╗██╗ ██████╗
+ ████╗ ████║██╔══██╗████╗ ██║██║██╔════╝██╔═══██╗████╗ ████║██║██╔═══██╗
+ ██╔████╔██║███████║██╔██╗██║██║██║     ██║   ██║██╔████╔██║██║██║   ██║
+ ██║╚██╔╝██║██╔══██║██║╚████║██║██║     ██║   ██║██║╚██╔╝██║██║██║   ██║
+ ██║ ╚═╝ ██║██║  ██║██║ ╚███║██║╚██████╗╚██████╔╝██║ ╚═╝ ██║██║╚██████╔╝
+ ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚══╝╚═╝ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝ ╚═════╝
+    </pre>
+    <div class="title-sub">E X P E R I M E N T O — A N D A R B</div>
+
+    <!-- Main menu -->
+    <div class="menu-bloco" id="menu-main">
+      <div class="menu-opt" onclick="iniciarJogo()">[ NOVO EXPERIMENTO ]</div>
+      <div class="menu-opt" onclick="mostrarDiff()">[ DIFICULDADE: <span id="diff-label">NORMAL</span> ]</div>
+      <div class="menu-opt" onclick="mostrarControles()">[ CONTROLES ]</div>
+    </div>
+
+    <!-- Difficulty -->
+    <div class="menu-bloco" id="menu-diff" style="display:none; text-align:center;">
+      <p style="color:#333;letter-spacing:3px;margin-bottom:20px;font-size:17px;">SELECIONE A DIFICULDADE</p>
+      <div class="diff-opt facil"    onclick="setDiff('facil')">[ FÁCIL — Pílulas abundantes, criaturas lentas ]</div>
+      <div class="diff-opt normal ativo" id="dopt-normal" onclick="setDiff('normal')">[ NORMAL — Como foi planejado ]</div>
+      <div class="diff-opt pesadelo" onclick="setDiff('pesadelo')">[ PESADELO — Eles sabem que você está aqui ]</div>
+      <div class="menu-opt" style="margin-top:20px;" onclick="voltarMenu()">[ VOLTAR ]</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="menu-bloco" id="menu-ctrl" style="display:none; text-align:center;">
+      <p style="color:var(--amarelo);letter-spacing:4px;margin-bottom:22px;font-size:22px;">CONTROLES</p>
+      <div class="ctrl-row">
+        <p><span>W / A / S / D &nbsp; ou &nbsp; ↑ ← ↓ →</span> &nbsp;—&nbsp; Mover</p>
+        <p><span>F</span> &nbsp;—&nbsp; Alternar lanterna</p>
+        <p><span>I</span> &nbsp;—&nbsp; Abrir mochila</p>
+        <p><span>ENTER</span> &nbsp;—&nbsp; Fechar documentos</p>
+
+        <p style="margin-top:18px; color:#aaa; font-size:90%;">Colete 6 documentos para obter o código do elevador.</p>
+
+        <p style="margin-top:12px; color:#aaa; font-size:90%;">
+          <span style="color:var(--amarelo)">E</span> &nbsp;= Elevador (saída) &nbsp;&nbsp;
+          <span style="color:var(--azul)">D</span> &nbsp;= Descida (próximo andar)
+        </p>
+
+        <p style="margin-top:10px; color:#aaa; font-size:90%;">
+          <span style="color:var(--vermelho)">!</span> Aberração &nbsp;&nbsp;
+          <span style="color:var(--amarelo)">Z</span> Zumbi Médico &nbsp;&nbsp;
+          <span style="color:var(--roxo)">S</span> Sombra &nbsp;&nbsp;
+          <span style="color:var(--vermelho)">B</span> Chefe (Boss)
+        </p>
+
+        <p style="margin-top:10px; color:#aaa; font-size:90%;">
+          <span style="color:var(--amarelo)">N</span> Nota/Documento &nbsp;&nbsp;
+          <span style="color:var(--azul)">?</span> Item no chão &nbsp;&nbsp;
+          <span style="color:var(--verde)">@</span> Você &nbsp;&nbsp;
+          <span style="color:#550000">%</span> Cadáver (lootável)
+        </p>
+      </div>
+      <div class="menu-opt" style="margin-top:24px;" onclick="voltarMenu()">[ VOLTAR ]</div>
+    </div>
+
+    <div class="horror-flavor" id="horror-flavor"></div>
+  </div>
+
+  <!-- ===== GAME ===== -->
+  <div id="game-wrapper">
+    <div id="hud"></div>
+    <canvas id="minimapCanvas"></canvas>
+    <div id="perigo"></div>
+    <pre id="grid"></pre>
+    <div id="log"></div>
+    <div id="btn-row">
+      <button class="btn-retro" id="btn-inv"   onclick="toggleInv()">[ MOCHILA (I) ]</button>
+      <button class="btn-retro" id="btn-flash" onclick="toggleFlash()">[ LANTERNA (F) ]</button>
+      <button class="btn-retro" id="btn-restart" style="display:none;" onclick="voltarHomepage()">[ MENU PRINCIPAL ]</button>
+    </div>
+  </div>
+
+  <!-- Lore screen -->
+  <div id="lore-screen" class="overlay-screen">
+    <h2 class="amarelo" style="letter-spacing:5px;margin-bottom:18px;">DOCUMENTO ENCONTRADO</h2>
+    <pre id="lore-text" class="cinza" style="white-space:pre-wrap;max-width:580px;text-align:center;font-size:16px;line-height:1.7;"></pre>
+    <p class="verde" style="margin-top:28px;animation:blink 1s infinite;font-size:16px;letter-spacing:2px;">[ ENTER para largar o papel ]</p>
+  </div>
+
+  <!-- Inventory -->
+  <div id="inv-screen" class="overlay-screen" style="justify-content:flex-start;padding-top:50px;">
+    <h2 class="verde" style="letter-spacing:6px;">M O C H I L A</h2>
+    <p class="cinza" id="inv-status" style="margin-top:6px;font-size:15px;letter-spacing:2px;"></p>
+    <p class="cinza" id="arma-status" style="margin-top:2px;font-size:13px;letter-spacing:1px;"></p>
+    <div id="inv-list" style="margin-top:18px;"></div>
+    <button class="btn-retro" style="margin-top:30px;" onclick="toggleInv()">[ FECHAR ]</button>
+  </div>
+
+  <!-- Boss warning -->
+  <div id="boss-warning">
+    <div style="text-align:center;">
+      <div id="boss-text" style="color:var(--vermelho);font-size:clamp(28px,5vw,56px);letter-spacing:8px;text-shadow:0 0 30px var(--vermelho);animation:glitchTitle 0.4s infinite;"></div>
+      <div style="font-size:20px;color:#444;margin-top:18px;letter-spacing:3px;">[ PRESSIONE QUALQUER TECLA ]</div>
+    </div>
+  </div>
+
+  <!-- Mobile D-pad -->
+  <div id="dpad">
+    <div class="dpad-row"><div class="dpad-btn" id="db-up">▲</div></div>
+    <div class="dpad-row">
+      <div class="dpad-btn" id="db-lt">◄</div>
+      <div class="dpad-btn" style="opacity:0.15;">·</div>
+      <div class="dpad-btn" id="db-rt">►</div>
+    </div>
+    <div class="dpad-row"><div class="dpad-btn" id="db-dn">▼</div></div>
+  </div>
+  <div id="mob-actions">
+    <div class="mob-btn" onclick="toggleFlash()">[ LANTERNA ]</div>
+    <div class="mob-btn" onclick="toggleInv()">[ MOCHILA ]</div>
+  </div>
+
+  <script>
+  // ============================================================
+  // CONSTANTS
+  // ============================================================
+  const W = 42, H = 22;
+  const MAX_INV = 10;
+  const TOTAL_NOTAS = 6;
+
+  const DIFFS = {
+    facil:    { danoM:0.55, drainM:0.65, inimM:0.10, itemM:1.5, nome:'FÁCIL' },
+    normal:   { danoM:1.00, drainM:1.00, inimM:0.16, itemM:1.0, nome:'NORMAL' },
+    pesadelo: { danoM:1.65, drainM:1.55, inimM:0.27, itemM:0.65, nome:'PESADELO' },
+  };
+  let diff = 'normal';
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  let estado = 'HOMEPAGE';
+  let mapa=[], jogador={}, lanterna=true;
+  let inimigos=[], itens=[], alucs=[], notas=[];
+  let cadaveres=[]; // blood stains / lootable corpses
+  let porta={}, arma={}, logs=[];
+  let notasColetadas=0, nivelAtual=1, isBoss=false;
+  let killed=0, turnos=0;
+  let textosLore=[];
+  let hbInterval=null, whisperTimer=null, ambientTimer=null;
+  let flickerThisTurn=false;
+
+  // ============================================================
+  // LORE
+  // ============================================================
+  const POOL_LORE = [
+    "DIÁRIO MÉDICO - 14/10:\nA privação sensorial era para acalmar as mentes hiperativas. Mas o silêncio absoluto não existe. Quando tiramos o som do mundo, eles começaram a ouvir a 'Estática'. E a Estática tem voz.",
+    "REGISTRO DE ENFERMAGEM:\nO Paciente 42 arrancou os próprios olhos hoje. Quando tentei impedi-lo, ele riu e disse: 'Eles estavam usando meus olhos para enxergar o nosso mundo.'",
+    "AVISO DA ADMINISTRAÇÃO:\nNUNCA deixe a bateria zerar. A escuridão neste nível não é a ausência de luz. É uma presença. Ela altera a arquitetura. Ela tem fome.",
+    "ESCRITO EM SANGUE NO AZULEJO:\nAquele que anda batendo nas paredes não é o Diretor. Se você o vir de longe, olhe para as pernas dele. Têm articulações demais. Corra.",
+    "NOTA EM UM CADÁVER DE JALECO:\nEu matei o enfermeiro. Eu juro que tive que matar. Quando as luzes piscaram ele não tinha mais rosto. Apenas pele lisa e um zumbido.",
+    "OBSERVAÇÃO DO DR. SILVA:\nOs ratos do B-2 sumiram. Não há corpos. Apenas marcas de garras rasgando as paredes em direção ao teto. Eles não fugiram. Foram puxados.",
+    "PÁGINA RASGADA DE PRONTUÁRIO:\nPaciente 73 cantou um jingle de 1950. De trás pra frente. Com três vozes diferentes saindo da mesma garganta.",
+    "BILHETE ESCONDIDO EM UMA CAMA:\nNós achávamos que a loucura era um defeito químico no cérebro. É um parasita. E acabamos de dar a ele um ambiente estéril, no escuro, para se reproduzir.",
+    "GRAVAÇÃO DE ÁUDIO TRANSCRITA:\nSe você vir algo no escuro, não acenda a lanterna. A luz não os afasta. Apenas permite que eles saibam que você os está vendo. E eles odeiam ser vistos.",
+    "DIÁRIO DE MANUTENÇÃO:\nO subsolo não foi construído para manter os pacientes presos lá embaixo. Pelas vigas de chumbo, foi feito para impedir que o que eles invocaram subisse.",
+    "RASCUNHO NUM GUARDANAPO:\nEle não para de arranhar o próprio crânio. Diz que tem um inseto de rádio lá dentro. A radiografia não parecia um tumor. Parecia um feto.",
+    "CARTA NÃO ENVIADA:\nAs portas do B-4 trancaram sozinhas. Há 40 pacientes e 12 médicos lá. O sistema de som só transmite um som molhado de mastigação.",
+    "AVISO SANITÁRIO:\nNão bebam a água das pias. O encanamento passa perto do tanque de isolamento. A água está saindo preta e cheirando a ozônio e sangue velho.",
+    "MANUSCRITO INCOMPLETO:\nEles não são demônios. Demônios seguem regras, têm nomes. Essas coisas são apenas o eco de mentes despedaçadas que ganharam massa e carne no escuro.",
+    "ANOTAÇÃO DO ARQUITETO:\nToda vez que pisco, o corredor muda. Eu projetei esses corredores com 3 metros de largura. Ontem medi com meus passos. Tinham apenas 1 metro.",
+    "PROTOCOLO DE EMERGÊNCIA:\nEm caso de Evento Tipo-7, NÃO ative as luzes de emergência. A luz vermelha muda o comportamento deles. Eles param de correr e começam a rastejar.",
+    "FICHA DO PACIENTE 09:\nNome: [REDACTED]. Diagnóstico: esquizofrenia leve. Diz que consegue ver os fios que controlam os médicos. Pediu para não ser alimentado pois 'a comida tem ovos dentro'.",
+    // — NOVAS —
+    "BILHETE DOBRADO NO BOLSO DE UM AVENTAL:\nTem algo errado com o Andar B-6. As paredes não são simétricas. Medi três vezes. O corredor leste tem 4 metros a mais do lado de dentro do que do lado de fora.\nO espaço extra está cheio de barulho de respiração.",
+    "TRANSCRIÇÃO DE SESSÃO - PACIENTE 31:\nMédico: 'O que você vê quando fecha os olhos?'\nPaciente 31: '...o senhor de olhos abertos.'\nMédico: 'O que é o senhor?'\nPaciente 31: 'O que sobra quando todos os outros vão embora.'\n[FIM DA SESSÃO — MÉDICO AUSENTE NO DIA SEGUINTE]",
+    "RELATÓRIO DE SEGURANÇA - CÂMERA 14:\nNas gravações do corredor B-3 entre 03h17 e 03h19, algo caminha em direção à câmera.\nPela velocidade, levaria 40 segundos para percorrer o corredor. Percorreu em 2.\nA câmera parou às 03h19. Não foi substituída.",
+    "ANOTAÇÕES DO DR. FONSECA:\nO experimento de privação de identidade falhou. Os pacientes não perderam o senso de self. Adquiriram um novo. Coletivo.\nEles não falam mais em 'eu'. Só em 'nós'.\nEu comecei a fazer o mesmo hoje de manhã. Não percebi até o almoço.",
+    "FOLHA DE CHAMADA - TURNO DA MADRUGADA:\nPresentes: 8 de 8 enfermeiros.\nPresentes: 3 de 3 médicos.\nPresentes: [riscado] [riscado] [riscado]\nNota na margem: 'eles assinaram mas nenhum chegou. os nomes estavam com a caligrafia deles mas as mãos que escreveram não eram humanas.'",
+    "FRAGMENTO DE DIÁRIO - AUTOR DESCONHECIDO:\nDia 1: Acordei no B-3. Não me lembro de como vim parar aqui.\nDia 3: Encontrei uma saída mas ela leva de volta ao B-3.\nDia 7: Não existe Dia 7. O corredor apagou o dia 7. Isso é o dia 6 de novo.\nDia ?: Acho que sempre fui daqui.",
+    "ETIQUETA DE MEDICAMENTO:\nFRASCO 7-C — USO RESTRITO — ANDAR B\nComposição: [ILEGÍVEL]\nEfeitos esperados: dissociação controlada, receptividade aumentada.\nEfeitos observados: o paciente começou a se dissolver nas paredes. Não metaforicamente.",
+    "CARTA DO ENGENHEIRO CHEFE:\nA fiação do B-5 não obedece ao diagrama que eu mesmo desenhei. Os fios levam a lugares que não existem na planta.\nSegui um deles ontem com uma lanterna. O fio terminava no meio do ar no escuro. Estava quente. Pulsava.",
+    "NOTA COLADA NA PORTA DO REFEITÓRIO:\nNÃO COMA A SOPA DE QUINTA.\nnão é veneno. é pior.\nquem come para de dormir mas não para de sonhar.",
+    "DEPOIMENTO — SOBREVIVENTE DO INCIDENTE B-1:\nEles não me atacaram. Me olharam. Só isso.\nMas o olhar durou tempo demais. Quando acabou, eu sabia coisas que não queria saber.\nSobre mim. Sobre o prédio. Sobre o que fica entre os pensamentos.\nNão consigo mais não saber.",
+    "POST-IT AMARELO NA TELA DE UM COMPUTADOR:\nSe você está lendo isso, o monitor está ligado.\nSe o monitor está ligado, a sala tem energia.\nSe a sala tem energia, CORRA.\nEles usam a eletricidade para pensar mais rápido.",
+    "DIÁRIO DO PACIENTE 88:\nEles me deram um caderno para desenhar.\nDesenhei o mesmo rosto 400 vezes. Não sei de quem é.\nOntem um dos enfermeiros viu meu caderno e ficou muito pálido.\nEle disse que era o rosto dele. Mas não era. Não ainda.",
+    "RELATÓRIO PSIQUIÁTRICO - CONFIDENCIAL:\nO paciente afirma que as sombras no corredor têm memória. Que guardam o eco de todos que passaram por ali.\nClassificamos como psicose dissociativa.\nDepois que o Dr. Amaral leu o relatório ele ficou três horas olhando para a própria sombra. Não virou mais de costas para ela.",
+    "BILHETE NA SOLA DE UM SAPATO:\nse você achar este sapato, o dono está no teto.\nnão olhe para cima.",
+    "COMUNICADO INTERNO - URGENTE:\nO Paciente 00 não consta em nenhum prontuário.\nO Paciente 00 não foi admitido por nenhum médico.\nEle está no quarto no fim do corredor B-8 há mais tempo do que este prédio existe.\nNão abra a porta. Não fale com ele. Não pense nele por tempo demais.",
+    "RASCUNHO DE ARTIGO - NUNCA PUBLICADO:\nConclusão preliminar: a loucura coletiva aqui não é contágio social. É atração gravitacional.\nExiste algo no centro deste prédio que curva a percepção como massa curva o espaço.\nQuanto mais você desce, mais forte é o campo.\nNós já ultrapassamos o ponto de escape.",
+    "MENSAGEM GRAVADA NA PAREDE COM UNHA:\nnão existe b-1\nnão existe b-2\nnão existe b-3\nvocê nunca saiu do b-0\nvocê nunca vai sair do b-0",
+    "RELATÓRIO DE NECROPSIA - INCIDENTE 14:\nCausa mortis: indeterminada.\nObservações: pulmões intactos. Coração intacto. Cérebro intacto.\nO corpo não apresenta lesão alguma.\nO paciente simplesmente parou.\nExpressão facial: serenidade absoluta.\nÚltima palavra registrada por testemunha: 'ah'.",
+    "BILHETE SOB A PORTA DA SALA DE REGISTROS:\nVocê vai tentar usar o elevador.\nO elevador vai funcionar.\nVocê vai apertar o botão do andar térreo.\nA porta vai abrir.\nVocê vai ver o corredor B-3.\nO elevador não sobe. Ele nunca soube. Ele só faz você esquecer que desceu."
+  ];
+  const LORE_FINAL = "RELATÓRIO FINAL DA CONTENÇÃO:\nA estrutura falhou. A geometria entrou em colapso.\nNós fomos o experimento deles o tempo todo.\n\n[ CÓDIGO DO ELEVADOR: 7-3-4-1 ]";
+
+  const FLAVORS = [
+    '"Eles não dormem. Eles esperam."',
+    '"Você ouviu isso? ... Nem eu."',
+    '"A geometria daqui está errada."',
+    '"Não olhe para as rachaduras no teto."',
+    '"O último pesquisador durou 4 andares."',
+    '"A luz não vai te salvar. Mas o escuro vai te matar."',
+    '"Paciente 88 desenhava o mesmo rosto em tudo. Nunca soube de quem era."',
+    '"Se você escutar seu próprio nome nas paredes, não responda."',
+  ];
+
+  // ============================================================
+  // AUDIO ENGINE
+  // ============================================================
+  let actx = null;
+  function ac() {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    return actx;
+  }
+  function tone(freq, dur, type='sine', vol=0.3, freqEnd=null) {
+    try {
+      const c=ac(), o=c.createOscillator(), g=c.createGain();
+      o.connect(g); g.connect(c.destination);
+      o.type=type; o.frequency.setValueAtTime(freq,c.currentTime);
+      if(freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd,c.currentTime+dur);
+      g.gain.setValueAtTime(vol,c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
+      o.start(c.currentTime); o.stop(c.currentTime+dur);
+    } catch(e){}
+  }
+  const sndStep   = ()=>tone(180+Math.random()*60,0.06,'sine',0.07);
+  const sndHit    = ()=>{ tone(60,0.25,'sawtooth',0.45,30); tone(200,0.1,'square',0.15); };
+  const sndPickup = ()=>{ tone(440,0.08,'sine',0.2); setTimeout(()=>tone(660,0.12,'sine',0.2),80); };
+  const sndNote   = ()=>{ tone(330,0.25,'sine',0.3); setTimeout(()=>tone(550,0.3,'sine',0.25),200); setTimeout(()=>tone(440,0.4,'sine',0.2),400); };
+  const sndFlash  = ()=>tone(350,0.12,'square',0.15);
+  const sndDeath  = ()=>{ tone(120,0.6,'sawtooth',0.5,50); setTimeout(()=>tone(80,1.2,'sawtooth',0.4,40),400); };
+  const sndLevel  = ()=>{ tone(220,0.1,'square',0.3); setTimeout(()=>tone(330,0.1,'square',0.3),130); setTimeout(()=>tone(440,0.15,'square',0.3),260); };
+  const sndBoss   = ()=>{ for(let i=0;i<4;i++) setTimeout(()=>tone(40+i*20,0.4,'sawtooth',0.5),i*200); };
+  const sndBleed  = ()=>{ tone(80,0.3,'sawtooth',0.25,60); };
+  const sndCreak  = ()=>{ tone(120+Math.random()*80,0.4,'sawtooth',0.08,80); };
+  const sndBreathe= ()=>{
+    try{
+      const c=ac(), o=c.createOscillator(), g=c.createGain(), f=c.createBiquadFilter();
+      o.connect(f); f.connect(g); g.connect(c.destination);
+      f.type='lowpass'; f.frequency.value=300;
+      o.type='sawtooth'; o.frequency.setValueAtTime(60,c.currentTime);
+      o.frequency.linearRampToValueAtTime(55,c.currentTime+0.8);
+      g.gain.setValueAtTime(0,c.currentTime);
+      g.gain.linearRampToValueAtTime(0.06,c.currentTime+0.3);
+      g.gain.linearRampToValueAtTime(0,c.currentTime+0.8);
+      o.start(c.currentTime); o.stop(c.currentTime+0.8);
+    }catch(e){}
+  };
+
+  // Heartbeat: speed depends on HP
+  function startHeartbeat() {
+    stopHeartbeat();
+    function beat() {
+      if(estado!=='JOGANDO') return;
+      const hp=jogador.hp||0;
+      if(hp>40) return;
+      const spd = hp>25?900:hp>15?600:350;
+      tone(55,0.08,'sine',0.35); 
+      setTimeout(()=>tone(48,0.1,'sine',0.28),120);
+      document.getElementById('hud').style.setProperty('--hb-speed',spd+'ms');
+      hbInterval=setTimeout(beat,spd);
+    }
+    beat();
+  }
+  function stopHeartbeat() { clearTimeout(hbInterval); hbInterval=null; }
+
+  // Ambient events: distant sounds while playing
+  function startAmbient() {
+    stopAmbient();
+    function loop() {
+      if(estado!=='JOGANDO'){ ambientTimer=setTimeout(loop,8000); return; }
+      const r=Math.random();
+      if(r<0.35) sndCreak();
+      else if(r<0.55) sndBreathe();
+      // tiny random delayed thud
+      else if(r<0.70){ setTimeout(()=>tone(40,0.5,'sine',0.06),Math.random()*2000); }
+      ambientTimer=setTimeout(loop,5000+Math.random()*12000);
+    }
+    ambientTimer=setTimeout(loop,4000+Math.random()*8000);
+  }
+  function stopAmbient() { clearTimeout(ambientTimer); ambientTimer=null; }
+
+  // Whispers: creepy log messages at random intervals
+  const WHISPERS = [
+    "...você ouviu isso?","...estamos aqui.","...não se vire agora.",
+    "...quantos andares você desceu?","...achamos você.","...corra.",
+    "...o chão está ficando mais fundo.","...você está sangrando.",
+    "...há três atrás de você.","...apague a luz. por favor.",
+    "...você não deveria ter lido aquilo.","...nós lembramos de você.",
+    "...o elevador nunca vai funcionar.","...você não está sozinho.",
+  ];
+  function startWhispers() {
+    stopWhispers();
+    function loop() {
+      if(estado==='JOGANDO'&&jogador.san<65){
+        const w=WHISPERS[Math.floor(Math.random()*WHISPERS.length)];
+        addLog(w,'whisper');
+        render();
+      }
+      whisperTimer=setTimeout(loop,8000+Math.random()*15000);
+    }
+    whisperTimer=setTimeout(loop,12000+Math.random()*10000);
+  }
+  function stopWhispers() { clearTimeout(whisperTimer); whisperTimer=null; }
+
+  // ============================================================
+  // HOMEPAGE
+  // ============================================================
+  let fIdx=0, fTimer=null;
+  function initHomepage() {
+    document.getElementById('homepage').style.display='flex';
+    document.getElementById('game-wrapper').style.display='none';
+    estado='HOMEPAGE';
+    rotateFlavor();
+  }
+  function rotateFlavor() {
+    document.getElementById('horror-flavor').textContent = FLAVORS[fIdx++ % FLAVORS.length];
+    fTimer = setTimeout(rotateFlavor, 6000);
+  }
+  function mostrarDiff() {
+    document.getElementById('menu-main').style.display='none';
+    document.getElementById('menu-diff').style.display='flex';
+    document.getElementById('menu-ctrl').style.display='none';
+  }
+  function mostrarControles() {
+    document.getElementById('menu-main').style.display='none';
+    document.getElementById('menu-diff').style.display='none';
+    document.getElementById('menu-ctrl').style.display='flex';
+  }
+  function voltarMenu() {
+    document.getElementById('menu-main').style.display='flex';
+    document.getElementById('menu-diff').style.display='none';
+    document.getElementById('menu-ctrl').style.display='none';
+  }
+  function setDiff(d) {
+    diff=d;
+    document.querySelectorAll('.diff-opt').forEach(e=>e.classList.remove('ativo'));
+    const map={facil:0,normal:1,pesadelo:2};
+    document.querySelectorAll('.diff-opt')[map[d]].classList.add('ativo');
+    document.getElementById('diff-label').textContent=DIFFS[d].nome;
+    voltarMenu();
+  }
+  function iniciarJogo() {
+    clearTimeout(fTimer);
+    document.getElementById('homepage').style.display='none';
+    document.getElementById('game-wrapper').style.display='flex';
+    if ('ontouchstart' in window) {
+      document.getElementById('dpad').style.display='block';
+      document.getElementById('mob-actions').style.display='flex';
+    }
+    initVars(); gerarNivel(); render();
+    startWhispers(); startAmbient();
+  }
+  function voltarHomepage() {
+    ['lore-screen','inv-screen','boss-warning'].forEach(id=>{
+      document.getElementById(id).style.display='none';
+    });
+    document.getElementById('danger-pulse').classList.remove('ativo');
+    stopHeartbeat(); stopWhispers(); stopAmbient();
+    setTint(0,0,0);
+    initHomepage(); voltarMenu();
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  function initVars() {
+    jogador={x:1,y:1,hp:100,san:100,bat:80,inv:[],sangramento:0};
+    lanterna=true;
+    arma={nome:'Mãos nuas',dano:2,dur:999};
+    logs=["Você desperta no frio. O ar cheira a mofo e desinfetante."];
+    notasColetadas=0; nivelAtual=1; isBoss=false;
+    killed=0; turnos=0; cadaveres=[];
+    let pool=[...POOL_LORE].sort(()=>Math.random()-0.5);
+    textosLore=[...pool.slice(0,TOTAL_NOTAS-1), LORE_FINAL].sort(()=>Math.random()-0.5);
+    estado='JOGANDO';
+    document.getElementById('btn-restart').style.display='none';
+    document.getElementById('btn-inv').style.display='inline-block';
+    document.getElementById('btn-flash').style.display='inline-block';
+    document.getElementById('minimapCanvas').style.display='block';
+    setTint(0,0,0);
+  }
+
+  function addLog(msg,cls='verde') {
+    logs.push(`<span class="${cls}">${msg}</span>`);
+    if(logs.length>5) logs.shift();
+  }
+
+  function dst(x1,y1,x2,y2){return Math.hypot(x1-x2,y1-y2);}
+
+  // ============================================================
+  // ITEMS
+  // ============================================================
+  const ARMAS=[
+    {nome:'Bisturi Enferrujado', dano:10, dur:4,  classe:'cinza'},
+    {nome:'Cano de Chumbo',      dano:8,  dur:10, classe:'cinza'},
+    {nome:'Machado de Bombeiro', dano:20, dur:6,  classe:'vermelho'},
+    {nome:'Chave de Fenda',      dano:5,  dur:18, classe:'cinza'},
+    {nome:'Fêmur Quebrado',      dano:7,  dur:7,  classe:'amarelo'},
+  ];
+  function gerarItem() {
+    // itemM only affects spawn frequency in gerarNivel — type distribution is always balanced
+    const r = Math.random();
+    if (r < 0.25) return Math.random() < 0.65
+      ? {nome:'Bandagem Suja', hp:15, classe:'azul'}
+      : {nome:'Kit Médico',    hp:40, classe:'azul'};
+    if (r < 0.45) {
+      const rr = Math.random();
+      if (rr < 0.45) return {nome:'Pílulas Brancas', san:25, classe:'roxo'};
+      if (rr < 0.75) return {nome:'Morfina',          hp:20, san:50, classe:'roxo'};
+      return {nome:'Adrenalina', hp:8, san:8, bat:8, classe:'amarelo'};
+    }
+    if (r < 0.70) return Math.random() < 0.65
+      ? {nome:'Pilha Fraca',  bat:25, classe:'amarelo'}
+      : {nome:'Bateria Nova', bat:60, classe:'amarelo'};
+    return {...ARMAS[Math.floor(Math.random() * ARMAS.length)]};
+  }
+
+  // ============================================================
+  // ENEMIES
+  // ============================================================
+  const ENEMY_CFG={
+    'A':{hp:[6,14], dano:10,vis:7, spd:1,   char:'!',cor:'vermelho', nome:'Aberração'},
+    'Z':{hp:[18,30],dano:14,vis:5, spd:0.5, char:'Z',cor:'amarelo',  nome:'Zumbi Médico'},
+    'S':{hp:[4,10], dano:12,vis:9, spd:1,   char:'S',cor:'roxo',     nome:'Sombra'},
+    'B':{hp:[0,0],  dano:28,vis:99,spd:1,   char:'B',cor:'vermelho', nome:'O DIRETOR'},
+  };
+  function mkEnemy(x,y,tipo=null) {
+    if(!tipo){
+      const r=Math.random();
+      tipo = nivelAtual<=2||r<0.45?'A':r<0.72?'Z':'S';
+    }
+    const c=ENEMY_CFG[tipo];
+    // Boss HP: 30 base + 8 per level — killable with ~3 good weapon hits
+    const hp=tipo==='B'?30+nivelAtual*8:c.hp[0]+Math.floor(Math.random()*(c.hp[1]-c.hp[0]));
+    return {x,y,tipo,hp,dano:c.dano,vis:c.vis,spd:c.spd,char:c.char,cor:c.cor,nome:c.nome,mt:0};
+  }
+
+  // ============================================================
+  // MAP GENERATION
+  // ============================================================
+  function gerarNivel() {
+    mapa=Array.from({length:H},()=>Array(W).fill('#'));
+    let salas=[];
+    isBoss=(nivelAtual%3===0);
+    const nSalas=6+Math.min(Math.floor(nivelAtual/2),4);
+
+    for(let t=0;t<nSalas;t++){
+      let sw=Math.floor(Math.random()*7)+4, sh=Math.floor(Math.random()*4)+3;
+      let sx=Math.floor(Math.random()*(W-sw-2))+1, sy=Math.floor(Math.random()*(H-sh-2))+1;
+      let cx=Math.floor(sx+sw/2), cy=Math.floor(sy+sh/2);
+      for(let j=sy;j<sy+sh;j++) for(let i=sx;i<sx+sw;i++) mapa[j][i]='.';
+      if(salas.length>0){
+        let p=salas[salas.length-1].c;
+        for(let px=Math.min(cx,p.x);px<=Math.max(cx,p.x);px++) mapa[p.y][px]='.';
+        for(let py=Math.min(cy,p.y);py<=Math.max(cy,p.y);py++) mapa[py][cx]='.';
+      }
+      salas.push({x:sx,y:sy,w:sw,h:sh,c:{x:cx,y:cy}});
+    }
+
+    jogador.x=salas[0].c.x; jogador.y=salas[0].c.y;
+    const tipoPorta=notasColetadas>=TOTAL_NOTAS?'E':'D';
+    porta={x:salas[salas.length-1].c.x, y:salas[salas.length-1].c.y, tipo:tipoPorta};
+    mapa[porta.y][porta.x]='.';
+
+    inimigos=[]; itens=[]; notas=[]; alucs=[]; cadaveres=[];
+
+    // Lore note
+    if(textosLore.length>0&&salas.length>2){
+      let s=salas[1+Math.floor(Math.random()*(salas.length-2))];
+      notas.push({x:s.x+Math.floor(Math.random()*s.w),y:s.y+Math.floor(Math.random()*s.h),texto:textosLore.pop()});
+    }
+
+    const d=DIFFS[diff];
+    let chanceE=d.inimM+nivelAtual*0.07; if(chanceE>0.85)chanceE=0.85;
+
+    // Boss in last room + guaranteed weapon drop in penultimate room
+    if(isBoss){
+      let ls=salas[salas.length-1];
+      inimigos.push(mkEnemy(ls.c.x,ls.c.y,'B'));
+      // Guaranteed strong weapon before the boss
+      if(salas.length>=2){
+        let ps=salas[salas.length-2];
+        itens.push({nome:'Machado de Bombeiro',dano:20,dur:8,classe:'vermelho',
+          x:ps.x+Math.floor(Math.random()*ps.w), y:ps.y+Math.floor(Math.random()*ps.h)});
+        addLog(`Andar de Boss! Algo reluz na sala anterior...`,'amarelo');
+      }
+    }
+
+    for(let i=1;i<salas.length-(isBoss?1:0);i++){
+      let s=salas[i];
+      if(Math.random()<chanceE){
+        inimigos.push(mkEnemy(s.x+Math.floor(Math.random()*s.w),s.y+Math.floor(Math.random()*s.h)));
+        if(nivelAtual>=3&&Math.random()<nivelAtual*0.08)
+          inimigos.push(mkEnemy(s.x+Math.floor(Math.random()*s.w),s.y+Math.floor(Math.random()*s.h)));
+      }
+      if(Math.random()<0.68*d.itemM){
+        let it={...gerarItem(),x:s.x+Math.floor(Math.random()*s.w),y:s.y+Math.floor(Math.random()*s.h)};
+        itens.push(it);
+      }
+    }
+
+    if(isBoss){
+      document.getElementById('boss-text').innerHTML=
+        `A N D A R &nbsp; B-${nivelAtual}<br><span style="font-size:0.5em;color:#880000;">O &nbsp; D I R E T O R &nbsp; E S T Á &nbsp; A Q U I</span>`;
+      document.getElementById('boss-warning').style.display='flex';
+      estado='BOSS';
+      sndBoss();
+    }
+  }
+
+  // ============================================================
+  // DISTORTION
+  // ============================================================
+  function distorcer() {
+    if(!lanterna||jogador.san<40){
+      let n=lanterna?1:4;
+      for(let i=0;i<n;i++){
+        if(Math.random()<0.28){
+          let rx=jogador.x+Math.floor(Math.random()*9)-4;
+          let ry=jogador.y+Math.floor(Math.random()*9)-4;
+          if(rx>0&&rx<W-1&&ry>0&&ry<H-1&&(rx!==porta.x||ry!==porta.y)){
+            if(mapa[ry][rx]==='#') mapa[ry][rx]='.';
+            else if(mapa[ry][rx]==='.'&&!inimigos.some(e=>e.x===rx&&e.y===ry)) mapa[ry][rx]=' ';
+          }
+        }
+      }
+    }
+  }
+
+  // ============================================================
+  // SCREEN SHAKE
+  // ============================================================
+  function shake() {
+    const g=document.getElementById('grid');
+    g.classList.remove('shaking');
+    void g.offsetWidth;
+    g.classList.add('shaking');
+    setTimeout(()=>g.classList.remove('shaking'),300);
+  }
+
+  // ============================================================
+  // INVENTORY
+  // ============================================================
+  function toggleInv() {
+    if(estado==='JOGANDO'){
+      estado='INVENTARIO';
+      document.getElementById('inv-screen').style.display='flex';
+      renderInv();
+    } else if(estado==='INVENTARIO'){
+      estado='JOGANDO';
+      document.getElementById('inv-screen').style.display='none';
+      render();
+    }
+  }
+  function renderInv() {
+    document.getElementById('inv-status').innerText=`Capacidade: ${jogador.inv.length}/${MAX_INV}`;
+    document.getElementById('arma-status').innerText=`Arma: ${arma.nome} (Dano:${arma.dano} | Durabilidade:${arma.dur})`;
+    let html='';
+    if(!jogador.inv.length){
+      html='<p class="cinza" style="text-align:center;margin-top:24px;font-size:18px;">Mochila vazia.</p>';
+    } else {
+      jogador.inv.forEach((it,i)=>{
+        let desc=[];
+        if(it.hp)  desc.push(`+${it.hp} HP`);
+        if(it.san) desc.push(`+${it.san} SAN`);
+        if(it.bat) desc.push(`+${it.bat} BAT`);
+        if(it.dano) desc.push(`ATK:${it.dano} DUR:${it.dur}`);
+        const acao=it.dano?'Equipar':'Usar';
+        html+=`<div class="inv-item">
+          <div style="flex:1;">
+            <span class="${it.classe}">▸ ${it.nome}</span>
+            <span style="color:#555;font-size:12px;margin-left:8px;">${desc.join(' ')}</span>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0;">
+            <button class="inv-btn" onclick="usarItem(${i})">[ ${acao} ]</button>
+            <button class="inv-btn" style="color:#aa2222;border-color:#aa2222;" onclick="descartarItem(${i})">[ X ]</button>
+          </div>
+        </div>`;
+      });
+    }
+    document.getElementById('inv-list').innerHTML=html;
+  }
+  function descartarItem(idx) {
+    const it = jogador.inv[idx];
+    // Drop on current tile if empty, else just destroy
+    const tileOk = !itens.some(i=>i.x===jogador.x&&i.y===jogador.y);
+    if(tileOk) itens.push({...it, x:jogador.x, y:jogador.y});
+    jogador.inv.splice(idx,1);
+    addLog(`Descartou ${it.nome}${tileOk?' (no chão)':' (perdido)'}`, 'cinza');
+    // Tiny drop sound
+    try{ tone(200,0.08,'sine',0.12); }catch(e){}
+    renderInv();
+  }
+  function usarItem(idx) {
+    let it=jogador.inv[idx];
+    let msg=`Usou ${it.nome}: `;
+    if(it.bat){jogador.bat=Math.min(100,jogador.bat+it.bat); msg+=`+${it.bat} Bat `;}
+    if(it.hp) {jogador.hp =Math.min(100,jogador.hp +it.hp ); msg+=`+${it.hp} HP `;}
+    if(it.san){jogador.san=Math.min(100,jogador.san+it.san); msg+=`+${it.san} Mente `;}
+    if(it.dano){
+      let old=arma;
+      arma={nome:it.nome,dano:it.dano,dur:it.dur};
+      msg+='(Equipado)';
+      jogador.inv.splice(idx,1);
+      if(old.nome!=='Mãos nuas') jogador.inv.push({...old});
+    } else { jogador.inv.splice(idx,1); }
+    addLog(msg,it.classe);
+    sndPickup();
+    renderInv();
+  }
+  function toggleFlash() {
+    if(estado!=='JOGANDO') return;
+    lanterna=!lanterna;
+    addLog(`Lanterna ${lanterna?'LIGADA':'DESLIGADA'}`,lanterna?'amarelo':'cinza');
+    sndFlash(); render();
+  }
+
+  // ============================================================
+  // SCREEN TINT
+  // ============================================================
+  function setTint(r,g,b,a=0) {
+    const el=document.getElementById('tint-layer');
+    if(!el) return;
+    el.style.background=`rgba(${r},${g},${b},${a})`;
+    el.style.opacity=a>0?'1':'0';
+  }
+  function updateScreenEffects() {
+    const hp=jogador.hp, san=jogador.san;
+    // Red tint from blood loss
+    const redA  = hp<40  ? Math.min(0.35,(40-hp)/80)  : 0;
+    // Green tint from sanity loss
+    const sanA  = san<40 ? Math.min(0.25,(40-san)/80) : 0;
+    if(redA>0)      setTint(180,0,0,redA);
+    else if(sanA>0) setTint(0,60,0,sanA);
+    else            setTint(0,0,0,0);
+    // Heartbeat
+    if(hp<=40) startHeartbeat(); else stopHeartbeat();
+    // Bleed flash indicator
+    const bi=document.getElementById('bleed-indicator');
+    if(jogador.sangramento>0){ bi.classList.add('show'); }
+    else { bi.classList.remove('show'); }
+  }
+
+  // ============================================================
+  // GAME TURN
+  // ============================================================
+  function processar(dx,dy) {
+    if(estado!=='JOGANDO') return;
+    turnos++;
+
+    // ── LANTERN FLICKER (bat < 20%) ──
+    flickerThisTurn = (lanterna && jogador.bat < 20 && Math.random() < 0.25);
+    if(flickerThisTurn) addLog("A lanterna pisca... você fica cego por um instante.",'cinza');
+
+    let nx=jogador.x+dx, ny=jogador.y+dy;
+    if(ny<0||ny>=H||nx<0||nx>=W) return;
+
+    let aluc=alucs.find(a=>a.x===nx&&a.y===ny);
+    let inim=inimigos.find(e=>e.x===nx&&e.y===ny);
+
+    if(aluc){
+      addLog("Você ataca o ar. Era uma sombra...","cinza");
+      jogador.san-=5;
+      alucs=alucs.filter(a=>a!==aluc);
+    } else if(inim){
+      inim.hp-=arma.dano;
+      if(arma.nome!=='Mãos nuas') arma.dur--;
+      if(arma.dur<=0&&arma.nome!=='Mãos nuas'){
+        addLog(`Sua ${arma.nome} QUEBROU!`,"vermelho");
+        arma={nome:'Mãos nuas',dano:2,dur:999};
+      }
+      if(inim.hp<=0){
+        // ── SPAWN CORPSE ──
+        const temItem = inim.tipo!=='S' && Math.random()<0.55;
+        cadaveres.push({
+          x:inim.x, y:inim.y,
+          item: temItem ? gerarItem() : null,
+          looted: false
+        });
+        inimigos=inimigos.filter(e=>e!==inim);
+        killed++;
+        addLog(`${inim.nome} eliminado!`,"verde");
+        jogador.san=Math.min(100,jogador.san+3);
+        if(inim.tipo==='Z'&&Math.random()<0.6){
+          // Zumbi drops on corpse tile
+          const cad=cadaveres.find(c=>c.x===inim.x&&c.y===inim.y);
+          if(cad) cad.item=gerarItem();
+        }
+        if(inim.tipo==='B'){
+          addLog("O DIRETOR CAIU! +30 Saúde +30 Mente","amarelo");
+          jogador.hp=Math.min(100,jogador.hp+30);
+          jogador.san=Math.min(100,jogador.san+30);
+        }
+      } else {
+        addLog(`Atingiu ${inim.nome}! (${inim.hp}HP)`, "cinza");
+      }
+      sndHit();
+    } else if(mapa[ny][nx]===' '){
+      jogador.hp-=5; jogador.san-=10;
+      addLog("Pisou no Vazio! A realidade pisca.","roxo");
+      shake(); mapa[ny][nx]='.'; jogador.x=nx; jogador.y=ny;
+    } else if(mapa[ny][nx]!=='#'){
+      jogador.x=nx; jogador.y=ny; sndStep();
+    }
+
+    // ── STEP ON CORPSE ──
+    const cadIdx=cadaveres.findIndex(c=>c.x===jogador.x&&c.y===jogador.y&&!c.looted);
+    if(cadIdx!==-1){
+      const cad=cadaveres[cadIdx];
+      cad.looted=true;
+      if(cad.item){
+        if(jogador.inv.length<MAX_INV){
+          jogador.inv.push(cad.item);
+          addLog(`Revistou cadáver: encontrou ${cad.item.nome}`,cad.item.classe);
+          sndPickup();
+        } else {
+          // Drop on floor
+          itens.push({...cad.item, x:cad.x, y:cad.y});
+          addLog(`Revistou cadáver — mochila cheia, item no chão.`,'cinza');
+        }
+      } else {
+        addLog("Revistou o cadáver. Nada além de sangue frio.",'cinza');
+      }
+    }
+
+    // Note
+    let nIdx=notas.findIndex(n=>n.x===jogador.x&&n.y===jogador.y);
+    if(nIdx!==-1){
+      document.getElementById('lore-text').innerText=notas[nIdx].texto;
+      document.getElementById('lore-screen').style.display='flex';
+      estado='LENDO'; notasColetadas++;
+      addLog(`Documento! (${notasColetadas}/${TOTAL_NOTAS})`,"amarelo");
+      notas.splice(nIdx,1); sndNote(); return;
+    }
+
+    // Item
+    let iIdx=itens.findIndex(i=>i.x===jogador.x&&i.y===jogador.y);
+    if(iIdx!==-1){
+      let it=itens[iIdx];
+      if(jogador.inv.length<MAX_INV){
+        jogador.inv.push(it); itens.splice(iIdx,1);
+        addLog(`Guardou: ${it.nome}`,it.classe); sndPickup();
+      } else { addLog(`Mochila cheia!`,"vermelho"); }
+    }
+
+    // Porta
+    if(jogador.x===porta.x&&jogador.y===porta.y){
+      if(porta.tipo==='E'){ mostrarVitoria(); return; }
+      else { nivelAtual++; addLog(`Descendo para B-${nivelAtual}...`,"amarelo"); sndLevel(); gerarNivel(); }
+    }
+
+    // Battery
+    const d=DIFFS[diff];
+    if(lanterna) jogador.bat=Math.max(0,jogador.bat-d.drainM);
+    else jogador.san=Math.max(0,jogador.san-2);
+    if(jogador.bat<=0&&lanterna){ addLog("A luz pisca e morre.","vermelho"); lanterna=false; }
+
+    // ── BLEEDING ──
+    if(jogador.sangramento>0){
+      jogador.hp=Math.max(0,jogador.hp-2);
+      jogador.sangramento--;
+      sndBleed();
+      if(jogador.sangramento===0) addLog("O sangramento estancou.",'cinza');
+      else addLog(`Você está sangrando... (${jogador.sangramento} turnos)`,'vermelho');
+    }
+
+    // Enemy AI — patrol when no aggro, charge when aggro
+    inimigos.forEach(e=>{
+      let d2=dst(jogador.x,jogador.y,e.x,e.y);
+      let aggro=(lanterna&&!flickerThisTurn&&d2<=e.vis)||(!lanterna&&d2<=3);
+
+      // ── PATROL (wander when no aggro) ──
+      if(!aggro){
+        if(Math.random()<0.3){
+          const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+          const [px,py]=dirs[Math.floor(Math.random()*4)];
+          const wx=e.x+px, wy=e.y+py;
+          if(wx>0&&wx<W-1&&wy>0&&wy<H-1&&mapa[wy][wx]==='.'&&!inimigos.some(o=>o!==e&&o.x===wx&&o.y===wy))
+            { e.x=wx; e.y=wy; }
+        }
+        return;
+      }
+
+      // Sombra teleports
+      if(e.tipo==='S'&&Math.random()<0.18){
+        let tx=jogador.x+Math.floor(Math.random()*7)-3;
+        let ty=jogador.y+Math.floor(Math.random()*7)-3;
+        if(tx>0&&tx<W&&ty>0&&ty<H&&mapa[ty][tx]==='.'&&!inimigos.some(o=>o!==e&&o.x===tx&&o.y===ty)){
+          e.x=tx; e.y=ty;
+        }
+        return;
+      }
+      // Zumbi slow
+      if(e.spd<1){ e.mt++; if(e.mt<2) return; e.mt=0; }
+
+      if(d2<=1.5){
+        const dmg=Math.max(1,Math.floor((Math.random()*8+e.dano*0.7)*d.danoM));
+        jogador.hp-=dmg;
+        addLog(`${e.nome} atacou! (-${dmg} HP)`,"vermelho");
+        shake(); sndHit();
+        // ── TRIGGER BLEEDING on heavy hit ──
+        if(dmg>=12 && jogador.sangramento===0){
+          jogador.sangramento=3;
+          addLog("Você começa a sangrar!",'vermelho');
+          const bi=document.getElementById('bleed-indicator');
+          bi.classList.add('show'); setTimeout(()=>bi.classList.remove('show'),2000);
+        }
+      } else {
+        let ex=jogador.x>e.x?1:(jogador.x<e.x?-1:0);
+        let ey=jogador.y>e.y?1:(jogador.y<e.y?-1:0);
+        let nx2=e.x+ex, ny2=e.y+ey;
+        if(ny2>=0&&ny2<H&&nx2>=0&&nx2<W&&mapa[ny2][nx2]==='.'&&!inimigos.some(o=>o!==e&&o.x===nx2&&o.y===ny2)){
+          e.x=nx2; e.y=ny2;
+        } else if(ex!==0&&mapa[e.y][e.x+ex]==='.'&&!inimigos.some(o=>o!==e&&o.x===e.x+ex&&o.y===e.y)){
+          e.x+=ex;
+        } else if(ey!==0&&mapa[e.y+ey]&&mapa[e.y+ey][e.x]==='.'&&!inimigos.some(o=>o!==e&&o.x===e.x&&o.y===e.y+ey)){
+          e.y+=ey;
+        }
+      }
+    });
+
+    distorcer();
+
+    // Hallucinations — more aggressive at very low san
+    alucs=[];
+    const halChance = jogador.san < 30 ? 0.7 : jogador.san < 50 ? (50-jogador.san)/100 : 0;
+    const nHals = jogador.san < 20 ? 3 : 1;
+    for(let h=0;h<nHals;h++){
+      if(Math.random()<halChance){
+        let hx=jogador.x+Math.floor(Math.random()*11)-5;
+        let hy=jogador.y+Math.floor(Math.random()*11)-5;
+        if(hx>0&&hx<W&&hy>0&&hy<H&&(mapa[hy][hx]==='.'||mapa[hy][hx]===' ')) alucs.push({x:hx,y:hy});
+      }
+    }
+
+    updateScreenEffects();
+    if(jogador.hp<=0||jogador.san<=0){ mostrarGameOver(); return; }
+    render();
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+  // Characters that replace floor tiles at low sanity
+  const GLITCH_CHARS = ['?','!','|','/','\\','~','+','×','¿','░','▒','▓'];
+  function render() {
+    if(estado==='GAMEOVER'||estado==='VITORIA') return;
+
+    // Lantern flicker collapses vision
+    let visao = flickerThisTurn ? 1 : (lanterna ? 8 : 2);
+    // Sombra shrinks vision
+    if(!flickerThisTurn && inimigos.some(e=>e.tipo==='S'&&dst(jogador.x,jogador.y,e.x,e.y)<=4))
+      visao=Math.max(2,visao-3);
+
+    const perigoReal=inimigos.some(e=>dst(jogador.x,jogador.y,e.x,e.y)<=3);
+    const perigoFalso=alucs.some(a=>dst(jogador.x,jogador.y,a.x,a.y)<=3);
+
+    // HUD
+    const hp=Math.max(0,Math.round(jogador.hp));
+    const san=Math.max(0,Math.round(jogador.san));
+    const bat=Math.max(0,Math.round(jogador.bat));
+    const hpC  = hp>50  ? '#dd2222' : hp>25  ? '#ff8800' : '#ff0000';
+    const sanC = san>50 ? '#dd44dd' : san>25 ? '#882288' : '#550055';
+    const batC = bat>30 ? '#dddd22' : '#ff8800';
+    const hpCls = hp<=40 ? 'beat' : '';
+    const bleedTag = jogador.sangramento>0
+      ? `<span style="color:#ff0000;animation:blink 0.4s infinite;">⬥ SANGRAMENTO(${jogador.sangramento})</span>`
+      : '';
+
+    document.getElementById('hud').innerHTML=`
+      <div class="stat-bloco ${hpCls}">
+        <span class="bar-label" style="color:${hpC}">VIDA</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${hp}%;background:${hpC};box-shadow:0 0 5px ${hpC}"></div></div>
+        <span class="bar-num" style="color:${hpC}">${hp}%</span>
+      </div>
+      <div class="stat-bloco">
+        <span class="bar-label" style="color:${sanC}">MENTE</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${san}%;background:${sanC};box-shadow:0 0 5px ${sanC}"></div></div>
+        <span class="bar-num" style="color:${sanC}">${san}%</span>
+      </div>
+      <div class="stat-bloco">
+        <span class="bar-label" style="color:${batC}">BAT</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${bat}%;background:${batC};box-shadow:0 0 5px ${batC}"></div></div>
+        <span class="bar-num" style="color:${batC}">${bat}%</span>
+      </div>
+      <span class="cinza" style="font-size:11px;letter-spacing:1px;">
+        B-${nivelAtual} &nbsp;|&nbsp; ${arma.nome}(${arma.dano}dmg) &nbsp;|&nbsp; LORE:${notasColetadas}/${TOTAL_NOTAS} &nbsp;|&nbsp;
+        LANTERNA:<span style="display:inline-block;width:3ch;text-align:left;">${lanterna?'<span class="amarelo">ON</span>':'<span class="cinza">OFF</span>'}</span>
+      </span>
+      ${bleedTag}`;
+
+    const perigoMsg = perigoReal
+      ? (inimigos.find(e=>dst(jogador.x,jogador.y,e.x,e.y)<=3)?.tipo==='B'
+          ? '[!!] O DIRETOR ESTÁ AQUI.' : '[!] ALGO ESTÁ PERTO...')
+      : (perigoFalso&&jogador.san<30) ? '[!] ELES ESTÃO EM TODO LUGAR...' : '';
+    document.getElementById('perigo').innerText=perigoMsg;
+    document.getElementById('danger-pulse').classList.toggle('ativo',perigoReal);
+
+    // Sanity distortion probability for floor tiles
+    const distortChance = san<30 ? 0.18 : san<50 ? 0.07 : 0;
+    const gridGlitch = san < 25;
+
+    // Grid
+    let g = gridGlitch ? '<span class="san-glitch">' : '';
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        const d=dst(jogador.x,jogador.y,x,y);
+        if(d>visao){g+=' ';continue;}
+        if(x===jogador.x&&y===jogador.y){g+=`<span class="verde">@</span>`;continue;}
+        if(x===porta.x&&y===porta.y){
+          g+=porta.tipo==='E'?`<span class="amarelo">E</span>`:`<span class="azul">D</span>`;continue;
+        }
+        const en=inimigos.find(e=>e.x===x&&e.y===y);
+        const al=alucs.find(a=>a.x===x&&a.y===y);
+        const nt=notas.find(n=>n.x===x&&n.y===y);
+        const it=itens.find(i=>i.x===x&&i.y===y);
+        const cad=cadaveres.find(c=>c.x===x&&c.y===y);
+        if(en){
+          if(en.tipo==='S'&&d>visao-2) g+=`<span class="roxo" style="opacity:0.35">s</span>`;
+          else g+=`<span class="${en.cor}">${en.char}</span>`;
+        } else if(al){
+          g+=`<span class="vermelho" style="opacity:0.6">!</span>`;
+        } else if(nt){
+          g+=`<span class="amarelo">N</span>`;
+        } else if(it){
+          g+=`<span class="${it.classe}">?</span>`;
+        } else if(cad){
+          // Corpse: looted = dark stain, unlooted = pulsing red
+          g+=cad.looted
+            ? `<span class="blood">%</span>`
+            : `<span style="color:#880000;text-shadow:0 0 6px #440000;">%</span>`;
+        } else if(mapa[y][x]==='#'){
+          const shade=d<3?'#999':d<5?'#444':'#1e1e1e';
+          // Sanity: walls sometimes hallucinate into doorways
+          if(distortChance>0&&Math.random()<distortChance*0.3)
+            g+=`<span style="color:#0a1a0a">.</span>`;
+          else g+=`<span style="color:${shade}">#</span>`;
+        } else if(mapa[y][x]===' '){
+          g+=`<span class="roxo" style="opacity:0.5"> </span>`;
+        } else {
+          // Floor: sanity distorts characters
+          if(distortChance>0&&Math.random()<distortChance){
+            const gc=GLITCH_CHARS[Math.floor(Math.random()*GLITCH_CHARS.length)];
+            g+=`<span style="color:#0a280a;opacity:0.7">${gc}</span>`;
+          } else {
+            g+='.';
+          }
+        }
+      }
+      g+='\n';
+    }
+    if(gridGlitch) g+='</span>';
+    document.getElementById('grid').innerHTML=g;
+    document.getElementById('log').innerHTML=logs.join('<br>');
+    renderMinimap();
+  }
+
+  // ============================================================
+  // MINIMAP
+  // ============================================================
+  function renderMinimap(){
+    const cv=document.getElementById('minimapCanvas');
+    if(!cv) return;
+    const S=5; // pixels per tile
+    cv.width=W*S; cv.height=H*S;
+    const ctx=cv.getContext('2d');
+
+    // Background
+    ctx.fillStyle='#050505'; ctx.fillRect(0,0,cv.width,cv.height);
+
+    // Floor tiles
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(mapa[y][x]!=='#'){
+        ctx.fillStyle='#0d2a0d';
+        ctx.fillRect(x*S,y*S,S,S);
+        // Tiny border to separate cells
+        ctx.fillStyle='#071407';
+        ctx.fillRect(x*S,y*S,1,1);
+      }
+    }
+
+    // Corpses (dark red stain)
+    cadaveres.forEach(c=>{
+      ctx.fillStyle=c.looted?'#1a0000':'#550000';
+      ctx.fillRect(c.x*S+1,c.y*S+1,S-2,S-2);
+    });
+    // Items (small dot)
+    itens.forEach(it=>{
+      ctx.fillStyle='#4488ff';
+      ctx.fillRect(it.x*S+1,it.y*S+1,S-2,S-2);
+    });
+
+    // Notes
+    notas.forEach(n=>{
+      ctx.fillStyle='#ddcc00';
+      ctx.fillRect(n.x*S+1,n.y*S+1,S-2,S-2);
+    });
+
+    // Porta
+    ctx.fillStyle=porta.tipo==='E'?'#ffee22':'#2288ff';
+    ctx.fillRect(porta.x*S,porta.y*S,S,S);
+    // Porta glow border
+    ctx.strokeStyle=porta.tipo==='E'?'#ffee22':'#44aaff';
+    ctx.lineWidth=1; ctx.strokeRect(porta.x*S,porta.y*S,S,S);
+
+    // Enemies
+    inimigos.forEach(e=>{
+      const col=e.tipo==='B'?'#ff5500':e.tipo==='S'?'#ff44ff':e.tipo==='Z'?'#ffcc00':'#ff2222';
+      ctx.fillStyle=col;
+      if(e.tipo==='B'){
+        // Boss: full tile + outline
+        ctx.fillRect(e.x*S-1,e.y*S-1,S+2,S+2);
+        ctx.strokeStyle='#ffffff'; ctx.lineWidth=1;
+        ctx.strokeRect(e.x*S-1,e.y*S-1,S+2,S+2);
+      } else {
+        ctx.fillRect(e.x*S+1,e.y*S+1,S-2,S-2);
+      }
+    });
+
+    // Player — bright green 3×3 cross
+    const px=jogador.x*S, py=jogador.y*S;
+    ctx.fillStyle='#00ff41';
+    ctx.fillRect(px,      py+S/2-1, S,   2); // horizontal
+    ctx.fillRect(px+S/2-1,py,       2,   S); // vertical
+    // Bright center
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(px+S/2-1,py+S/2-1,2,2);
+
+    // Vision radius overlay (dim fog outside vision range)
+    const visao=lanterna?8:2;
+    ctx.fillStyle='rgba(0,0,0,0.55)';
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(dst(jogador.x,jogador.y,x,y)>visao)
+        ctx.fillRect(x*S,y*S,S,S);
+    }
+  }
+
+  // ============================================================
+  // GAME OVER / VICTORY
+  // ============================================================
+  function endCleanup(){
+    document.getElementById('hud').innerHTML='';
+    document.getElementById('perigo').innerText='';
+    document.getElementById('log').innerHTML='';
+    document.getElementById('btn-inv').style.display='none';
+    document.getElementById('btn-flash').style.display='none';
+    document.getElementById('minimapCanvas').style.display='none';
+    document.getElementById('danger-pulse').classList.remove('ativo');
+    document.getElementById('btn-restart').style.display='inline-block';
+    document.getElementById('bleed-indicator').classList.remove('show');
+    stopHeartbeat(); stopWhispers(); stopAmbient();
+    setTint(0,0,0,0);
+  }
+  function mostrarGameOver(){
+    estado='GAMEOVER'; sndDeath(); endCleanup();
+    document.getElementById('grid').innerHTML=`<span class="vermelho"><br><br>
+  O &nbsp; R U Í D O &nbsp; I N T E R N O &nbsp; T E &nbsp; C O N S U M I U .<br><br>
+  <span class="cinza">Andar alcançado: B-${nivelAtual}</span><br>
+  <span class="cinza">Criaturas eliminadas: ${killed}</span><br>
+  <span class="cinza">Documentos lidos: ${notasColetadas}/${TOTAL_NOTAS}</span><br>
+  <span class="cinza">Turnos sobrevividos: ${turnos}</span><br><br>
+  <span style="color:#2a0a0a;">Seu corpo agora é apenas mais uma sombra nos corredores.</span><br></span>`;
+  }
+  function mostrarVitoria(){
+    estado='VITORIA'; endCleanup();
+    sndLevel(); setTimeout(sndLevel,400); setTimeout(sndLevel,800);
+    document.getElementById('grid').innerHTML=`<span class="verde"><br><br>
+  V O C Ê &nbsp; D I G I T A &nbsp; O &nbsp; C Ó D I G O .<br><br>
+  <span class="cinza">A porta do elevador se fecha lentamente.</span><br>
+  <span class="cinza">Você sente o vento frio da superfície.</span><br><br>
+  <span class="amarelo">Andares descidos: ${nivelAtual}</span><br>
+  <span class="amarelo">Criaturas eliminadas: ${killed}</span><br>
+  <span class="amarelo">Documentos coletados: ${notasColetadas}/${TOTAL_NOTAS}</span><br>
+  <span class="amarelo">Turnos: ${turnos}</span><br><br>
+  <span style="color:#111111;">...mas o que você viu lá embaixo nunca vai embora.</span><br></span>`;
+  }
+
+  // ============================================================
+  // INPUT
+  // ============================================================
+  window.addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+
+    if(estado==='BOSS'){
+      document.getElementById('boss-warning').style.display='none';
+      estado='JOGANDO'; render(); return;
+    }
+    if(estado==='LENDO'&&e.key==='Enter'){
+      document.getElementById('lore-screen').style.display='none';
+      estado='JOGANDO'; render(); return;
+    }
+    if(k==='i'&&(estado==='JOGANDO'||estado==='INVENTARIO')){ toggleInv(); return; }
+    if(estado==='HOMEPAGE'&&e.key==='Enter'){ iniciarJogo(); return; }
+    if(estado!=='JOGANDO') return;
+
+    if(k==='w'||k==='arrowup')    { e.preventDefault(); processar(0,-1); }
+    else if(k==='s'||k==='arrowdown')  { e.preventDefault(); processar(0,1); }
+    else if(k==='a'||k==='arrowleft')  { e.preventDefault(); processar(-1,0); }
+    else if(k==='d'||k==='arrowright') { e.preventDefault(); processar(1,0); }
+    else if(k==='f') toggleFlash();
+  });
+
+  // Mobile d-pad
+  function setupDpad() {
+    const map={ 'db-up':[0,-1],'db-dn':[0,1],'db-lt':[-1,0],'db-rt':[1,0] };
+    Object.entries(map).forEach(([id,[dx,dy]])=>{
+      const el=document.getElementById(id);
+      if(!el) return;
+      el.addEventListener('touchstart',ev=>{ ev.preventDefault(); processar(dx,dy); },{passive:false});
+    });
+  }
+  setupDpad();
+
+  // ============================================================
+  // START
+  // ============================================================
+  initHomepage();
+  </script>
+</body>
+</html>

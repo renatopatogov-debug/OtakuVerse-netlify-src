@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Manicômio ASCII</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Roguelike em arte ASCII: sobrevivência e terror psicológico no manicômio.">
+    <style>
+        body {
+            background-color: #050505;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+        #crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #game-container {
+            text-align: center;
+            text-shadow: 0 0 5px #0f0;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        pre {
+            font-size: 18px;
+            line-height: 18px;
+            letter-spacing: 2px;
+            margin: 20px 0;
+            text-align: left;
+            display: inline-block;
+        }
+        .hud { font-weight: bold; margin-bottom: 10px; }
+        .log-box { height: 100px; display: flex; flex-direction: column; justify-content: flex-end; }
+        
+        .verde { color: #0f0; }
+        .vermelho { color: #f22; text-shadow: 0 0 8px #f22; }
+        .cinza { color: #777; text-shadow: none; }
+        .amarelo { color: #ff2; text-shadow: 0 0 8px #ff2; }
+        .azul { color: #4af; text-shadow: 0 0 8px #4af; }
+        .roxo { color: #f4f; text-shadow: 0 0 8px #f4f; }
+        
+        .overlay-screen {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            color: #0f0;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 5;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .btn-retro {
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            padding: 8px 16px;
+            cursor: pointer;
+            text-shadow: 0 0 5px #0f0;
+            box-shadow: 0 0 5px #0f0;
+            margin: 10px;
+        }
+        .btn-retro:hover { background: #0f0; color: #000; text-shadow: none; }
+        
+        .inv-item {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 350px; margin: 8px 0; border-bottom: 1px dashed #333; padding-bottom: 5px;
+        }
+        .inv-btn {
+            background: #000; color: #0f0; border: 1px solid #0f0;
+            cursor: pointer; font-family: monospace; padding: 2px 8px;
+        }
+        .inv-btn:hover { background: #0f0; color: #000; }
+
+    </style>
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+    <div id="crt-overlay"></div>
+    
+    <div id="game-container">
+        <div id="hud" class="hud"></div>
+        <div id="perigo" class="vermelho" style="height: 20px;"></div>
+        <pre id="grid"></pre>
+        <div id="log" class="log-box"></div>
+        
+        <div>
+            <button class="btn-retro" id="btn-inventory" onclick="toggleInventario()">[ INVENTÁRIO (I) ]</button>
+            <button class="btn-retro" id="btn-restart" style="display:none;" onclick="reiniciarJogo()">[ REINICIAR EXPERIMENTO ]</button>
+        </div>
+    </div>
+
+    <div id="lore-screen" class="overlay-screen">
+        <h2 class="amarelo">DOCUMENTO ANTIGO</h2>
+        <pre id="lore-text" class="cinza" style="white-space: pre-wrap; max-width: 600px; text-align: center;"></pre>
+        <p class="verde" style="margin-top: 30px; animation: blink 1s infinite;">[ Pressione ENTER para soltar o papel ]</p>
+    </div>
+
+    <div id="inventory-screen" class="overlay-screen" style="justify-content: flex-start; padding-top: 60px;">
+        <h2 class="verde">M O C H I L A</h2>
+        <p class="cinza" id="inv-status">Capacidade: 0/10</p>
+        <div id="inventory-list" style="margin-top: 20px; text-shadow: none;"></div>
+        <button class="btn-retro" style="margin-top: 40px;" onclick="toggleInventario()">[ FECHAR ]</button>
+    </div>
+
+    <script>
+        const LARGURA = 40;
+        const ALTURA = 20;
+        const MAX_INVENTARIO = 10;
+        let estadoJogo = 'JOGANDO'; 
+        
+        let mapa = [];
+        let jogador = {};
+        let lanternaLigada = true;
+        let inimigos = [], itens = [], alucinacoes = [], notas = [];
+        let porta = { x: 0, y: 0, tipo: 'D' };
+        let arma = {};
+        let logs = [];
+        let notasColetadas = 0;
+        let nivelAtual = 1; 
+        const totalNotas = 6;
+        let textosLore = [];
+
+        // Pool gigante de histórias bizarras (mais de 15 textos)
+        const poolLoreBizarro = [
+            "DIÁRIO MÉDICO - 14/10:\nA privação sensorial era para acalmar as mentes hiperativas. Mas o silêncio absoluto não existe. Quando tiramos o som do mundo, eles começaram a ouvir a 'Estática'. E a Estática tem voz.",
+            "REGISTRO DE ENFERMAGEM:\nO Paciente 42 arrancou os próprios olhos hoje. Quando tentei impedi-lo, ele riu e disse: 'Eles estavam usando meus olhos para enxergar o nosso mundo.'",
+            "AVISO DA ADMINISTRAÇÃO:\nNUNCA deixe a bateria zerar. A escuridão neste nível não é a ausência de luz. É uma presença. Ela altera a arquitetura. Ela tem fome.",
+            "ESCRITO EM SANGUE NO AZULEJO:\nAquele que anda batendo nas paredes não é o Diretor. Se você o vir de longe, olhe para as pernas dele. Tem articulações demais. Corra.",
+            "NOTA EM UM CADÁVER DE JALECO:\nEu matei o enfermeiro. Eu juro que tive que matar. Quando as luzes piscaram... ele não tinha mais rosto. Apenas uma pele lisa e um zumbido.",
+            "OBSERVAÇÃO DO DR. SILVA:\nOs ratos do B-2 sumiram. Não há corpos. Apenas marcas de garras rasgando as paredes em direção ao teto. Eles não fugiram. Foram puxados.",
+            "PÁGINA RASGADA DE PRONTUÁRIO:\nPaciente 73 cantou um jingle de rádio de 1950 hoje. De trás pra frente. Com três vozes diferentes saindo da mesma garganta. A visitação foi cancelada.",
+            "BILHETE ESCONDIDO EM UMA CAMA:\nNós achávamos que a loucura era um defeito químico no cérebro. É um parasita. E acabamos de dar a ele um ambiente estéril, no escuro, para se reproduzir.",
+            "GRAVAÇÃO DE ÁUDIO TRANSCRITA:\nSe você vir algo no escuro, não acenda a lanterna. A luz não os afasta. Apenas permite que eles saibam que você os está vendo. E eles odeiam ser vistos.",
+            "DIÁRIO DE MANUTENÇÃO:\nO subsolo não foi construído para manter os pacientes presos lá embaixo. Pelas vigas de chumbo, foi feito para impedir que o que eles invocaram subisse.",
+            "RASCUNHO NUM GUARDANAPO:\nEle não para de arranhar o próprio crânio. Diz que tem um inseto de rádio lá dentro. A radiografia não parecia um tumor... parecia um feto.",
+            "CARTA NÃO ENVIADA:\nAs portas do B-4 trancaram sozinhas. Há 40 pacientes e 12 médicos lá. O sistema de som só transmite um som molhado de mastigação. Ninguém vai descer para checar.",
+            "AVISO SANITÁRIO:\nNão bebam a água das pias. O encanamento passa perto do tanque de isolamento principal. A água está saindo preta e cheirando a ozônio e sangue velho.",
+            "MANUSCRITO INCOMPLETO:\nEles não são demônios. Demônios seguem regras, têm nomes. Essas coisas são apenas o eco de mentes despedaçadas que ganharam massa e carne no escuro.",
+            "ANOTAÇÃO DO ARQUITETO:\nToda vez que pisco, o corredor muda. Eu projetei esses corredores com 3 metros de largura. Ontem medi com meus passos. Tinham apenas 1 metro."
+        ];
+
+        // Texto que PRECISA aparecer na última nota para você ganhar o jogo
+        const loreElevadorFinal = "RELATÓRIO FINAL DA CONTENÇÃO:\nA estrutura falhou. A geometria entrou em colapso.\nNós fomos o experimento deles o tempo todo.\n\n[ CÓDIGO DO ELEVADOR: 7-3-4-1 ]";
+
+        function inicializarVariaveis() {
+            jogador = { x: 1, y: 1, hp: 100, sanidade: 100, bateria: 80, inventario: [] };
+            lanternaLigada = true;
+            arma = { nome: 'Mãos nuas', dano: 2, durabilidade: 999 };
+            logs = ["Você desperta no frio. O ar cheira a mofo e desinfetante."];
+            notasColetadas = 0;
+            nivelAtual = 1;
+            
+            // Sorteia 5 notas únicas do pool gigante
+            let poolEmbaralhado = [...poolLoreBizarro].sort(() => Math.random() - 0.5);
+            let selecionadas = poolEmbaralhado.slice(0, totalNotas - 1); // Pega 5
+            selecionadas.push(loreElevadorFinal); // Adiciona a do elevador
+            
+            // Embaralha essas 6 notas para o elevador não ser sempre a última a aparecer
+            textosLore = selecionadas.sort(() => Math.random() - 0.5);
+            
+            estadoJogo = 'JOGANDO';
+            document.getElementById('btn-restart').style.display = 'none';
+            document.getElementById('btn-inventory').style.display = 'inline-block';
+        }
+
+        function reiniciarJogo() {
+            inicializarVariaveis();
+            gerarNivel();
+            renderizar();
+        }
+
+        function addLog(msg, classe = 'verde') {
+            logs.push(`<span class="${classe}">${msg}</span>`);
+            if (logs.length > 5) logs.shift();
+        }
+
+        function dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); }
+
+        function gerarItem() {
+            const rand = Math.random();
+            if (rand < 0.3) return Math.random() < 0.7 ? { nome: 'Bandagem Suja', hp: 15, classe: 'azul' } : { nome: 'Kit Médico', hp: 40, classe: 'azul' };
+            if (rand < 0.55) return Math.random() < 0.8 ? { nome: 'Pílulas', sanidade: 25, classe: 'roxo' } : { nome: 'Morfina', hp: 20, sanidade: 50, classe: 'roxo' };
+            if (rand < 0.85) return Math.random() < 0.75 ? { nome: 'Pilha Fraca', carga: 25, classe: 'amarelo' } : { nome: 'Bateria Nova', carga: 60, classe: 'amarelo' };
+            return Math.random() < 0.5 ? { nome: 'Bisturi', dano: 12, durabilidade: 3, classe: 'cinza' } : { nome: 'Cano de Chumbo', dano: 8, durabilidade: 8, classe: 'cinza' };
+        }
+
+        function gerarNivel() {
+            mapa = Array.from({ length: ALTURA }, () => Array(LARGURA).fill('#'));
+            let salas = [];
+            
+            for (let i = 0; i < 6; i++) {
+                let w = Math.floor(Math.random() * 5) + 4;
+                let h = Math.floor(Math.random() * 3) + 3;
+                let x = Math.floor(Math.random() * (LARGURA - w - 2)) + 1;
+                let y = Math.floor(Math.random() * (ALTURA - h - 2)) + 1;
+                let centro = { x: Math.floor(x + w/2), y: Math.floor(y + h/2) };
+                
+                for (let j = y; j < y + h; j++) {
+                    for (let i = x; i < x + w; i++) mapa[j][i] = '.';
+                }
+                
+                if (salas.length > 0) {
+                    let prev = salas[salas.length - 1].centro;
+                    for (let px = Math.min(centro.x, prev.x); px <= Math.max(centro.x, prev.x); px++) mapa[prev.y][px] = '.';
+                    for (let py = Math.min(centro.y, prev.y); py <= Math.max(centro.y, prev.y); py++) mapa[py][centro.x] = '.';
+                }
+                salas.push({ x, y, w, h, centro });
+            }
+
+            jogador.x = salas[0].centro.x; jogador.y = salas[0].centro.y;
+            porta = { x: salas[salas.length-1].centro.x, y: salas[salas.length-1].centro.y, tipo: notasColetadas >= totalNotas ? 'E' : 'D' };
+            mapa[porta.y][porta.x] = '.';
+
+            inimigos = []; itens = []; notas = []; alucinacoes = [];
+            
+            if (textosLore.length > 0 && salas.length > 2) {
+                let s = salas[Math.floor(Math.random() * (salas.length - 2)) + 1];
+                notas.push({ x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h), texto: textosLore.pop() });
+            }
+
+            let chanceInimigo = 0.15 + (nivelAtual * 0.10); 
+            if (chanceInimigo > 0.8) chanceInimigo = 0.8; 
+
+            for (let i = 1; i < salas.length; i++) {
+                let s = salas[i];
+                if (Math.random() < chanceInimigo) {
+                    inimigos.push({ x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h), hp: Math.floor(Math.random()*8)+8 });
+                    if (nivelAtual >= 3 && Math.random() < (nivelAtual * 0.1)) {
+                        inimigos.push({ x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h), hp: Math.floor(Math.random()*8)+8 });
+                    }
+                }
+                if (Math.random() < 0.7) itens.push({ ...gerarItem(), x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h) });
+            }
+        }
+
+        function distorcer() {
+            if (!lanternaLigada || jogador.sanidade < 40) {
+                let inst = lanternaLigada ? 1 : 4;
+                for (let i = 0; i < inst; i++) {
+                    if (Math.random() < 0.3) {
+                        let rx = jogador.x + Math.floor(Math.random() * 9) - 4;
+                        let ry = jogador.y + Math.floor(Math.random() * 9) - 4;
+                        if (rx > 0 && rx < LARGURA-1 && ry > 0 && ry < ALTURA-1 && (rx !== porta.x || ry !== porta.y)) {
+                            if (mapa[ry][rx] === '#') mapa[ry][rx] = '.';
+                            else if (mapa[ry][rx] === '.' && !inimigos.some(e => e.x===rx && e.y===ry) && !itens.some(i => i.x===rx && i.y===ry)) mapa[ry][rx] = ' ';
+                        }
+                    }
+                }
+            }
+        }
+
+        function toggleInventario() {
+            if (estadoJogo === 'JOGANDO') {
+                estadoJogo = 'INVENTARIO';
+                document.getElementById('inventory-screen').style.display = 'flex';
+                renderizarInventario();
+            } else if (estadoJogo === 'INVENTARIO') {
+                estadoJogo = 'JOGANDO';
+                document.getElementById('inventory-screen').style.display = 'none';
+                renderizar();
+            }
+        }
+
+        function renderizarInventario() {
+            document.getElementById('inv-status').innerText = `Capacidade: ${jogador.inventario.length}/${MAX_INVENTARIO}`;
+            let html = '';
+            
+            if (jogador.inventario.length === 0) {
+                html = '<p class="cinza" style="text-align:center; margin-top:30px;">Sua mochila está vazia.</p>';
+            } else {
+                jogador.inventario.forEach((item, index) => {
+                    let acao = item.dano ? 'Equipar' : 'Usar';
+                    html += `
+                    <div class="inv-item">
+                        <span class="${item.classe}">- ${item.nome}</span>
+                        <button class="inv-btn" onclick="usarItem(${index})">[ ${acao} ]</button>
+                    </div>`;
+                });
+            }
+            document.getElementById('inventory-list').innerHTML = html;
+        }
+
+        function usarItem(index) {
+            let it = jogador.inventario[index];
+            let msg = `Usou ${it.nome}: `;
+            
+            if (it.carga) { jogador.bateria = Math.min(100, jogador.bateria + it.carga); msg += `+${it.carga} Bat `; }
+            if (it.hp) { jogador.hp = Math.min(100, jogador.hp + it.hp); msg += `+${it.hp} HP `; }
+            if (it.sanidade) { jogador.sanidade = Math.min(100, jogador.sanidade + it.sanidade); msg += `+${it.sanidade} Mente `; }
+            
+            if (it.dano) { 
+                let armaAntiga = arma;
+                arma = { nome: it.nome, dano: it.dano, durabilidade: it.durabilidade }; 
+                msg += `(Equipado)`; 
+                jogador.inventario.splice(index, 1);
+                if (armaAntiga.nome !== 'Mãos nuas') {
+                    jogador.inventario.push({nome: armaAntiga.nome, dano: armaAntiga.dano, durabilidade: armaAntiga.durabilidade, classe: 'cinza'});
+                }
+            } else {
+                jogador.inventario.splice(index, 1);
+            }
+            
+            addLog(msg, it.classe);
+            renderizarInventario(); 
+        }
+
+        function renderizar() {
+            if (estadoJogo === 'GAMEOVER' || estadoJogo === 'VITORIA') return;
+
+            let visao = lanternaLigada ? 7 : 2;
+            let perigoReal = inimigos.some(e => dist(jogador.x, jogador.y, e.x, e.y) <= 3);
+            let perigoFalso = alucinacoes.some(a => dist(jogador.x, jogador.y, a.x, a.y) <= 3);
+
+            document.getElementById('hud').innerHTML = 
+                `VIDA: ${jogador.hp}% | MENTE: ${jogador.sanidade}% | BATERIA: ${jogador.bateria}% | ANDAR: B-${nivelAtual}<br>` +
+                `ARMA: ${arma.nome} (Dano: ${arma.dano} | Durab: ${arma.durabilidade}) | LORE: ${notasColetadas}/${totalNotas}`;
+            
+            document.getElementById('perigo').innerText = (perigoReal || (perigoFalso && jogador.sanidade < 30)) ? "[!] O MEDO PULSA... ALGO ESTÁ PERTO." : "";
+
+            let gridStr = "";
+            for (let y = 0; y < ALTURA; y++) {
+                for (let x = 0; x < LARGURA; x++) {
+                    if (dist(jogador.x, jogador.y, x, y) > visao) { gridStr += " "; continue; }
+                    
+                    if (x === jogador.x && y === jogador.y) gridStr += "@";
+                    else if (x === porta.x && y === porta.y) gridStr += porta.tipo === 'E' ? `<span class="amarelo">E</span>` : "D";
+                    else if (inimigos.some(e => e.x === x && e.y === y) || alucinacoes.some(a => a.x === x && a.y === y)) gridStr += `<span class="vermelho">!</span>`;
+                    else if (notas.some(n => n.x === x && n.y === y)) gridStr += `<span class="amarelo">N</span>`;
+                    else {
+                        let item = itens.find(i => i.x === x && i.y === y);
+                        if (item) gridStr += `<span class="${item.classe}">?</span>`;
+                        else if (mapa[y][x] === '#') gridStr += `<span class="cinza">#</span>`;
+                        else if (mapa[y][x] === ' ') gridStr += `<span class="roxo"> </span>`;
+                        else gridStr += ".";
+                    }
+                }
+                gridStr += "\n";
+            }
+            document.getElementById('grid').innerHTML = gridStr;
+            document.getElementById('log').innerHTML = logs.join('<br>');
+        }
+
+        function mostrarGameOver() {
+            estadoJogo = 'GAMEOVER';
+            document.getElementById('hud').innerHTML = "";
+            document.getElementById('perigo').innerText = "";
+            document.getElementById('log').innerHTML = "";
+            document.getElementById('btn-inventory').style.display = 'none';
+            
+            document.getElementById('grid').innerHTML = 
+                `<span class="vermelho"><br><br><br>` +
+                `  O   R U Í D O   I N T E R N O   T E   C O N S U M I U .<br><br>` +
+                `  Sua mente quebrou no Andar B-${nivelAtual}.<br>` +
+                `  Seu corpo agora é apenas mais uma sombra nos corredores.<br><br>` +
+                `</span>`;
+                
+            document.getElementById('btn-restart').style.display = 'inline-block';
+        }
+
+        function mostrarVitoria() {
+            estadoJogo = 'VITORIA';
+            document.getElementById('hud').innerHTML = "";
+            document.getElementById('perigo').innerText = "";
+            document.getElementById('log').innerHTML = "";
+            document.getElementById('btn-inventory').style.display = 'none';
+            
+            document.getElementById('grid').innerHTML = 
+                `<span class="verde"><br><br><br>` +
+                `  V O C Ê   D I G I T A   O   C Ó D I G O .<br><br>` +
+                `  A porta do elevador se fecha.<br>` +
+                `  Você sente o vento frio da superfície.<br>` +
+                `  Você escapou do Abismo após descer ${nivelAtual} andares.<br><br>` +
+                `</span>`;
+                
+            document.getElementById('btn-restart').style.display = 'inline-block';
+        }
+
+        function processarTurno(dx, dy) {
+            let nx = jogador.x + dx, ny = jogador.y + dy;
+            
+            let aluc = alucinacoes.find(a => a.x === nx && a.y === ny);
+            let inimigo = inimigos.find(e => e.x === nx && e.y === ny);
+
+            if (aluc) {
+                addLog("Você ataca o ar. Era uma sombra...", "cinza");
+                jogador.sanidade -= 5;
+                alucinacoes = alucinacoes.filter(a => a !== aluc);
+            } else if (inimigo) {
+                inimigo.hp -= arma.dano;
+                arma.durabilidade--;
+                if (arma.durabilidade <= 0 && arma.nome !== 'Mãos nuas') {
+                    addLog(`Sua ${arma.nome} QUEBROU!`, "vermelho");
+                    arma = { nome: 'Mãos nuas', dano: 2, durabilidade: 999 };
+                }
+                if (inimigo.hp <= 0) {
+                    inimigos = inimigos.filter(e => e !== inimigo);
+                    addLog("Você obliterou a criatura.");
+                } else {
+                    addLog(`Acertou a aberração! (-${arma.dano} HP)`, "cinza");
+                }
+            } else if (mapa[ny][nx] === ' ') {
+                jogador.hp -= 5; jogador.sanidade -= 10;
+                addLog("Pisou no Vazio! A realidade pisca e o chão volta.", "roxo");
+                mapa[ny][nx] = '.';
+                jogador.x = nx; jogador.y = ny;
+            } else if (mapa[ny][nx] !== '#') {
+                jogador.x = nx; jogador.y = ny;
+            }
+
+            let notaIdx = notas.findIndex(n => n.x === jogador.x && n.y === jogador.y);
+            if (notaIdx !== -1) {
+                document.getElementById('lore-text').innerText = notas[notaIdx].texto;
+                document.getElementById('lore-screen').style.display = 'flex';
+                estadoJogo = 'LENDO';
+                notasColetadas++;
+                addLog(`Lore revelada. (${notasColetadas}/${totalNotas})`, "amarelo");
+                notas.splice(notaIdx, 1);
+                return;
+            }
+
+            let itemIdx = itens.findIndex(i => i.x === jogador.x && i.y === jogador.y);
+            if (itemIdx !== -1) {
+                let it = itens[itemIdx];
+                if (jogador.inventario.length < MAX_INVENTARIO) {
+                    jogador.inventario.push(it);
+                    addLog(`Guardou na mochila: ${it.nome}`, it.classe);
+                    itens.splice(itemIdx, 1);
+                } else {
+                    addLog(`Mochila cheia! Não pode pegar ${it.nome}.`, "vermelho");
+                }
+            }
+
+            if (jogador.x === porta.x && jogador.y === porta.y) {
+                if (porta.tipo === 'E') {
+                    mostrarVitoria();
+                    return;
+                } else {
+                    nivelAtual++; 
+                    addLog(`Descendo para o Andar B-${nivelAtual}...`);
+                    gerarNivel();
+                }
+            }
+
+            if (lanternaLigada) jogador.bateria -= 1; else jogador.sanidade -= 2;
+            if (jogador.bateria <= 0) {
+                jogador.bateria = 0;
+                if (lanternaLigada) addLog("A luz pisca e morre.", "vermelho");
+                lanternaLigada = false;
+            }
+
+            inimigos.forEach(e => {
+                let d = dist(jogador.x, jogador.y, e.x, e.y);
+                if ((lanternaLigada && d <= 7) || (!lanternaLigada && d <= 2)) {
+                    let ex = jogador.x > e.x ? 1 : (jogador.x < e.x ? -1 : 0);
+                    let ey = jogador.y > e.y ? 1 : (jogador.y < e.y ? -1 : 0);
+                    if (d <= 1.5) {
+                        jogador.hp -= Math.floor(Math.random()*8)+8;
+                        addLog("Garras rasgam sua carne!", "vermelho");
+                    } else if (mapa[e.y+ey][e.x+ex] !== '#' && mapa[e.y+ey][e.x+ex] !== ' ') {
+                        e.x += ex; e.y += ey;
+                    }
+                }
+            });
+
+            distorcer();
+            alucinacoes = [];
+            if (jogador.sanidade < 50 && Math.random() < (50 - jogador.sanidade)/100) {
+                let hx = jogador.x + Math.floor(Math.random()*11)-5, hy = jogador.y + Math.floor(Math.random()*11)-5;
+                if (hx > 0 && hx < LARGURA && hy > 0 && hy < ALTURA && (mapa[hy][hx] === '.' || mapa[hy][hx] === ' ')) alucinacoes.push({x: hx, y: hy});
+            }
+
+            if (jogador.hp <= 0 || jogador.sanidade <= 0) {
+                mostrarGameOver();
+                return;
+            }
+
+            renderizar();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            let key = e.key.toLowerCase();
+            
+            if (estadoJogo === 'LENDO' && e.key === 'Enter') {
+                document.getElementById('lore-screen').style.display = 'none';
+                estadoJogo = 'JOGANDO';
+                renderizar();
+                return;
+            }
+            
+            if (key === 'i') {
+                if (estadoJogo === 'JOGANDO' || estadoJogo === 'INVENTARIO') {
+                    toggleInventario();
+                    return;
+                }
+            }
+
+            if (estadoJogo !== 'JOGANDO') return;
+            
+            if (key === 'w' || key === 'arrowup') processarTurno(0, -1);
+            else if (key === 's' || key === 'arrowdown') processarTurno(0, 1);
+            else if (key === 'a' || key === 'arrowleft') processarTurno(-1, 0);
+            else if (key === 'd' || key === 'arrowright') processarTurno(1, 0);
+            else if (key === 'f') { 
+                lanternaLigada = !lanternaLigada; 
+                addLog(`Lanterna ${lanternaLigada ? 'LIGADA' : 'DESLIGADA'}`);
+                renderizar(); 
+            }
+        });
+
+        inicializarVariaveis();
+        gerarNivel();
+        renderizar();
+    </script>
+</body>
+</html>

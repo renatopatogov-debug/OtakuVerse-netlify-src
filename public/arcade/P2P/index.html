@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Fast Share - Acervo</title>
+    <meta name="description" content="Transferência direta de arquivos entre navegadores via WebRTC, sem servidor de arquivos.">
+    <meta name="theme-color" content="#0f0f12">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --text: #f8fafc;
+            --primary: #00adb5; --primary-hover: #00767a;
+            --success: #10b981; --border: #334155;
+            --danger: #ef4444; --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', system-ui, sans-serif; background-color: var(--bg); color: var(--text);
+            display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;
+        }
+        .container {
+            background-color: var(--card); padding: 2.5rem; border-radius: 20px;
+            width: 100%; max-width: 450px; text-align: center; border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        .hidden { display: none !important; }
+        .btn {
+            background-color: var(--primary); color: white; border: none; padding: 0.85rem 1.5rem;
+            border-radius: 10px; font-size: 1rem; cursor: pointer; font-weight: 600; width: 100%; margin-top: 15px;
+            transition: all 0.2s ease;
+        }
+        .btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .btn-success { background-color: var(--success); }
+        .btn-success:hover { background-color: #059669; }
+        .btn-danger { background-color: transparent; border: 1px solid var(--danger); color: var(--danger); }
+        .btn-danger:hover { background-color: var(--danger); color: white; }
+        
+        .dropzone { 
+            border: 2px dashed var(--border); padding: 3rem 2rem; border-radius: 16px; 
+            cursor: pointer; margin-bottom: 15px; transition: all 0.3s ease; background: rgba(255,255,255,0.02);
+        }
+        .dropzone:hover { background-color: rgba(0, 173, 181, 0.05); border-color: var(--primary); }
+        .dropzone-icon { font-size: 3rem; margin-bottom: 15px; display: block; }
+        
+        .qr-container { display: inline-block; margin: 20px 0; background: white; padding: 15px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        
+        .progress-box { text-align: left; margin-top: 20px; }
+        .progress-bar { width: 100%; background-color: var(--border); height: 10px; border-radius: 5px; overflow: hidden; margin: 12px 0; }
+        .progress-fill { width: 0%; height: 100%; background-color: var(--primary); transition: width 0.1s linear; }
+        .progress-fill.connecting { background-color: var(--warning); width: 100%; animation: pulse 1.5s infinite ease-in-out; }
+        
+        .link-box { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 0.85rem; word-break: break-all; color: #cbd5e1; font-family: monospace; }
+        .status-msg { font-size: 0.9rem; color: #94a3b8; margin-top: 8px; font-weight: 500;}
+        
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+
+        .back-hub {
+            position: fixed; top: 16px; left: 16px; z-index: 100;
+            font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+            color: #94a3b8; text-decoration: none; border: 1px solid var(--border);
+            padding: 7px 12px; border-radius: 999px; background: #0f172ad9;
+            backdrop-filter: blur(6px); transition: color 0.2s, border-color 0.2s;
+        }
+        .back-hub:hover { color: #fff; border-color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="/" class="back-hub">← Acervo</a>
+    <h2 style="margin-top: 0;">P2P Transfer⚡</h2>
+    <p style="color: #64748b; font-size: 0.9rem; margin-top: -15px; margin-bottom: 25px;">Conexão Direta Criptografada</p>
+    
+    <div id="viewSelection">
+        <div class="dropzone" id="dropzone">
+            <span class="dropzone-icon">📤</span>
+            <p style="margin: 0; font-weight: 500;">Clique ou arraste um arquivo</p>
+            <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: #64748b;">Qualquer tamanho. Zero servidores.</p>
+            <input type="file" id="fileInput" style="display:none;">
+        </div>
+    </div>
+
+    <div id="viewStatus" class="hidden">
+        <div id="boxShare">
+            <p style="font-size:0.9rem; color:#e2e8f0; margin-bottom: 5px;">Aponte a câmera ou compartilhe o link:</p>
+            <div style="text-align: center;"><div id="shareQr" class="qr-container"></div></div>
+            <div id="shareLink" class="link-box">Gerando link seguro...</div>
+            <button class="btn" id="btnCopyLink" style="background-color: var(--border);">Copiar Link</button>
+            <hr style="border: 0; height: 1px; background: var(--border); margin: 25px 0;">
+        </div>
+
+        <div class="progress-box">
+            <h3 id="progressTitle" style="margin: 0 0 5px 0; font-size: 1.1rem;">Aguardando Conexão...</h3>
+            <div id="fileMeta" style="font-size: 0.85rem; color: var(--primary); display:none; margin-bottom: 5px;"></div>
+            
+            <div class="progress-bar"><div class="progress-fill connecting" id="progressBar"></div></div>
+            <div id="statusLabel" class="status-msg">Iniciando ambiente seguro...</div>
+            
+            <button id="downloadBtn" class="btn btn-success hidden">Salvar Arquivo</button>
+            <button class="btn btn-danger" id="btnCancel">Cancelar Operação</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CHUNK_SIZE = 64 * 1024; 
+    
+    // CONFIGURAÇÃO COMPLETA: STUN + TURN (Fura o bloqueio do 4G e redes diferentes)
+    const rtcConfig = { 
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+            { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" }
+        ]
+    };
+    
+    // ATENÇÃO: o servidor de sinalização abaixo está OFFLINE (verificado em 29/10/2026).
+    // Era um Worker do Cloudflare de terceiros, fora do seu controle.
+    // Sem um servidor de sinalização próprio, o WebRTC não fecha conexão e a página não funciona.
+    // Substitua pela URL do SEU Worker (ou de outro backend de sinalização compatível).
+    const MY_SIGNAL_SERVER = "wss://servidor-de-sinal-p2p.renatopatogov.workers.dev";
+    
+    let peerConnection, dataChannel, ws;
+    let selectedFile, role, roomId;
+    let receivedChunks = [], receivedSize = 0, metaData = null;
+    let fileWritableStream = null, isAborted = false, readyInterval = null, handshakeStarted = false;
+    let transferenciaConcluida = false, signalWatchdog = null, tentativasEspera = 0;
+
+    // ID único para ignorar o próprio eco do Worker
+    const myClientId = Math.random().toString(36).substring(2, 15);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+
+    if (roomParam) {
+        role = "receiver";
+        roomId = roomParam;
+        document.getElementById('viewSelection').classList.add('hidden');
+        document.getElementById('viewStatus').classList.remove('hidden');
+        document.getElementById('boxShare').classList.add('hidden');
+        document.getElementById('progressTitle').innerText = "Preparando Download...";
+        document.getElementById('statusLabel').innerText = "Conectando ao remetente...";
+        inicializarP2P();
+    } else {
+        role = "sender";
+        configurarPainelEnvio();
+    }
+
+    function configurarPainelEnvio() {
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        dropzone.onclick = () => fileInput.click();
+        dropzone.ondragover = (e) => { e.preventDefault(); dropzone.style.borderColor = "var(--primary)"; };
+        dropzone.ondragleave = () => { dropzone.style.borderColor = "var(--border)"; };
+        dropzone.ondrop = (e) => { e.preventDefault(); if(e.dataTransfer.files.length) prepararEnvio(e.dataTransfer.files[0]); };
+        fileInput.onchange = () => { if(fileInput.files.length) prepararEnvio(fileInput.files[0]); };
+    }
+
+    function prepararEnvio(file) {
+        selectedFile = file;
+        roomId = Math.random().toString(36).substring(2, 8); 
+        
+        document.getElementById('viewSelection').classList.add('hidden');
+        document.getElementById('viewStatus').classList.remove('hidden');
+        
+        const linkCompleto = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+        document.getElementById('shareLink').innerText = linkCompleto;
+        
+        new QRCode(document.getElementById("shareQr"), { text: linkCompleto, width: 160, height: 160, colorDark : "#0f172a", colorLight : "#ffffff" });
+        
+        document.getElementById('btnCopyLink').onclick = () => {
+            navigator.clipboard.writeText(linkCompleto).catch(() => {
+                const temp = document.createElement("textarea");
+                temp.value = linkCompleto; document.body.appendChild(temp);
+                temp.select(); document.execCommand("copy"); document.body.removeChild(temp);
+            });
+            const btn = document.getElementById('btnCopyLink');
+            const originalText = btn.innerText;
+            btn.innerText = "Copiado!"; btn.style.backgroundColor = "var(--success)";
+            setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "var(--border)"; }, 2000);
+        };
+
+        inicializarP2P();
+    }
+
+    function inicializarP2P() {
+        ws = new WebSocket(MY_SIGNAL_SERVER);
+
+        signalWatchdog = setTimeout(() => {
+            if (!isAborted && !handshakeStarted && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                falhaCritica("Servidor de sinalização indisponível. Sem ele não é possível negociar a conexão P2P.");
+            }
+        }, 12000);
+
+        ws.onopen = () => {
+            clearTimeout(signalWatchdog);
+            if (role === "receiver") {
+                enviarSinal({ action: "client_ready" });
+                if (!readyInterval) {
+                    readyInterval = setInterval(() => {
+                        if (isAborted || handshakeStarted) return;
+                        if (++tentativasEspera > 120) {
+                            clearInterval(readyInterval);
+                            falhaCritica("O remetente não apareceu. Verifique se o link ainda está válido e recarregue a página.");
+                            return;
+                        }
+                        enviarSinal({ action: "client_ready" });
+                    }, 1000);
+                }
+            }
+            configurarWebRTC();
+        };
+
+        ws.onmessage = async (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                
+                if (msg.room !== roomId) return;
+                if (msg.senderId === myClientId) return;
+                
+                if (msg.action === "client_ready" && role === "sender") {
+                    if (!handshakeStarted) {
+                        handshakeStarted = true;
+                        clearInterval(readyInterval); 
+                        iniciarHandshake();
+                    }
+                } else if (msg.sdp) {
+                    if (msg.sdp.type === 'offer') {
+                        clearInterval(readyInterval);
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        enviarSinal({ sdp: peerConnection.localDescription });
+                    } else if (msg.sdp.type === 'answer') {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                    }
+                } else if (msg.candidate) {
+                    try { await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e){}
+                }
+            } catch (e) { console.error(e); }
+        };
+
+        ws.onerror = () => { if (!isAborted && !transferenciaConcluida) falhaCritica("Não foi possível falar com o servidor de sinalização."); };
+
+        ws.onclose = () => {
+            clearTimeout(signalWatchdog);
+            if (!isAborted && !transferenciaConcluida) falhaCritica("A conexão de sinalização caiu antes da transferência terminar.");
+        };
+    }
+
+    function configurarWebRTC() {
+        peerConnection = new RTCPeerConnection(rtcConfig);
+        peerConnection.onicecandidate = (e) => { if (e.candidate) enviarSinal({ candidate: e.candidate }); };
+
+        peerConnection.oniceconnectionstatechange = () => {
+            const state = peerConnection.iceConnectionState;
+            if (state === "connected" || state === "completed") {
+                document.getElementById('progressBar').classList.remove('connecting');
+                document.getElementById('statusLabel').style.color = "var(--success)";
+                if(role === "sender") document.getElementById('boxShare').classList.add('hidden'); 
+            } else if (["failed", "closed"].includes(state)) {
+                if (!isAborted) falhaCritica("Conexão P2P bloqueada pela rede.");
+            }
+        };
+
+        if (role === "sender") {
+            dataChannel = peerConnection.createDataChannel("fileTransfer", { ordered: true });
+            dataChannel.binaryType = "arraybuffer";
+            dataChannel.bufferedAmountLowThreshold = 256 * 1024;
+            dataChannel.onopen = () => transmitirArquivo();
+        } else {
+            peerConnection.ondatachannel = (event) => {
+                dataChannel = event.channel;
+                dataChannel.binaryType = "arraybuffer";
+                dataChannel.bufferedAmountLowThreshold = 256 * 1024;
+                clearInterval(readyInterval);
+                configurarRecebimento();
+            };
+        }
+    }
+
+    function iniciarHandshake() {
+        document.getElementById('statusLabel').innerText = "Sincronizando chaves...";
+        peerConnection.createOffer()
+            .then(offer => peerConnection.setLocalDescription(offer))
+            .then(() => enviarSinal({ sdp: peerConnection.localDescription }))
+            .catch(() => falhaCritica("Falha ao gerar protocolo P2P."));
+    }
+
+    function enviarSinal(dados) {
+        dados.room = roomId;
+        dados.senderId = myClientId;
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(dados));
+    }
+
+    async function transmitirArquivo() {
+        if(isAborted || !selectedFile) return;
+        clearInterval(readyInterval); 
+
+        const label = document.getElementById('statusLabel');
+        const bar = document.getElementById('progressBar');
+        document.getElementById('progressTitle').innerText = "Enviando Arquivo";
+        label.innerText = "Iniciando stream...";
+        bar.style.width = "0%";
+        
+        dataChannel.send(JSON.stringify({ type: "meta", name: selectedFile.name, size: selectedFile.size }));
+
+        let offset = 0;
+        const SAFE_BUFFER_LIMIT = 1024 * 1024; 
+
+        while (offset < selectedFile.size) {
+            if(isAborted) return;
+            if (dataChannel.bufferedAmount > SAFE_BUFFER_LIMIT) {
+                await new Promise(resolve => {
+                    let liberado = false;
+                    const concluir = () => {
+                        if (liberado) return;
+                        liberado = true;
+                        dataChannel.onbufferedamountlow = null;
+                        clearTimeout(limite);
+                        resolve();
+                    };
+                    // Rede de segurança: nunca esperar para sempre pelo drenar do buffer
+                    const limite = setTimeout(concluir, 5000);
+                    dataChannel.onbufferedamountlow = concluir;
+                });
+            }
+            
+            const slice = selectedFile.slice(offset, offset + CHUNK_SIZE);
+            const buffer = await slice.arrayBuffer();
+            dataChannel.send(buffer);
+            offset += CHUNK_SIZE;
+
+            const percent = Math.min((offset / selectedFile.size) * 100, 100);
+            bar.style.width = `${percent}%`;
+            label.innerText = `${Math.round(percent)}% (${(offset / (1024*1024)).toFixed(1)} MB)`;
+        }
+        
+        dataChannel.send(JSON.stringify({ type: "eof" }));
+        transferenciaConcluida = true;
+        document.getElementById('progressTitle').innerText = "Envio Concluído!";
+        label.innerText = "O destinatário recebeu o arquivo com sucesso.";
+        document.getElementById('btnCancel').innerText = "Voltar ao Início";
+        document.getElementById('btnCancel').classList.replace("btn-danger", "btn");
+        setTimeout(() => { if(ws) ws.close(); }, 2000); 
+    }
+
+    function configurarRecebimento() {
+        clearInterval(readyInterval); 
+        
+        dataChannel.onmessage = async (e) => {
+            if(isAborted) return;
+
+            if (typeof e.data === "string") {
+                const msg = JSON.parse(e.data);
+                if (msg.type === "meta") {
+                    metaData = msg;
+                    const bar = document.getElementById('progressBar');
+                    bar.classList.remove('connecting');
+                    bar.style.width = "0%";
+                    
+                    document.getElementById('progressTitle').innerText = "Baixando Arquivo";
+                    document.getElementById('fileMeta').style.display = "block";
+                    document.getElementById('fileMeta').innerText = `${msg.name} (${(msg.size / (1024*1024)).toFixed(2)} MB)`;
+                    document.getElementById('statusLabel').innerText = "Requisitando permissão de disco...";
+
+                    if (window.showSaveFilePicker && window.isSecureContext) {
+                        try {
+                            const handle = await window.showSaveFilePicker({ suggestedName: metaData.name });
+                            fileWritableStream = await handle.createWritable();
+                            document.getElementById('statusLabel').innerText = "Stream direta ativada (Modo Performance)";
+                        } catch (err) { fileWritableStream = null; }
+                    }
+                } else if (msg.type === "eof") {
+                    transferenciaConcluida = true;
+                    document.getElementById('progressTitle').innerText = "Download Concluído!";
+                    document.getElementById('statusLabel').style.color = "var(--success)";
+                    document.getElementById('btnCancel').innerText = "Voltar ao Início";
+                    document.getElementById('btnCancel').classList.replace("btn-danger", "btn");
+
+                    if (fileWritableStream) {
+                        await fileWritableStream.close();
+                        fileWritableStream = null;
+                        document.getElementById('statusLabel').innerText = "Salvo diretamente no dispositivo.";
+                    } else {
+                        document.getElementById('statusLabel').innerText = "Processando arquivo final...";
+                        const blob = new Blob(receivedChunks, { type: "application/octet-stream" });
+                        const url = URL.createObjectURL(blob);
+                        const btn = document.getElementById('downloadBtn');
+                        
+                        btn.classList.remove('hidden');
+                        document.getElementById('statusLabel').innerText = "Clique acima para salvar.";
+                        btn.onclick = () => {
+                            const a = document.createElement('a'); a.href = url; a.download = metaData.name;
+                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(url), 1000); 
+                        };
+                    }
+                    if(ws) ws.close();
+                }
+            } else {
+                if (!metaData) return;
+                try {
+                    if (fileWritableStream) await fileWritableStream.write(e.data);
+                    else receivedChunks.push(e.data);
+                } catch (err) { falhaCritica("Sem espaço ou permissão no disco."); return; }
+                
+                receivedSize += e.data.byteLength;
+                const percent = Math.min((receivedSize / metaData.size) * 100, 100);
+                document.getElementById('progressBar').style.width = `${percent}%`;
+                document.getElementById('statusLabel').innerText = `${Math.round(percent)}% transferido`;
+            }
+        };
+    }
+
+    function falhaCritica(motivo) {
+        if (isAborted) return;
+        isAborted = true;
+        clearInterval(readyInterval);
+        clearTimeout(signalWatchdog);
+
+        const titulo = document.getElementById('progressTitle');
+        const label = document.getElementById('statusLabel');
+        const bar = document.getElementById('progressBar');
+        if (titulo) { titulo.innerText = "Falha na transferência"; titulo.style.color = "var(--danger)"; }
+        if (label) { label.innerText = motivo; label.style.color = "var(--danger)"; label.style.fontWeight = "600"; }
+        if (bar) { bar.classList.remove('connecting'); bar.style.width = "100%"; bar.style.background = "var(--danger)"; }
+        const btn = document.getElementById('btnCancel');
+        if (btn) { btn.innerText = "Voltar ao Início"; btn.classList.remove('btn-danger'); }
+    }
+
+    function voltarAoInicio() {
+        isAborted = true;
+        clearInterval(readyInterval);
+        clearTimeout(signalWatchdog);
+        if(fileWritableStream) { try { fileWritableStream.close(); } catch(e){} }
+        if(dataChannel) { try { dataChannel.close(); } catch(e){} }
+        if(peerConnection) { try { peerConnection.close(); } catch(e){} }
+        if(ws) ws.close();
+
+        // Caminho relativo: funciona em qualquer domínio e em qualquer pasta
+        window.location.href = window.location.pathname;
+    }
+
+    document.getElementById('btnCancel').onclick = voltarAoInicio;
+</script>
+</body>
+</html>

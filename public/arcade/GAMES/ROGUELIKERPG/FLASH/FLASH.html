@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flash Arcade Hub</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Player de jogos Flash (SWF) no navegador, via Ruffle.">
+    <style>
+        :root {
+            --primary: #ffcc00;
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: white;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 { color: var(--primary); margin-top: 20px; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Container do Player */
+        #game-container {
+            position: relative;
+            width: 95%;
+            max-width: 800px;
+            aspect-ratio: 4 / 3;
+            background: #000;
+            border: 4px solid #333;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+
+        #ruffle-player { width: 100%; height: 100%; }
+
+        .placeholder-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #666;
+        }
+
+        /* Hub de Jogos */
+        .hub {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            width: 95%;
+            max-width: 800px;
+            padding-bottom: 40px;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid #333;
+            text-align: center;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            background: #252525;
+        }
+
+        .game-card img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: #000;
+        }
+
+        .hub-empty {
+            width: 95%;
+            max-width: 800px;
+            margin-bottom: 40px;
+            padding: 24px;
+            border: 1px dashed #333;
+            border-radius: 8px;
+            color: #888;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            text-align: center;
+        }
+
+        .hub-empty code {
+            background: #000;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--primary);
+            font-size: 0.85em;
+        }
+
+        /* Controles Mobile */
+        .mobile-controls {
+            display: none; /* Escondido no PC */
+            grid-template-areas: 
+                ". up ."
+                "left down right"
+                "a . space";
+            gap: 10px;
+            margin-bottom: 20px;
+            user-select: none;
+        }
+
+        .btn {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            touch-action: manipulation;
+        }
+
+        .btn:active { background: var(--primary); color: black; }
+
+        /* Mostrar controles apenas em telas touch/pequenas */
+        @media (max-width: 768px) {
+            .mobile-controls { display: grid; }
+            h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+
+    <h1>🕹️ Flash Game Hub</h1>
+
+    <div id="game-container">
+        <div id="ruffle-player">
+            <div class="placeholder-text">
+                <p>Escolha um jogo abaixo</p>
+                <small>(Pode levar alguns segundos para carregar)</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="mobile-controls">
+        <div class="btn" style="grid-area: up" id="key-38">▲</div>
+        <div class="btn" style="grid-area: left" id="key-37">◀</div>
+        <div class="btn" style="grid-area: down" id="key-40">▼</div>
+        <div class="btn" style="grid-area: right" id="key-39">▶</div>
+        <div class="btn" style="grid-area: space; border-radius: 10px; width: 80px;" id="key-32">SPACE</div>
+        <div class="btn" style="grid-area: a; background: #ff4444;" id="key-13">ENT</div>
+    </div>
+
+    <div class="hub-empty">
+        <p>Nenhum jogo carregado.</p>
+        <p>Coloque os arquivos <code>.swf</code> nesta pasta e registre cada um com
+           <code>loadGame('nome-do-arquivo.swf')</code> no bloco <code>.hub</code>.</p>
+    </div>
+
+    <script src="https://unpkg.com/@ruffle-rs/ruffle@0.7.1"></script>
+
+    <script>
+        window.RufflePlayer = window.RufflePlayer || {};
+        let rufflePlayerInstance;
+
+        // Função para carregar o jogo
+        function loadGame(swfFile) {
+            const container = document.getElementById("ruffle-player");
+            container.innerHTML = ""; // Limpa o player atual
+
+            const ruffle = window.RufflePlayer.newest();
+            rufflePlayerInstance = ruffle.createPlayer();
+            container.appendChild(rufflePlayerInstance);
+
+            rufflePlayerInstance.load({
+                url: swfFile,
+                allowScriptAccess: false,
+            });
+            
+            // Rolar para o topo suavemente ao clicar no jogo
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Lógica de simulação de teclado para Mobile
+        function simulateKey(code, type) {
+            const mapa = {
+                37: ['ArrowLeft', 'ArrowLeft'],
+                38: ['ArrowUp', 'ArrowUp'],
+                39: ['ArrowRight', 'ArrowRight'],
+                40: ['ArrowDown', 'ArrowDown'],
+                32: [' ', 'Space'],
+                13: ['Enter', 'Enter']
+            };
+            const par = mapa[code] || ['', ''];
+            const event = new KeyboardEvent(type, {
+                key: par[0],
+                code: par[1],
+                keyCode: code,
+                which: code,
+                bubbles: true,
+                cancelable: true
+            });
+            // Dispara no próprio player: o Ruffle escuta no elemento dele, não no document
+            (rufflePlayerInstance || document).dispatchEvent(event);
+        }
+
+        // Mapear eventos de toque nos botões virtuais
+        document.querySelectorAll('.btn').forEach(button => {
+            const keyCode = parseInt(button.id.replace('key-', ''));
+            
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                simulateKey(keyCode, 'keydown');
+            });
+
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                simulateKey(keyCode, 'keyup');
+            });
+        });
+    </script>
+</body>
+</html>

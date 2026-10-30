@@ -1,0 +1,11 @@
+# Export limpo para deploy (git archive / ZIP)
+# Pastas de artefatos e ferramentas locais não vão no pacote de deploy.
+.zscripts/ export-ignore
+download/ export-ignore
+examples/ export-ignore
+mini-services/ export-ignore
+scripts/ export-ignore
+tests/ export-ignore
+tool-results/ export-ignore
+worklog.md export-ignore
+.env export-ignore

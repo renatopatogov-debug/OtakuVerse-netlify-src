@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROTOCOLO SPYFALL — CLASSIFIED</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Spyfall: jogo de dedução social para grupos, com locais, profissões e objetos secretos.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Special+Elite&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-desk: #1e1e1e;
+            --paper: #f2edd8;
+            --paper-alt: #ede8d0;
+            --ink: #1e1e1e;
+            --ink-light: #555;
+            --accent: #b91d1d;
+            --accent-dark: #8a1515;
+            --highlight: #e8dcb5;
+            --shadow: rgba(0,0,0,0.35);
+            --font-typewriter: 'Special Elite', monospace;
+            --font-stamp: 'Black Ops One', cursive;
+            --line: #c8c0a0;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-desk);
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(40,40,40,0.8) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(30,30,30,0.8) 0%, transparent 50%),
+                repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.03) 39px, rgba(255,255,255,0.03) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.03) 39px, rgba(255,255,255,0.03) 40px);
+            color: var(--ink);
+            font-family: var(--font-typewriter);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px 10px 40px;
+        }
+
+        /* Pasta/Documento principal */
+        #app {
+            background-color: var(--paper);
+            width: 100%;
+            max-width: 480px;
+            padding: 2.5rem 2.2rem 2rem;
+            position: relative;
+            box-shadow: 
+                0 1px 1px rgba(0,0,0,0.12),
+                0 12px 0 -6px #e4dfcc,
+                0 12px 1px -5px rgba(0,0,0,0.18),
+                0 24px 0 -12px #d9d4c0,
+                0 24px 1px -11px rgba(0,0,0,0.18),
+                8px 8px 30px 4px rgba(0,0,0,0.55);
+            border: 1px solid #ccc5a8;
+            transform: rotate(-0.3deg);
+        }
+
+        /* Faixa lateral esquerda estilo caderno */
+        #app::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 38px;
+            width: 1px; height: 100%;
+            background: rgba(185,29,29,0.35);
+            pointer-events: none;
+        }
+
+        /* Clipe de papel — via SVG inline no HTML */
+        #app::before { content: none; }
+
+        .paperclip {
+            position: absolute;
+            top: -22px;
+            right: 52px;
+            z-index: 20;
+            filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.4));
+            pointer-events: none;
+        }
+
+        /* Linhas pautadas de fundo */
+        .ruled-bg {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: repeating-linear-gradient(
+                transparent, transparent 27px,
+                rgba(180,170,140,0.25) 27px, rgba(180,170,140,0.25) 28px
+            );
+            pointer-events: none;
+            border-radius: inherit;
+        }
+
+        /* ── HEADER ── */
+        .header-block {
+            text-align: center;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 3px double var(--ink);
+            position: relative;
+        }
+        .header-eyebrow {
+            font-size: 0.6rem;
+            letter-spacing: 4px;
+            opacity: 0.5;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 4px;
+        }
+        h1 {
+            font-family: var(--font-stamp);
+            color: var(--ink);
+            font-size: 1.9rem;
+            margin: 0 0 6px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+        .header-sub {
+            font-size: 0.65rem;
+            letter-spacing: 3px;
+            opacity: 0.45;
+            display: block;
+        }
+
+        /* ── STAMP ── */
+        .stamp-box {
+            border: 3px solid var(--accent);
+            color: var(--accent);
+            font-family: var(--font-stamp);
+            padding: 5px 14px;
+            text-transform: uppercase;
+            display: inline-block;
+            transform: rotate(-2.5deg);
+            opacity: 0.85;
+            letter-spacing: 2px;
+            font-size: 0.9rem;
+            mix-blend-mode: multiply;
+            text-shadow: 0 0 8px rgba(185,29,29,0.2);
+        }
+
+        /* ── LABELS ── */
+        .label-small {
+            font-size: 0.62rem;
+            letter-spacing: 2px;
+            display: block;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: bold;
+            opacity: 0.55;
+            font-family: var(--font-typewriter);
+        }
+
+        /* ── GERAL ── */
+        .section { margin-bottom: 22px; }
+        .hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.35s ease-out; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px) rotate(-0.3deg); }
+            to   { opacity: 1; transform: translateY(0) rotate(0deg); }
+        }
+
+        /* ── LISTA DE JOGADORES ── */
+        .player-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .player-num {
+            font-family: var(--font-stamp);
+            font-size: 0.75rem;
+            opacity: 0.4;
+            min-width: 20px;
+        }
+
+        input[type="text"], input[type="number"] {
+            border: none;
+            border-bottom: 2px dotted rgba(0,0,0,0.3);
+            background: transparent;
+            font-family: var(--font-typewriter);
+            padding: 7px 4px;
+            font-size: 0.95rem;
+            color: var(--ink);
+            flex-grow: 1;
+            transition: all 0.2s;
+        }
+        input:focus {
+            outline: none;
+            background: rgba(0,0,0,0.04);
+            border-bottom: 2px solid var(--ink);
+        }
+        input[type="number"] { text-align: center; }
+
+        /* ── BOTÕES ── */
+        button {
+            background: transparent;
+            border: 1.5px solid var(--ink);
+            color: var(--ink);
+            cursor: pointer;
+            font-family: var(--font-typewriter);
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            transition: all 0.18s;
+            text-transform: uppercase;
+            position: relative;
+        }
+        button:hover {
+            background: var(--ink);
+            color: var(--paper);
+        }
+        button:active { transform: scale(0.97); }
+
+        .btn-remove {
+            border: none;
+            font-size: 1.1rem;
+            color: rgba(185,29,29,0.6);
+            padding: 0 8px;
+            line-height: 1;
+            min-width: 28px;
+        }
+        .btn-remove:hover {
+            background: transparent;
+            color: var(--accent);
+            transform: scale(1.2);
+        }
+
+        .btn-add {
+            width: 100%;
+            border-style: dashed;
+            border-color: var(--ink-light);
+            color: var(--ink-light);
+            font-size: 0.8rem;
+            padding: 9px;
+            margin-top: 4px;
+        }
+        .btn-add:hover { border-color: var(--ink); color: var(--ink); background: transparent; }
+
+        /* ── MODOS ── */
+        .mode-container {
+            background: var(--paper-alt);
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 2px,
+                transparent 2px, transparent 8px
+            );
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--ink);
+            margin: 18px 0;
+        }
+        .mode-row {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .mode-btn {
+            flex: 1;
+            opacity: 0.5;
+            border: 1px dashed var(--ink-light);
+            font-size: 0.72rem;
+            padding: 8px 4px;
+            letter-spacing: 1px;
+            color: var(--ink-light);
+        }
+        .mode-btn.active {
+            opacity: 1;
+            border: 2px solid var(--ink);
+            background: var(--ink);
+            color: var(--paper);
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.25);
+        }
+        .mode-btn:hover:not(.active) {
+            background: transparent;
+            color: var(--ink);
+            opacity: 0.8;
+        }
+
+        /* ── CONFIG GRID ── */
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+            border-top: 1px solid var(--line);
+            padding-top: 16px;
+            align-items: end;
+        }
+
+        /* ── CHECKBOX ── */
+        .checkbox-wrapper input { display: none; }
+        .checkbox-wrapper label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .checkbox-wrapper label::before {
+            content: "";
+            display: inline-block;
+            width: 15px; height: 15px;
+            border: 2px solid var(--ink);
+            margin-right: 8px;
+            transition: all 0.18s;
+            flex-shrink: 0;
+        }
+        .checkbox-wrapper input:checked + label::before {
+            background-color: var(--ink);
+            box-shadow: inset 0 0 0 3px var(--paper);
+        }
+
+        /* ── BOTÃO PRINCIPAL ── */
+        .btn-main {
+            width: 100%;
+            padding: 14px;
+            margin-top: 22px;
+            border: 2.5px solid var(--ink);
+            font-size: 1rem;
+            letter-spacing: 3px;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 5px,
+                rgba(0,0,0,0.025) 5px,
+                rgba(0,0,0,0.025) 10px
+            );
+        }
+        .btn-main:hover { background: var(--ink); color: var(--paper); }
+
+        /* ── CARTÃO DE REVELAÇÃO ── */
+        .card {
+            border: 2px dashed var(--line);
+            padding: 28px 18px;
+            text-align: center;
+            margin: 18px 0;
+            background: #fffcf0;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+        .card.revealed {
+            border-color: var(--ink);
+            border-style: solid;
+        }
+
+        /* Marca d'água CONFIDENTIAL */
+        .card::after {
+            content: "CONFIDENTIAL";
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-20deg);
+            font-family: var(--font-stamp);
+            font-size: 2.6rem;
+            color: rgba(0,0,0,0.04);
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 0;
+            letter-spacing: 3px;
+        }
+
+        .role-val {
+            font-size: 1.7rem;
+            font-weight: bold;
+            margin: 14px 0;
+            text-transform: uppercase;
+            padding: 10px 14px;
+            background: #1a1a1a;
+            color: #1a1a1a;
+            transition: color 0.45s, background 0.45s;
+            user-select: none;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 2px;
+            cursor: default;
+        }
+        .revealed .role-val {
+            background: transparent;
+            color: var(--accent);
+            text-decoration: underline;
+            text-decoration-style: wavy;
+            text-underline-offset: 4px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 14px;
+            font-size: 1rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            position: relative;
+            z-index: 1;
+            margin-top: 8px;
+        }
+
+        .reveal-btn-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            border-style: dashed;
+            border-color: var(--line);
+            padding: 22px;
+            color: var(--ink-light);
+        }
+        .reveal-icon { font-size: 2rem; line-height: 1; }
+        .reveal-btn-inner:hover { border-color: var(--ink); color: var(--ink); background: transparent; }
+
+        /* ── NOME ATUAL ── */
+        .current-name-box {
+            text-align: center;
+            margin-bottom: 18px;
+            padding: 12px;
+            border: 1px solid var(--line);
+            background: var(--paper-alt);
+        }
+
+        /* ── TIMER ── */
+        #hourglass-canvas {
+            display: block;
+            margin: 0 auto;
+            image-rendering: pixelated;
+            opacity: 0.85;
+        }
+        #timer-display {
+            font-family: var(--font-stamp);
+            font-size: 2.8rem;
+            text-align: center;
+            margin-top: 8px;
+            color: var(--ink);
+            letter-spacing: 4px;
+            transition: color 0.3s;
+        }
+        .timer-wrapper {
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--line);
+            background: var(--paper-alt);
+            margin-bottom: 16px;
+        }
+
+        /* ── LISTA DE ITENS ── */
+        .item-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3px 10px;
+            font-size: 0.77rem;
+            border: 1.5px solid var(--ink);
+            padding: 14px;
+            max-height: 230px;
+            overflow-y: auto;
+            background: #fff;
+            scrollbar-width: thin;
+            scrollbar-color: var(--ink) transparent;
+        }
+        .item-grid::-webkit-scrollbar { width: 5px; }
+        .item-grid::-webkit-scrollbar-thumb { background: var(--ink-light); }
+        .item-grid div {
+            padding: 4px 2px;
+            border-bottom: 1px dotted #ddd;
+            cursor: pointer;
+            transition: color 0.15s;
+            line-height: 1.3;
+        }
+        .item-grid div:hover { background: rgba(0,0,0,0.04); }
+        .crossed { text-decoration: line-through; color: #aaa !important; }
+
+        /* ── RELATÓRIO FINAL ── */
+        .results-box {
+            border: 4px double var(--accent);
+            padding: 22px 18px;
+            margin-top: 22px;
+            background: rgba(185,29,29,0.04);
+            text-align: center;
+        }
+        .final-secret-val {
+            font-size: 1.6rem;
+            font-weight: bold;
+            font-family: var(--font-stamp);
+            letter-spacing: 2px;
+            color: var(--accent);
+            margin: 8px 0 20px;
+        }
+        .spy-name {
+            font-family: var(--font-stamp);
+            font-size: 1.2rem;
+            color: var(--accent);
+            display: block;
+            margin-top: 6px;
+            letter-spacing: 2px;
+        }
+
+        /* ── DIVISORES ── */
+        .divider {
+            border: none;
+            border-top: 1px dashed var(--line);
+            margin: 18px 0;
+        }
+
+        /* ── TOGGLE LIST BTN ── */
+        .btn-toggle-list {
+            border: none;
+            background: none;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            display: block;
+            margin: 14px auto;
+            font-size: 0.77rem;
+            color: var(--ink-light);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 4px 8px;
+        }
+        .btn-toggle-list:hover { background: none; color: var(--ink); }
+
+        /* ── BTN ENCERRAR ── */
+        .btn-end {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .btn-end:hover { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+
+        /* ── NOTA DE RODAPÉ ── */
+        .memo-note {
+            text-align: center;
+            font-size: 0.72rem;
+            font-style: italic;
+            opacity: 0.55;
+            margin: 8px 0 0;
+        }
+
+        /* ── CONTAGEM DE ITENS ── */
+        .mode-count {
+            font-size: 0.6rem;
+            opacity: 0.5;
+            letter-spacing: 1px;
+            display: block;
+            text-align: center;
+            margin-top: 6px;
+        }
+
+        /* ── BARRA DE PROGRESSO (timer) ── */
+        .timer-bar-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(0,0,0,0.1);
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .timer-bar {
+            height: 100%;
+            background: var(--ink);
+            transition: width 1s linear, background 0.3s;
+        }
+
+        /* ── SCROLL ESTILIZADO ── */
+        html { scroll-behavior: smooth; }
+
+        @media (max-width: 420px) {
+            #app { padding: 1.8rem 1.4rem 1.6rem; }
+            h1 { font-size: 1.5rem; }
+            .config-grid { grid-template-columns: 1fr 1fr; }
+            .config-grid > div:last-child { grid-column: span 2; }
+        }
+    </style>
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+
+<div id="app">
+    <div class="ruled-bg"></div>
+
+    <!-- Clipe de papel SVG -->
+    <svg class="paperclip" width="28" height="80" viewBox="0 0 28 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 72 C8 76 20 76 20 72 L20 16 C20 8 8 8 8 16 L8 68 C8 70 10 72 14 72 C18 72 20 70 20 68 L20 20"
+              stroke="#3a3a3a" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    </svg>
+
+    <div class="header-block">
+        <span class="header-eyebrow">DOCUMENTO CLASSIFICADO — USO INTERNO</span>
+        <h1>Spyfall</h1>
+        <span class="header-sub">PROTOCOLO DE INFILTRAÇÃO v2.0</span>
+    </div>
+
+    <!-- ══ TELA DE CONFIGURAÇÃO ══ -->
+    <div id="setupView" class="fade-in">
+        <span class="label-small">Lista de Agentes:</span>
+        <div id="playerList" class="section"></div>
+        <button class="btn-add" onclick="addPlayer()">+ Adicionar Agente</button>
+
+        <div class="mode-container">
+            <span class="label-small" style="text-align: center;">Modo da Missão:</span>
+            <div class="mode-row">
+                <button class="mode-btn active" id="modeLoc" onclick="setMode('loc')">Locais</button>
+                <button class="mode-btn" id="modeProf" onclick="setMode('prof')">Profissões</button>
+                <button class="mode-btn" id="modeObj" onclick="setMode('obj')">Objetos</button>
+            </div>
+            <span class="mode-count" id="modeCountLabel"></span>
+        </div>
+
+        <div class="config-grid">
+            <div class="checkbox-wrapper">
+                <span class="label-small">Timer</span>
+                <input type="checkbox" id="enableTimerCheck" checked onchange="toggleTimerInput(this.checked)">
+                <label for="enableTimerCheck">Ativo</label>
+            </div>
+            <div id="timerMinBox">
+                <span class="label-small">Tempo (min)</span>
+                <input type="number" id="timerMin" value="8" min="1" max="30" style="width: 100%;">
+            </div>
+            <div>
+                <span class="label-small">Nº Espiões</span>
+                <input type="number" id="spyCount" value="1" min="1" style="width: 100%;">
+            </div>
+        </div>
+
+        <button class="btn-main" onclick="initGame()">▶ Iniciar Protocolo</button>
+    </div>
+
+    <!-- ══ TELA DE DISTRIBUIÇÃO DE CARTAS ══ -->
+    <div id="gameView" class="hidden fade-in">
+        <div class="current-name-box">
+            <span class="label-small">Identificação Requerida:</span>
+            <div id="currentName" style="font-size: 1.7rem; font-weight: bold; font-family: var(--font-stamp); letter-spacing: 2px;">—</div>
+            <div id="turnCounter" style="font-size: 0.65rem; opacity: 0.45; margin-top: 4px; letter-spacing: 2px;"></div>
+        </div>
+
+        <div class="card" id="mainCard">
+            <div id="secretContent" class="hidden">
+                <span class="label-small" id="secretTitle">Dado Confidencial:</span>
+                <div id="secretVal" class="role-val">—</div>
+                <hr class="divider" style="margin: 10px 0 8px;">
+                <span class="label-small">Classificação:</span>
+                <div id="statusVal" class="status-badge">—</div>
+            </div>
+            <button id="revealBtn" onclick="toggleSecret()" class="reveal-btn-inner" style="width:100%;">
+                <span class="reveal-icon">☝</span>
+                <span style="font-size: 0.85rem; letter-spacing: 2px;">Toque para Revelar</span>
+            </button>
+        </div>
+
+        <p class="memo-note">Memorize e destrua após a leitura.</p>
+        <button class="btn-main" onclick="nextTurn()">Confirmar e Passar →</button>
+    </div>
+
+    <!-- ══ TELA DE INTERROGATÓRIO ══ -->
+    <div id="interrogationView" class="hidden fade-in">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div class="stamp-box">Interrogatório em Progresso</div>
+        </div>
+
+        <div id="timerElements" class="timer-wrapper">
+            <span class="label-small" style="text-align:center; margin-bottom: 10px;">Tempo Restante</span>
+            <canvas id="hourglass-canvas" width="60" height="90"></canvas>
+            <div id="timer-display">00:00</div>
+            <div class="timer-bar-container">
+                <div class="timer-bar" id="timerBar"></div>
+            </div>
+        </div>
+        <div id="noTimerLabel" class="hidden" style="text-align: center; font-weight: bold; margin: 28px 0; letter-spacing: 2px; font-size: 1rem; opacity: 0.7;">— INTERROGATÓRIO LIVRE —</div>
+
+        <button class="btn-toggle-list" onclick="toggleList()">[ Abrir Dossiê de Possibilidades ]</button>
+        <div id="masterList" class="item-grid hidden"></div>
+
+        <hr class="divider" style="margin: 24px 0 18px;">
+        <button class="btn-main btn-end" onclick="showFinalReport()">Encerrar Missão</button>
+    </div>
+
+    <!-- ══ TELA DE RELATÓRIO FINAL ══ -->
+    <div id="reportView" class="hidden fade-in">
+        <div class="header-block" style="border-color: var(--accent);">
+            <span class="header-eyebrow" style="color: var(--accent);">Missão Concluída</span>
+            <h1 style="color: var(--accent);">Relatório Final</h1>
+        </div>
+
+        <div class="results-box">
+            <span class="label-small">Local / Objeto / Profissão Real:</span>
+            <div class="final-secret-val" id="finalSecret">—</div>
+
+            <hr class="divider" style="border-color: rgba(185,29,29,0.3);">
+            <span class="label-small">Agentes Duplos Detectados:</span>
+            <div id="finalSpies">—</div>
+        </div>
+
+        <button class="btn-main" onclick="initGame()" style="margin-top: 22px;">↺ Nova Operação</button>
+        <button onclick="location.reload()" style="width:100%; border:none; margin-top:14px; font-size: 0.7rem; text-decoration:underline; opacity: 0.4; padding: 6px;">Voltar ao Menu Principal</button>
+    </div>
+</div>
+
+<script>
+    const data = {
+        loc: [
+            /* Infraestrutura */
+            "Aeroporto", "Estação de Metrô", "Porto", "Estação Ferroviária", "Rodoviária",
+            "Posto de Gasolina", "Garagem", "Oficina Mecânica", "Estacionamento", "Pedágio",
+            /* Entretenimento */
+            "Cinema", "Teatro", "Cassino", "Circo", "Zoológico", "Aquário", "Parque de Diversões",
+            "Sala de Escape", "Museu", "Galeria de Arte", "Estúdio de TV", "Arena de Esportes",
+            "Estádio", "Boliche", "Parque de Skate", "Kartodromo",
+            /* Comércio */
+            "Supermercado", "Shopping", "Mercado Municipal", "Farmácia", "Livraria",
+            "Joalheria", "Loja de Armas", "Leilão", "Feira de Antiguidades",
+            /* Educação e Cultura */
+            "Escola", "Universidade", "Biblioteca", "Laboratório", "Observatório Astronômico",
+            /* Saúde e Bem‑estar */
+            "Hospital", "Clínica Veterinária", "Spa", "Academia", "Asilo",
+            /* Religião */
+            "Igreja", "Catedral", "Templo", "Mesquita", "Sinagoga",
+            /* Gastronomia */
+            "Restaurante", "Padaria", "Bar", "Churrascaria", "Sushi Bar", "Cafeteria",
+            /* Hospedagem */
+            "Hotel", "Hostel", "Motel", "Acampamento",
+            /* Segurança / Estado */
+            "Delegacia", "Tribunal", "Presídio", "Quartel", "Base Militar",
+            "Embaixada", "Câmara Municipal", "Palácio do Governo",
+            /* Natureza / Ambientes externos */
+            "Praia", "Montanha", "Floresta Tropical", "Deserto", "Caverna",
+            "Ilha Particular", "Parque Nacional", "Fazenda", "Vinícola", "Cachoeira",
+            /* Indústria */
+            "Fábrica", "Refinaria", "Usina Nuclear", "Usina Hidrelétrica", "Mina de Carvão",
+            "Plataforma de Petróleo",
+            /* Especiais / Temáticos */
+            "Estação Espacial", "Submarino", "Navio Pirata", "Navio de Cruzeiro",
+            "Base Antártica", "Bunker Subterrâneo", "Castelo Medieval",
+            "Saloon do Velho Oeste", "Pirâmide", "Cemitério", "Estúdio de Cinema",
+            "Mansão Abandonada", "Cartório", "Estação Meteorológica"
+        ],
+        prof: [
+            /* Saúde */
+            "Médico", "Cirurgião", "Enfermeiro", "Dentista", "Veterinário",
+            "Farmacêutico", "Psicólogo", "Paramédico", "Fisioterapeuta",
+            /* Jurídico e segurança */
+            "Advogado", "Juiz", "Detetive", "Delegado", "Agente da CIA",
+            "Bombeiro", "Segurança", "Guarda Costas", "Hacker Ético", "Espião",
+            /* Ciência e Tecnologia */
+            "Cientista", "Astronauta", "Engenheiro", "Programador", "Arquiteto",
+            "Eletricista", "Encanador", "Arqueólogo", "Geólogo", "Físico Nuclear",
+            /* Comunicação e Arte */
+            "Ator", "Dançarino", "Músico", "Fotógrafo", "Jornalista",
+            "Escritor", "Dublador", "Designer", "Cinegrafista", "Estilista",
+            "Mágico", "Palhaço", "Tatuador", "Animador", "Influenciador Digital",
+            /* Serviços */
+            "Cozinheiro", "Garçom", "Taxista", "Piloto", "Marinheiro",
+            "Carteiro", "Bibliotecário", "Barbeiro", "Lixeiro", "Tradutor",
+            "Mecânico", "Motorista de Ônibus",
+            /* Política e Religião */
+            "Político", "Diplomata", "Padre", "Pastor", "Monge",
+            /* Esportes */
+            "Atleta Olímpico", "Árbitro de Futebol", "Personal Trainer", "Lutador de MMA",
+            "Piloto de Fórmula 1", "Mergulhador Profissional", "Alpinista",
+            /* Inusitados */
+            "Taxidermista", "Sommelier", "Caçador de Recompensas", "Malabarista",
+            "Controlador de Tráfego Aéreo", "Perfumista", "Pirotécnico",
+            "Criptógrafo", "Fonoaudiólogo", "Vidraceiro", "Coveiro"
+        ],
+        obj: [
+            /* Clássicos / Espião */
+            "Câmera Fotográfica", "Relógio de Bolso", "Guarda-chuva", "Maleta de Couro",
+            "Óculos Escuros", "Binóculos", "Lupa", "Bússola", "Caneta Tinteiro",
+            "Máquina de Escrever", "Rádio Amador", "Microfone Oculto", "Diário Trancado",
+            "Chave Mestra", "Isqueiro Zippo", "Mapas Antigos", "Cadeado",
+            /* Eletrônicos / Modernos */
+            "Calculadora Científica", "Relógio de Pulso", "Walkman", "Câmera de Segurança",
+            "Drone", "Pen Drive Criptografado", "Tablet Blindado", "GPS Portátil",
+            /* Instrumentos e Arte */
+            "Violino", "Harpa", "Telescópio", "Globo Terrestre", "Pintura em Tela",
+            "Escultura de Bronze", "Câmera de Filme Super 8",
+            /* Documentos e Papelaria */
+            "Passaporte Falso", "Contrato Misterioso", "Envelope Lacrado",
+            "Mapa do Tesouro", "Carimbo Oficial", "Diapositivo Projetado",
+            /* Armas e Segurança */
+            "Coldre de Couro", "Canivete Suíço", "Máscara de Gás", "Colete à Prova de Balas",
+            "Algemas", "Granadas de Fumaça",
+            /* Objetos do Cotidiano com Toque Misterioso */
+            "Garrafa de Vinho", "Baralho Marcado", "Troféu Misterioso", "Moeda Rara",
+            "Seringa Hipodérmica", "Caixa de Música", "Relógio de Areia",
+            "Chapéu de Abas Largas", "Guarda-luvas de Couro", "Bengala com Espada",
+            /* Curiosidades */
+            "Cachimbo", "Pergaminho Enrollado", "Fita Cassete", "Espada Decorativa",
+            "Livro com Páginas Cortadas", "Luneta de Pirata", "Cofre Portátil",
+            "Veneno em Frasco", "Chave de Cofre Numerada", "Megafone"
+        ]
+    };
+
+    let players = ["Agente Alfa", "Agente Bravo", "Agente Charlie", "Agente Delta"];
+    let mode = 'loc';
+    let state = {
+        secret: "", spies: [], index: 0,
+        timeRemaining: 0, totalTime: 0,
+        timerId: null, timerEnabled: true
+    };
+
+    // ── AMPULHETA PIXEL ART ──
+    const canvas = document.getElementById('hourglass-canvas');
+    const ctx = canvas.getContext('2d');
+    const scale = 3;
+
+    function drawHourglass() {
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = "#2b2b2b";
+
+        ctx.fillRect(2, 2, 16, 2);
+        ctx.fillRect(2, 26, 16, 2);
+        ctx.fillRect(4, 4, 2, 7);
+        ctx.fillRect(14, 4, 2, 7);
+        ctx.fillRect(4, 19, 2, 7);
+        ctx.fillRect(14, 19, 2, 7);
+        ctx.fillRect(6, 11, 2, 2);
+        ctx.fillRect(12, 11, 2, 2);
+        ctx.fillRect(8, 13, 4, 4);
+        ctx.fillRect(6, 17, 2, 2);
+        ctx.fillRect(12, 17, 2, 2);
+
+        if (state.totalTime === 0) return;
+
+        const maxGrains = 18;
+        const percent = state.timeRemaining / state.totalTime;
+        const grainsTop = Math.ceil(percent * maxGrains);
+        const grainsBot = maxGrains - grainsTop;
+
+        const slotsTop = [
+            {x:6,y:9},{x:8,y:9},{x:10,y:9},{x:12,y:9},
+            {x:6,y:7},{x:8,y:7},{x:10,y:7},{x:12,y:7},
+            {x:6,y:5},{x:8,y:5},{x:10,y:5},{x:12,y:5},
+            {x:8,y:3},{x:10,y:3}
+        ];
+        const slotsBot = [
+            {x:6,y:24},{x:8,y:24},{x:10,y:24},{x:12,y:24},
+            {x:6,y:22},{x:8,y:22},{x:10,y:22},{x:12,y:22},
+            {x:8,y:20},{x:10,y:20},
+            {x:8,y:18},{x:10,y:18}
+        ];
+
+        for (let i = 0; i < grainsTop && i < slotsTop.length; i++) drawSandGrain(slotsTop[i].x, slotsTop[i].y);
+        for (let i = 0; i < grainsBot && i < slotsBot.length; i++) drawSandGrain(slotsBot[i].x, slotsBot[i].y);
+
+        if (state.timeRemaining > 0 && state.timerEnabled) {
+            const frame = Math.floor(Date.now() / 150) % 3;
+            const dropY = 13 + (frame * 3);
+            if (dropY < 20) ctx.fillRect(9, dropY, 2, 2);
+        }
+    }
+    function drawSandGrain(x, y) { ctx.fillRect(x, y, 2, 2); }
+
+    // ── UI ──
+    function renderPlayers() {
+        const container = document.getElementById('playerList');
+        container.innerHTML = "";
+        players.forEach((name, i) => {
+            const row = document.createElement('div');
+            row.className = 'player-row';
+            row.innerHTML = `
+                <span class="player-num">${String(i+1).padStart(2,'0')}.</span>
+                <input type="text" value="${name}" onchange="players[${i}] = this.value">
+                <button class="btn-remove" onclick="removePlayer(${i})" title="Remover">×</button>`;
+            container.appendChild(row);
+        });
+    }
+
+    function addPlayer() {
+        const names = ["Echo","Foxtrot","Golf","Hotel","India","Juliet","Kilo","Lima","Mike","November"];
+        players.push(`Agente ${names[players.length - 4] || players.length + 1}`);
+        renderPlayers();
+    }
+
+    function removePlayer(i) {
+        if (players.length > 3) { players.splice(i, 1); renderPlayers(); }
+        else alert("Missão requer no mínimo 3 agentes.");
+    }
+
+    function setMode(m) {
+        mode = m;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        const id = 'mode' + m.charAt(0).toUpperCase() + m.slice(1);
+        document.getElementById(id).classList.add('active');
+        updateModeCount();
+    }
+
+    function updateModeCount() {
+        const count = data[mode].length;
+        const labels = {loc: 'locais', prof: 'profissões', obj: 'objetos'};
+        document.getElementById('modeCountLabel').textContent = `${count} ${labels[mode]} disponíveis`;
+    }
+
+    function toggleTimerInput(checked) {
+        document.getElementById('timerMinBox').style.opacity = checked ? '1' : '0.3';
+        document.getElementById('timerMinBox').style.pointerEvents = checked ? 'auto' : 'none';
+    }
+
+    function initGame() {
+        const spyCount = parseInt(document.getElementById('spyCount').value);
+        if (spyCount >= players.length) return alert("ERRO CRÍTICO: Número de espiões maior ou igual ao número de agentes.");
+
+        state.timerEnabled = document.getElementById('enableTimerCheck').checked;
+        const pool = data[mode];
+        state.secret = pool[Math.floor(Math.random() * pool.length)];
+        state.spies = [];
+        state.index = 0;
+        state.totalTime = parseInt(document.getElementById('timerMin').value) * 60;
+        state.timeRemaining = state.totalTime;
+        clearInterval(state.timerId);
+
+        let indices = [...Array(players.length).keys()];
+        for (let i = 0; i < spyCount; i++)
+            state.spies.push(indices.splice(Math.floor(Math.random() * indices.length), 1)[0]);
+
+        switchView('gameView');
+
+        const listDiv = document.getElementById('masterList');
+        listDiv.innerHTML = "";
+        [...pool].sort().forEach(item => {
+            const el = document.createElement('div');
+            el.textContent = "☐ " + item;
+            el.onclick = () => {
+                el.classList.toggle('crossed');
+                el.textContent = el.classList.contains('crossed')
+                    ? "☑ " + item : "☐ " + item;
+            };
+            listDiv.appendChild(el);
+        });
+
+        startTurn();
+    }
+
+    function switchView(viewId) {
+        document.querySelectorAll('#app > div:not(.ruled-bg):not(.header-block)').forEach(el => {
+            if (el.tagName === 'DIV') el.classList.add('hidden');
+        });
+        // More robust: show by id
+        ['setupView','gameView','interrogationView','reportView'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        const target = document.getElementById(viewId);
+        if (target) {
+            target.classList.remove('hidden');
+            target.classList.remove('fade-in');
+            void target.offsetWidth;
+            target.classList.add('fade-in');
+        }
+    }
+
+    function startTurn() {
+        document.getElementById('secretContent').classList.add('hidden');
+        document.getElementById('revealBtn').classList.remove('hidden');
+        document.getElementById('mainCard').classList.remove('revealed');
+        document.getElementById('currentName').textContent = players[state.index];
+        document.getElementById('turnCounter').textContent =
+            `Agente ${state.index + 1} de ${players.length}`;
+        const titles = { loc: "Localização Secreta:", prof: "Profissão Secreta:", obj: "Objeto Secreto:" };
+        document.getElementById('secretTitle').textContent = titles[mode];
+    }
+
+    function toggleSecret() {
+        const isSpy = state.spies.includes(state.index);
+        document.getElementById('secretVal').textContent = isSpy ? "???" : state.secret;
+        const statusEl = document.getElementById('statusVal');
+        if (isSpy) {
+            statusEl.textContent = "⚠ AGENTE INIMIGO";
+            statusEl.style.color = 'var(--accent)';
+            statusEl.style.border = '2px solid var(--accent)';
+        } else {
+            statusEl.textContent = "✓ AGENTE LEAL";
+            statusEl.style.color = 'var(--ink)';
+            statusEl.style.border = '2px solid var(--ink)';
+        }
+        document.getElementById('secretContent').classList.remove('hidden');
+        document.getElementById('revealBtn').classList.add('hidden');
+        document.getElementById('mainCard').classList.add('revealed');
+    }
+
+    function nextTurn() {
+        if (state.index < players.length - 1) {
+            state.index++;
+            startTurn();
+        } else {
+            switchView('interrogationView');
+            if (state.timerEnabled) {
+                document.getElementById('timerElements').classList.remove('hidden');
+                document.getElementById('noTimerLabel').classList.add('hidden');
+                startTimer();
+            } else {
+                document.getElementById('timerElements').classList.add('hidden');
+                document.getElementById('noTimerLabel').classList.remove('hidden');
+            }
+        }
+    }
+
+    function startTimer() {
+        updateTimerDisplay();
+        updateTimerBar();
+        drawHourglass();
+
+        const animLoop = setInterval(() => {
+            if (state.timeRemaining > 0 && state.timerEnabled) drawHourglass();
+            else clearInterval(animLoop);
+        }, 50);
+
+        state.timerId = setInterval(() => {
+            state.timeRemaining--;
+            updateTimerDisplay();
+            updateTimerBar();
+            if (state.timeRemaining <= 0) {
+                clearInterval(state.timerId);
+                drawHourglass();
+                document.getElementById('timer-display').textContent = "TEMPO!";
+                document.getElementById('timer-display').style.color = 'var(--accent)';
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        const m = Math.floor(state.timeRemaining / 60);
+        const s = state.timeRemaining % 60;
+        const el = document.getElementById('timer-display');
+        el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        el.style.color = state.timeRemaining < 30 ? 'var(--accent)' : 'var(--ink)';
+    }
+
+    function updateTimerBar() {
+        const bar = document.getElementById('timerBar');
+        if (!bar || state.totalTime === 0) return;
+        const pct = (state.timeRemaining / state.totalTime) * 100;
+        bar.style.width = pct + '%';
+        bar.style.background = state.timeRemaining < 30 ? 'var(--accent)' : 'var(--ink)';
+    }
+
+    function toggleList() {
+        const list = document.getElementById('masterList');
+        const btn = document.querySelector('.btn-toggle-list');
+        const hidden = list.classList.toggle('hidden');
+        btn.textContent = hidden ? '[ Abrir Dossiê de Possibilidades ]' : '[ Fechar Dossiê ]';
+    }
+
+    function showFinalReport() {
+        clearInterval(state.timerId);
+        switchView('reportView');
+        document.getElementById('finalSecret').textContent = state.secret;
+        document.getElementById('finalSpies').innerHTML =
+            state.spies.map(idx => `<span class="spy-name">— ${players[idx]} —</span>`).join('');
+    }
+
+    // ── INIT ──
+    renderPlayers();
+    updateModeCount();
+</script>
+</body>
+</html>

@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Nexus V6.0 | Omni-Persona - Sistema de Mapeamento Psico-Artístico</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Sistema avançado de mapeamento psicológico para geração de personas artísticas precisas">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+    <style>
+        :root {
+            --bg: #050505;
+            --bg-panel: #0a0a0a;
+            --panel: #0f0f0f;
+            --border: #1a1a1a;
+            --accent: #ff0055;
+            --accent2: #00ccff;
+            --accent3: #ffcc00;
+            --accent-glow: rgba(255, 0, 85, 0.2);
+            --text: #888;
+            --text-light: #ccc;
+            --highlight: #eee;
+            --success: #00ff88;
+            --warning: #ffcc00;
+            --info: #00ccff;
+            --shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+            --gradient: linear-gradient(135deg, var(--accent), var(--accent2));
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(255, 0, 85, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(0, 204, 255, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(255, 204, 0, 0.05) 0%, transparent 60%);
+            touch-action: manipulation;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin: 10px;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient);
+        }
+
+        h1 {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: clamp(0.9rem, 3vw, 1.2rem);
+            letter-spacing: clamp(2px, 1vw, 4px);
+            color: var(--text-light);
+            text-align: center;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            font-weight: 300;
+            position: relative;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        h1 span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        h2 {
+            color: var(--text-light);
+            font-weight: 300;
+            margin-bottom: 20px;
+            font-size: clamp(1rem, 4vw, 1.4rem);
+            line-height: 1.4;
+        }
+
+        h2 .question-number {
+            color: var(--accent2);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        h3 {
+            color: var(--text-light);
+            font-weight: 400;
+            margin: 20px 0 15px;
+            font-size: clamp(0.9rem, 3.5vw, 1.1rem);
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn-generator {
+            background: rgba(20, 20, 20, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+            text-align: left;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            min-height: 90px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .btn-generator:hover, .btn-generator:focus {
+            border-color: var(--accent);
+            color: var(--highlight);
+            background: rgba(30, 30, 30, 0.9);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(255, 0, 85, 0.15);
+            outline: none;
+        }
+
+        .btn-generator .model-name {
+            display: block;
+            font-size: clamp(1rem, 4vw, 1.2rem);
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-light);
+        }
+
+        .btn-generator .model-desc {
+            font-size: clamp(0.75rem, 2.5vw, 0.85rem);
+            opacity: 0.8;
+            line-height: 1.4;
+        }
+
+        .btn-option {
+            background: rgba(25, 25, 25, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            padding: 18px 18px 18px 35px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: clamp(0.8rem, 3vw, 0.9rem);
+            text-align: left;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            min-height: 70px;
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-option:hover, .btn-option:focus {
+            border-color: var(--accent);
+            color: var(--highlight);
+            background: rgba(255, 0, 85, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 0, 85, 0.1);
+            outline: none;
+        }
+
+        .btn-option::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 15px;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: background 0.2s;
+        }
+
+        .btn-option:hover::before, .btn-option:focus::before {
+            background: var(--accent);
+        }
+
+        .progress-section {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border);
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .progress-category {
+            color: var(--accent2);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: clamp(0.75rem, 3vw, 0.9rem);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--gradient);
+            width: 0%;
+            transition: width 0.6s cubic-bezier(0.65, 0, 0.35, 1);
+            position: relative;
+            border-radius: 2px;
+        }
+
+        .progress-text {
+            font-size: clamp(0.75rem, 3vw, 0.85rem);
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            font-family: 'JetBrains Mono', monospace;
+            width: 100%;
+        }
+
+        .dimension-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .dimension {
+            text-align: center;
+        }
+
+        .dimension-label {
+            font-size: clamp(0.7rem, 2.5vw, 0.8rem);
+            color: var(--text);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dimension-value {
+            font-size: clamp(1rem, 4vw, 1.2rem);
+            font-weight: 600;
+            color: var(--accent);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        #result-box {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            color: var(--text-light);
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: clamp(0.8rem, 3vw, 0.9rem);
+            line-height: 1.6;
+            margin: 25px 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            border-left: 4px solid var(--accent);
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: var(--gradient);
+            color: white;
+            border: none;
+            padding: clamp(15px, 4vw, 18px);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            font-size: clamp(0.9rem, 3vw, 1rem);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary:hover, .btn-primary:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 0, 85, 0.4);
+            background: linear-gradient(135deg, #ff1166, #00ddff);
+            outline: none;
+        }
+
+        .btn-secondary {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: clamp(14px, 3vw, 16px);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+        }
+
+        .btn-secondary:hover, .btn-secondary:focus {
+            border-color: var(--accent2);
+            color: var(--highlight);
+            background: rgba(0, 204, 255, 0.05);
+            outline: none;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success);
+            color: #000;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-weight: 500;
+            transform: translateX(150%);
+            transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            max-width: calc(100vw - 40px);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 25px;
+            color: var(--text);
+            font-size: clamp(0.75rem, 2.5vw, 0.85rem);
+            opacity: 0.6;
+            font-family: 'JetBrains Mono', monospace;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .visualization-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .chart-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .chart-wrapper {
+            background: rgba(10, 10, 10, 0.8);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient);
+        }
+
+        .chart-title {
+            text-align: center;
+            margin-bottom: 15px;
+            color: var(--accent2);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .chart-canvas {
+            width: 100% !important;
+            height: 250px !important;
+        }
+
+        .persona-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 25px 0;
+        }
+
+        .summary-card {
+            background: rgba(20, 20, 20, 0.7);
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .summary-title {
+            color: var(--accent2);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .archetype-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            background: var(--gradient);
+            color: white;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 1.2rem;
+            margin: 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .style-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        .style-tag {
+            padding: 6px 12px;
+            background: rgba(255, 0, 85, 0.1);
+            border: 1px solid rgba(255, 0, 85, 0.3);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .style-tag.primary {
+            background: rgba(255, 0, 85, 0.2);
+            border-color: var(--accent);
+            font-weight: 600;
+        }
+
+        .gender-form {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .gender-form h3 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: var(--accent2);
+            border-bottom: none;
+        }
+
+        .gender-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .gender-option {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .gender-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .gender-card {
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .gender-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(255, 0, 85, 0.15);
+        }
+
+        .gender-option input[type="radio"]:checked + .gender-card {
+            border-color: var(--accent);
+            background: rgba(255, 0, 85, 0.1);
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.2);
+        }
+
+        .gender-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .gender-label {
+            font-size: 1.1rem;
+            color: var(--text-light);
+            font-weight: 500;
+            display: block;
+        }
+
+        .gender-option input[type="radio"]:checked + .gender-card .gender-label {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .gender-subtitle {
+            font-size: 0.8rem;
+            color: var(--text);
+            margin-top: 5px;
+            display: block;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .form-buttons .btn-primary,
+        .form-buttons .btn-secondary {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .selected-platform-info {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 204, 255, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 204, 255, 0.3);
+        }
+
+        .selected-platform-label {
+            font-size: 0.8rem;
+            color: var(--accent2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .selected-platform-name {
+            font-size: 1.2rem;
+            color: var(--text-light);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .chart-container { grid-template-columns: 1fr; }
+            .persona-summary { grid-template-columns: 1fr; }
+            .chart-canvas { height: 200px !important; }
+            .gender-options { grid-template-columns: 1fr; gap: 15px; }
+            .gender-form { padding: 20px 15px; }
+            .form-buttons { flex-direction: column; }
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            .btn-generator:hover, .btn-option:hover, .btn-primary:hover, .btn-secondary:hover { transform: none; }
+            .gender-card:hover { transform: none; }
+        }
+    </style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+    <div class="container">
+        <!-- TELA 1: Seleção da Plataforma -->
+        <section id="screen-start" class="screen active">
+            <h1><span>NEXUS</span> V6.0 — SISTEMA DE MAPEAMENTO PSICO-ARTÍSTICO</h1>
+            <p style="text-align: center; margin-bottom: 25px; color: var(--text-light); font-size: clamp(0.9rem, 3.5vw, 1.1rem);">
+                Análise multidimensional baseada em DISC, Big Five, teoria da arte e psicologia da criatividade
+            </p>
+            <div class="grid">
+                <button class="btn-generator" onclick="selectPlatform('mj')">
+                    <span class="model-name">MIDJOURNEY V6.1</span>
+                    <span class="model-desc">Maestria artística avançada, composição complexa, interpretação criativa profunda</span>
+                </button>
+                <button class="btn-generator" onclick="selectPlatform('flux')">
+                    <span class="model-name">FLUX.1 PRO</span>
+                    <span class="model-desc">Realismo hiper-detalhado, fidelidade fotográfica, renderização cinemática</span>
+                </button>
+                <button class="btn-generator" onclick="selectPlatform('dalle')">
+                    <span class="model-name">DALL-E 3</span>
+                    <span class="model-desc">Conceituação narrativa, entendimento contextual profundo, coerência semântica</span>
+                </button>
+                <button class="btn-generator" onclick="selectPlatform('sd')">
+                    <span class="model-name">STABLE DIFFUSION XL</span>
+                    <span class="model-desc">Controle granular preciso, customização extrema, workflows complexos</span>
+                </button>
+            </div>
+            <div class="footer-text">
+                Sistema de 60 questões • 5 dimensões psicológicas • 12 eixos artísticos • Visualização Gráfica
+            </div>
+        </section>
+
+        <!-- TELA 2: Seleção de Gênero -->
+        <section id="screen-gender" class="screen">
+            <h1><span>IDENTIDADE</span> DE GÊNERO</h1>
+            <div class="selected-platform-info">
+                <span class="selected-platform-label">Plataforma Selecionada</span>
+                <span class="selected-platform-name" id="selected-platform-display">-</span>
+            </div>
+            <div class="gender-form">
+                <h3>Selecione o Gênero para Personalização</h3>
+                <div class="gender-options">
+                    <label class="gender-option">
+                        <input type="radio" name="gender" value="masculino" id="gender-masculino">
+                        <div class="gender-card">
+                            <span class="gender-icon">♂</span>
+                            <span class="gender-label">MASCULINO</span>
+                            <span class="gender-subtitle">Persona artística masculina</span>
+                        </div>
+                    </label>
+                    <label class="gender-option">
+                        <input type="radio" name="gender" value="feminino" id="gender-feminino">
+                        <div class="gender-card">
+                            <span class="gender-icon">♀</span>
+                            <span class="gender-label">FEMININO</span>
+                            <span class="gender-subtitle">Persona artística feminina</span>
+                        </div>
+                    </label>
+                </div>
+                <div class="form-buttons">
+                    <button class="btn-secondary" onclick="backToPlatform()">← VOLTAR</button>
+                    <button class="btn-primary" onclick="confirmGender()">CONTINUAR →</button>
+                </div>
+            </div>
+            <div class="footer-text">
+                A seleção de gênero influencia nuances estéticas e expressivas na persona gerada
+            </div>
+        </section>
+
+        <!-- TELA 3: Quiz -->
+        <section id="screen-quiz" class="screen">
+            <div class="progress-section">
+                <div class="progress-header">
+                    <div class="progress-category" id="category-label">PERFIL CRIATIVO</div>
+                    <div class="progress-text">
+                        <span id="progress-counter">Questão 1/60</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div id="p-bar" class="progress-bar"></div>
+                </div>
+                <div class="dimension-display" id="dimension-display"></div>
+            </div>
+            <h2><span class="question-number" id="q-number">Q1</span> <span id="q-text"></span></h2>
+            <div id="opts" class="grid"></div>
+        </section>
+
+        <!-- TELA 4: Resultados -->
+        <section id="screen-result" class="screen">
+            <h1><span>ANÁLISE</span> COMPLETA DA PERSONA</h1>
+            <div class="persona-summary" id="persona-summary"></div>
+            <div class="visualization-section">
+                <h3>VISUALIZAÇÃO GRÁFICA DO PERFIL</h3>
+                <div class="chart-container">
+                    <div class="chart-wrapper">
+                        <div class="chart-title">DIMENSÕES PSICOLÓGICAS</div>
+                        <canvas id="psychologyChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div class="chart-title">EIXOS ARTÍSTICOS</div>
+                        <canvas id="artisticAxesChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div class="chart-title">PERFIL DISC</div>
+                        <canvas id="discChart" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div class="chart-title">ESTILOS DOMINANTES</div>
+                        <canvas id="stylesChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="visualization-section">
+                <h3>RADAR DE PERSONALIDADE CRIATIVA</h3>
+                <div class="chart-wrapper">
+                    <div class="chart-title">MAPEAMENTO MULTIDIMENSIONAL</div>
+                    <canvas id="radarChart" class="chart-canvas"></canvas>
+                </div>
+            </div>
+            <div id="result-box"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 25px 0;">
+                <button class="btn-primary" onclick="copyToClipboard()">📋 COPIAR PROMPT OTIMIZADO</button>
+                <button class="btn-secondary" onclick="downloadAnalysis()">⬇️ BAIXAR ANÁLISE COMPLETA</button>
+            </div>
+            <button class="btn-secondary" onclick="restartSystem()">↻ NOVA ANÁLISE PSICO-ARTÍSTICA</button>
+            <div class="footer-text">Nexus V6.0 • Sistema Omni-Persona • Análise concluída com sucesso</div>
+        </section>
+    </div>
+
+    <div class="notification" id="notification">
+        <span>✓</span>
+        <span id="notification-text">Prompt copiado para a área de transferência!</span>
+    </div>
+
+    <script>
+        const NexusSystem = {
+            config: {
+                totalQuestions: 60,
+                currentQuestion: 0,
+                selectedGenerator: '',
+                selectedGender: '',
+                dimensions: {
+                    abertura: 50, conscienciosidade: 50, extroversao: 50,
+                    amabilidade: 50, neuroticismo: 50, curiosidade: 50,
+                    resiliencia: 50, empatia: 50
+                },
+                artisticAxes: {
+                    ordemCaos: 50, realismoAbstracao: 50, tradicaoInovacao: 50,
+                    simplicidadeComplexidade: 50, otimismoPessimismo: 50,
+                    organicidadeMecanicidade: 50, introversaoExtroversao: 50,
+                    racionalEmocional: 50, concretismoSimbolismo: 50,
+                    individualismoColetivismo: 50
+                },
+                discProfile: {
+                    dominancia: 0, influencia: 0, estabilidade: 0,
+                    conformidade: 0, adaptabilidade: 0, assertividade: 0
+                },
+                styleScores: {
+                    conceptual: 0, performance: 0, minimalist: 0, popart: 0,
+                    installation: 0, urban: 0, nihei: 0, giger: 0, renaissance: 0,
+                    artdeco: 0, glitch: 0, surreal: 0, gothic: 0, solarpunk: 0,
+                    cyberpunk: 0, ukiyoe: 0, baroque: 0, bauhaus: 0, vaporwave: 0,
+                    impressionist: 0, photorealism: 0, brutalist: 0, darkfantasy: 0,
+                    abstract: 0, futurism: 0, biomorphic: 0, psychedelic: 0,
+                    constructivist: 0, suprematist: 0, expressionist: 0, cubist: 0,
+                    dada: 0, fauvism: 0, artnouveau: 0, pointillism: 0, opart: 0,
+                    magicalrealism: 0, lowbrow: 0, steampunk: 0, dieselpunk: 0
+                }
+            },
+
+            questions: [],
+            charts: {},
+
+            init: function() {
+                this.generateFullQuestions();
+                this.updateDimensionDisplay();
+            },
+
+            generateFullQuestions: function() {
+                const questionBank = [
+                    // PERFIL PSICOLÓGICO (1-10)
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Em situações de alta pressão, você tende a:",
+                        a: [
+                            {t: "Tomar decisões rápidas e assertivas", s: {discProfile: {dominancia: 8, assertividade: 5}, dimensions: {neuroticismo: -5}}},
+                            {t: "Buscar consenso e apoio da equipe", s: {discProfile: {influencia: 8, adaptabilidade: 5}, dimensions: {empatia: 5}}},
+                            {t: "Manter calma e seguir procedimentos estabelecidos", s: {discProfile: {estabilidade: 8, conformidade: 5}, dimensions: {resiliencia: 5}}},
+                            {t: "Analisar todos os ângulos antes de agir", s: {discProfile: {conformidade: 8}, dimensions: {conscienciosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Ao iniciar um novo projeto criativo, você prefere:",
+                        a: [
+                            {t: "Improvisar e descobrir o caminho durante o processo", s: {dimensions: {abertura: 8, curiosidade: 5}, artisticAxes: {ordemCaos: 15}}},
+                            {t: "Planejar meticulosamente cada etapa antes de começar", s: {dimensions: {conscienciosidade: 8}, artisticAxes: {ordemCaos: -15}}},
+                            {t: "Buscar referências e inspirações de diversas fontes", s: {dimensions: {abertura: 5, extroversao: 5}, artisticAxes: {tradicaoInovacao: 5}}},
+                            {t: "Confiar na intuição e nas primeiras ideias que surgem", s: {dimensions: {neuroticismo: -5}, artisticAxes: {racionalEmocional: 10}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Quando recebe críticas sobre seu trabalho, você:",
+                        a: [
+                            {t: "Analisa objetivamente e implementa mudanças se fizerem sentido", s: {dimensions: {conscienciosidade: 5, neuroticismo: -5}, discProfile: {dominancia: 3}}},
+                            {t: "Leva para o lado pessoal, mas usa como motivação", s: {dimensions: {neuroticismo: 5, resiliencia: 5}, artisticAxes: {racionalEmocional: 10}}},
+                            {t: "Busca entender a perspectiva do crítico e dialogar", s: {dimensions: {empatia: 8, amabilidade: 5}, discProfile: {influencia: 5}}},
+                            {t: "Mantém sua visão original, a menos que a crítica seja técnica", s: {dimensions: {abertura: -3}, discProfile: {dominancia: 5, estabilidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Em relação a regras e convenções artísticas:",
+                        a: [
+                            {t: "Vejo como ponto de partida para subverter e inovar", s: {artisticAxes: {tradicaoInovacao: 15}, dimensions: {abertura: 8}}},
+                            {t: "Respeito profundamente, mas busco evoluí-las organicamente", s: {artisticAxes: {tradicaoInovacao: -5}, dimensions: {conscienciosidade: 5}}},
+                            {t: "Ignoro completamente se limitarem minha expressão", s: {artisticAxes: {tradicaoInovacao: 20, ordemCaos: 10}, discProfile: {dominancia: 5}}},
+                            {t: "Estudo minuciosamente antes de decidir seguir ou quebrar", s: {dimensions: {conscienciosidade: 8, curiosidade: 5}, artisticAxes: {racionalEmocional: -5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Seu estado emocional ideal para criar é:",
+                        a: [
+                            {t: "Estabilidade emocional e mente clara", s: {dimensions: {neuroticismo: -10, resiliencia: 5}, artisticAxes: {racionalEmocional: -10}}},
+                            {t: "Intensidade emocional, seja positiva ou negativa", s: {dimensions: {neuroticismo: 5}, artisticAxes: {racionalEmocional: 15}}},
+                            {t: "Curiosidade aguçada e abertura total ao novo", s: {dimensions: {curiosidade: 10, abertura: 5}, artisticAxes: {tradicaoInovacao: 5}}},
+                            {t: "Conexão profunda com o tema ou mensagem", s: {dimensions: {empatia: 8}, artisticAxes: {concretismoSimbolismo: 10}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Ao colaborar com outros artistas, você tende a:",
+                        a: [
+                            {t: "Assumir a liderança e direcionar a visão geral", s: {discProfile: {dominancia: 10, assertividade: 5}, dimensions: {extroversao: 5}}},
+                            {t: "Facilitar a harmonia e garantir que todos se sintam ouvidos", s: {discProfile: {influencia: 8, estabilidade: 5}, dimensions: {amabilidade: 8, empatia: 5}}},
+                            {t: "Focar em sua contribuição específica com excelência técnica", s: {discProfile: {conformidade: 5}, dimensions: {conscienciosidade: 8}}},
+                            {t: "Adaptar-se fluidamente às necessidades do grupo", s: {discProfile: {adaptabilidade: 10}, dimensions: {abertura: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Diante de um bloqueio criativo, sua estratégia é:",
+                        a: [
+                            {t: "Persistir até superar através de disciplina e esforço", s: {dimensions: {conscienciosidade: 8, resiliencia: 5}, discProfile: {dominancia: 3}}},
+                            {t: "Fazer uma pausa e buscar inspiração em outras atividades", s: {dimensions: {abertura: 5, curiosidade: 5}, artisticAxes: {ordemCaos: 5}}},
+                            {t: "Conversar com outros criadores sobre o problema", s: {dimensions: {extroversao: 8, empatia: 5}, discProfile: {influencia: 5}}},
+                            {t: "Aceitar o bloqueio como parte natural do processo criativo", s: {dimensions: {neuroticismo: -5, resiliencia: 8}, discProfile: {estabilidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Sua relação com o tempo de trabalho é:",
+                        a: [
+                            {t: "Prefiro prazos apertados que geram adrenalina criativa", s: {dimensions: {neuroticismo: 3}, discProfile: {dominancia: 5}, artisticAxes: {ordemCaos: 10}}},
+                            {t: "Gosto de ritmos consistentes e previsíveis", s: {dimensions: {conscienciosidade: 5}, discProfile: {estabilidade: 8}, artisticAxes: {ordemCaos: -10}}},
+                            {t: "Trabalho em surtos intensos seguidos de períodos de reflexão", s: {dimensions: {abertura: 5}, artisticAxes: {simplicidadeComplexidade: 5}}},
+                            {t: "Me adapto conforme as demandas do projeto", s: {discProfile: {adaptabilidade: 8}, dimensions: {resiliencia: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Ao apresentar seu trabalho ao público, você:",
+                        a: [
+                            {t: "Explica cuidadosamente as intenções e processos por trás da obra", s: {dimensions: {conscienciosidade: 5, extroversao: 3}, artisticAxes: {concretismoSimbolismo: -5}}},
+                            {t: "Deixa a obra falar por si e observa as reações", s: {dimensions: {neuroticismo: -3}, artisticAxes: {concretismoSimbolismo: 10}, discProfile: {estabilidade: 5}}},
+                            {t: "Cria uma narrativa envolvente sobre a criação", s: {dimensions: {extroversao: 8, empatia: 5}, discProfile: {influencia: 8}}},
+                            {t: "Foca nos aspectos técnicos e inovações metodológicas", s: {dimensions: {conscienciosidade: 8}, artisticAxes: {racionalEmocional: -5}}}
+                        ]
+                    },
+                    {
+                        category: "PERFIL PSICOLÓGICO",
+                        q: "Sua motivação principal para criar arte é:",
+                        a: [
+                            {t: "Expressar ideias e conceitos que não cabem em palavras", s: {artisticAxes: {concretismoSimbolismo: 10}, dimensions: {abertura: 5}}},
+                            {t: "Conectar-se emocionalmente com outras pessoas", s: {dimensions: {empatia: 10, amabilidade: 5}, artisticAxes: {racionalEmocional: 10}}},
+                            {t: "Explorar as possibilidades técnicas e materiais", s: {dimensions: {curiosidade: 8, conscienciosidade: 5}, artisticAxes: {simplicidadeComplexidade: 5}}},
+                            {t: "Desafiar percepções e provocar mudanças", s: {discProfile: {dominancia: 5}, artisticAxes: {tradicaoInovacao: 10, otimismoPessimismo: -5}}}
+                        ]
+                    },
+                    // PROCESSO CRIATIVO (11-20)
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Sua abordagem preferida para desenvolver ideias é:",
+                        a: [
+                            {t: "Brainstorming livre sem julgamentos iniciais", s: {artisticAxes: {ordemCaos: 15}, dimensions: {abertura: 8, curiosidade: 5}}},
+                            {t: "Estruturação lógica e mapas mentais organizados", s: {artisticAxes: {ordemCaos: -15, racionalEmocional: -10}, dimensions: {conscienciosidade: 8}}},
+                            {t: "Colagem e remix de referências visuais diversas", s: {artisticAxes: {tradicaoInovacao: 5}, styleScores: {popart: 10, glitch: 5}}},
+                            {t: "Meditação e espera pela inspiração surgir naturalmente", s: {dimensions: {neuroticismo: -5}, artisticAxes: {racionalEmocional: 10}, discProfile: {estabilidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Quando se depara com um erro ou acidente no processo:",
+                        a: [
+                            {t: "Vejo como uma oportunidade para novas direções criativas", s: {artisticAxes: {ordemCaos: 10, tradicaoInovacao: 5}, dimensions: {abertura: 8}}},
+                            {t: "Corrijo imediatamente para manter a integridade do projeto", s: {artisticAxes: {ordemCaos: -10}, dimensions: {conscienciosidade: 8}}},
+                            {t: "Documento o erro para estudá-lo posteriormente", s: {dimensions: {curiosidade: 5, conscienciosidade: 5}, artisticAxes: {racionalEmocional: -5}}},
+                            {t: "Integro parcialmente, mantendo o controle da composição", s: {discProfile: {adaptabilidade: 5}, artisticAxes: {simplicidadeComplexidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Sua relação com referências e inspirações externas:",
+                        a: [
+                            {t: "Consumo intensamente de diversas fontes antes de criar", s: {dimensions: {curiosidade: 10, abertura: 5}, artisticAxes: {tradicaoInovacao: 5}}},
+                            {t: "Evito referências para não contaminar minha visão original", s: {artisticAxes: {tradicaoInovacao: 10, individualismoColetivismo: -10}, dimensions: {abertura: 3}}},
+                            {t: "Estudo profundamente mestres do passado antes de inovar", s: {artisticAxes: {tradicaoInovacao: -5}, styleScores: {renaissance: 5, baroque: 5}}},
+                            {t: "Busco inspiração na natureza e no cotidiano, não na arte", s: {artisticAxes: {organicidadeMecanicidade: 10}, styleScores: {impressionist: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Ao escolher materiais e técnicas, você prioriza:",
+                        a: [
+                            {t: "Novas tecnologias e ferramentas experimentais", s: {artisticAxes: {tradicaoInovacao: 10}, styleScores: {glitch: 5, cyberpunk: 5}}},
+                            {t: "Técnicas tradicionais dominadas com excelência", s: {artisticAxes: {tradicaoInovacao: -10}, styleScores: {renaissance: 5, photorealism: 5}}},
+                            {t: "Materiais sustentáveis e processos éticos", s: {artisticAxes: {organicidadeMecanicidade: 5}, styleScores: {solarpunk: 10}}},
+                            {t: "O que melhor serve ao conceito, independente de origem", s: {discProfile: {adaptabilidade: 5}, dimensions: {conscienciosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Sua relação com a finalização de uma obra:",
+                        a: [
+                            {t: "Sempre existe um ponto onde 'menos é mais'", s: {artisticAxes: {simplicidadeComplexidade: -15}, styleScores: {minimalist: 10}}},
+                            {t: "Adiciono camadas até sentir que está 'completo'", s: {artisticAxes: {simplicidadeComplexidade: 15}, styleScores: {baroque: 5, surreal: 5}}},
+                            {t: "Defino critérios objetivos de término no início", s: {dimensions: {conscienciosidade: 8}, artisticAxes: {racionalEmocional: -10}}},
+                            {t: "A obra decide quando está pronta, não eu", s: {dimensions: {neuroticismo: 3}, artisticAxes: {racionalEmocional: 10}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Como você lida com múltiplos projetos simultâneos:",
+                        a: [
+                            {t: "Alterno entre eles conforme a inspiração do momento", s: {artisticAxes: {ordemCaos: 10}, dimensions: {abertura: 5}, discProfile: {adaptabilidade: 5}}},
+                            {t: "Priorizo um principal e mantenho os outros em espera", s: {discProfile: {estabilidade: 5}, dimensions: {conscienciosidade: 5}}},
+                            {t: "Crio sistemas rigorosos para gerenciar todos eficientemente", s: {dimensions: {conscienciosidade: 10}, artisticAxes: {ordemCaos: -10}}},
+                            {t: "Foco exclusivo em um projeto até sua conclusão", s: {discProfile: {estabilidade: 8}, dimensions: {conscienciosidade: 5}, artisticAxes: {ordemCaos: -5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Sua abordagem para sketchs e rascunhos:",
+                        a: [
+                            {t: "Rápidos e gestuais, capturando a essência imediata", s: {artisticAxes: {racionalEmocional: 10}, styleScores: {expressionist: 5}}},
+                            {t: "Estudos detalhados que antecipam o trabalho final", s: {dimensions: {conscienciosidade: 8}, artisticAxes: {racionalEmocional: -5}, styleScores: {photorealism: 5}}},
+                            {t: "Processo iterativo de refinamento gradual", s: {discProfile: {adaptabilidade: 5}, dimensions: {curiosidade: 5}}},
+                            {t: "Não faço rascunhos, trabalho direto na peça final", s: {discProfile: {dominancia: 5}, artisticAxes: {ordemCaos: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Quando algo não está funcionando visualmente:",
+                        a: [
+                            {t: "Destruo e recomeço do zero sem hesitar", s: {discProfile: {dominancia: 8}, artisticAxes: {ordemCaos: 10}}},
+                            {t: "Analiso sistematicamente o que está desarmonioso", s: {dimensions: {conscienciosidade: 8}, artisticAxes: {racionalEmocional: -10}}},
+                            {t: "Peço feedback para outros olhos", s: {dimensions: {empatia: 5, extroversao: 5}, discProfile: {influencia: 5}}},
+                            {t: "Deixo descansar e retorno com perspectiva fresca", s: {discProfile: {estabilidade: 5}, dimensions: {resiliencia: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Sua relação com a repetição e série de obras:",
+                        a: [
+                            {t: "Exploro variações infinitas de um tema central", s: {dimensions: {curiosidade: 5}, artisticAxes: {simplicidadeComplexidade: 5}}},
+                            {t: "Cada obra é única e irrepetível", s: {artisticAxes: {individualismoColetivismo: 10}, discProfile: {dominancia: 3}}},
+                            {t: "Uso séries para estudar progressões sistemáticas", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {racionalEmocional: -5}}},
+                            {t: "A repetição me permite aperfeiçoar técnica", s: {dimensions: {conscienciosidade: 8}, discProfile: {estabilidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "PROCESSO CRIATIVO",
+                        q: "Como você documenta seu processo criativo:",
+                        a: [
+                            {t: "Fotografo/filmo tudo para análise posterior", s: {dimensions: {conscienciosidade: 5, curiosidade: 5}, artisticAxes: {racionalEmocional: -5}}},
+                            {t: "Mantenho um diário íntimo de reflexões", s: {dimensions: {neuroticismo: 3}, artisticAxes: {racionalEmocional: 10}}},
+                            {t: "Documento apenas etapas chave e resultados", s: {discProfile: {adaptabilidade: 5}, dimensions: {conscienciosidade: 3}}},
+                            {t: "Não documento, foco total no presente criativo", s: {artisticAxes: {racionalEmocional: 5}, discProfile: {dominancia: 3}}}
+                        ]
+                    },
+                    // ESTÉTICA E ESTILO (21-28)
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Ao observar uma obra de arte pela primeira vez, o que primeiro capta sua atenção?",
+                        a: [
+                            {t: "A composição e o equilíbrio formal dos elementos", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {racionalEmocional: -10, ordemCaos: -5}}},
+                            {t: "A carga emocional e o impacto visceral imediato", s: {artisticAxes: {racionalEmocional: 15}, styleScores: {expressionist: 5}}},
+                            {t: "A originalidade e a ruptura com convenções estabelecidas", s: {artisticAxes: {tradicaoInovacao: 10}, dimensions: {curiosidade: 5}}},
+                            {t: "A narrativa implícita e os símbolos codificados", s: {artisticAxes: {concretismoSimbolismo: 15}, dimensions: {abertura: 5}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Qual relação entre forma e conteúdo você considera mais poderosa?",
+                        a: [
+                            {t: "A forma É o conteúdo — o meio é a mensagem em si", s: {artisticAxes: {concretismoSimbolismo: -10}, styleScores: {minimalist: 5, constructivist: 5}}},
+                            {t: "A forma serve ao conteúdo, potencializando a mensagem", s: {artisticAxes: {racionalEmocional: -5}, dimensions: {conscienciosidade: 5}}},
+                            {t: "A tensão irresolvida entre forma e conteúdo é o próprio tema", s: {artisticAxes: {ordemCaos: 10}, styleScores: {conceptual: 10}}},
+                            {t: "Forma e conteúdo se fundem numa experiência holística", s: {artisticAxes: {racionalEmocional: 5}, styleScores: {surreal: 5, abstract: 5}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Em termos de complexidade visual, você prefere obras que:",
+                        a: [
+                            {t: "Revelam mais quanto mais tempo você as observa", s: {artisticAxes: {simplicidadeComplexidade: 15}, styleScores: {baroque: 5, surreal: 5}}},
+                            {t: "Comunicam tudo de imediato, sem ambiguidade", s: {artisticAxes: {simplicidadeComplexidade: -15}, styleScores: {minimalist: 8, bauhaus: 5}}},
+                            {t: "Equilibram um elemento central claro com detalhes periféricos", s: {artisticAxes: {simplicidadeComplexidade: 3}, dimensions: {conscienciosidade: 5}}},
+                            {t: "São deliberadamente confusas para exigir interpretação ativa", s: {artisticAxes: {ordemCaos: 15}, styleScores: {dada: 8, glitch: 5}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Qual tratamento da luz e sombra mais ressoa com sua estética?",
+                        a: [
+                            {t: "Chiaroscuro dramático — contrastes extremos entre luz e escuridão", s: {styleScores: {baroque: 10, darkfantasy: 5}, artisticAxes: {otimismoPessimismo: -10}}},
+                            {t: "Luz difusa e uniforme que exalta cada detalhe superficial", s: {styleScores: {photorealism: 8}, artisticAxes: {realismoAbstracao: -10}}},
+                            {t: "Luminosidade neon ou artificial com alto impacto cromático", s: {styleScores: {cyberpunk: 8, vaporwave: 5}, artisticAxes: {organicidadeMecanicidade: 10}}},
+                            {t: "Luz natural que captura a efemeridade de um momento", s: {styleScores: {impressionist: 10}, artisticAxes: {organicidadeMecanicidade: -5}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Em termos de textura nas artes visuais, você valoriza mais:",
+                        a: [
+                            {t: "Superfícies orgânicas com imperfeições e rugosidades", s: {artisticAxes: {organicidadeMecanicidade: -10}, styleScores: {expressionist: 5}}},
+                            {t: "Acabamentos lisos, polidos e geometricamente precisos", s: {styleScores: {artdeco: 8, bauhaus: 5}, artisticAxes: {organicidadeMecanicidade: 10}}},
+                            {t: "Colagens e mixagens de texturas contrastantes", s: {styleScores: {popart: 5, urban: 5}, artisticAxes: {ordemCaos: 10}}},
+                            {t: "A textura como ilusão — trompe-l'œil e hiper-realismo", s: {styleScores: {photorealism: 8}, artisticAxes: {realismoAbstracao: -15}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Qual paleta cromática representa melhor sua identidade visual?",
+                        a: [
+                            {t: "Tons sombrios e dessaturados com acentos vibrantes pontuais", s: {styleScores: {gothic: 5, darkfantasy: 5}, artisticAxes: {otimismoPessimismo: -10}}},
+                            {t: "Cores puras e saturadas inspiradas em populismo visual", s: {styleScores: {popart: 10, fauvism: 5}, artisticAxes: {otimismoPessimismo: 10}}},
+                            {t: "Gradientes etéreos e paletas pastéis com suavidade contemplativa", s: {styleScores: {vaporwave: 5}, artisticAxes: {racionalEmocional: 5}}},
+                            {t: "Preto, branco e cinza com lógica minimalista rigorosa", s: {styleScores: {minimalist: 10, bauhaus: 8}, artisticAxes: {simplicidadeComplexidade: -10}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Em relação à escala e proporção nas obras, você prefere:",
+                        a: [
+                            {t: "Obras monumentais que impõem presença física avassaladora", s: {discProfile: {dominancia: 8}, artisticAxes: {simplicidadeComplexidade: 5}, styleScores: {brutalist: 5}}},
+                            {t: "Miniaturas íntimas que exigem aproximação e contemplação", s: {dimensions: {empatia: 5}, artisticAxes: {individualismoColetivismo: -5}}},
+                            {t: "Proporções que subvertem a expectativa — o pequeno gigante ou o grande frágil", s: {artisticAxes: {tradicaoInovacao: 10}, styleScores: {surreal: 8}}},
+                            {t: "Proporções humanas que criam identificação e empatia direta", s: {dimensions: {empatia: 8, amabilidade: 5}, artisticAxes: {racionalEmocional: 5}}}
+                        ]
+                    },
+                    {
+                        category: "ESTÉTICA E ESTILO",
+                        q: "Como você enxerga a relação entre arte e função utilitária?",
+                        a: [
+                            {t: "Arte pura não serve — a beleza é seu próprio propósito", s: {artisticAxes: {concretismoSimbolismo: 15}, dimensions: {abertura: 5}}},
+                            {t: "Arte e função são indissociáveis — design é a arte mais honesta", s: {styleScores: {bauhaus: 10}, artisticAxes: {ordemCaos: -5}}},
+                            {t: "Arte deve subverter a função esperada para criar novo sentido", s: {styleScores: {dada: 5, conceptual: 8}, artisticAxes: {tradicaoInovacao: 10}}},
+                            {t: "A tensão entre arte e uso cria obras mais ricas e ambíguas", s: {artisticAxes: {ordemCaos: 5}, dimensions: {curiosidade: 5}}}
+                        ]
+                    },
+                    // TECNOLOGIA E FUTURO (29-34)
+                    {
+                        category: "TECNOLOGIA E FUTURO",
+                        q: "Qual sua postura em relação ao uso de inteligência artificial nas artes?",
+                        a: [
+                            {t: "É uma ferramenta poderosa que amplifica a intenção criativa humana", s: {artisticAxes: {tradicaoInovacao: 10, organicidadeMecanicidade: 5}}},
+                            {t: "Representa uma ruptura filosófica que questiona a própria autoria", s: {styleScores: {conceptual: 10}, artisticAxes: {concretismoSimbolismo: 10}}},
+                            {t: "Deve ser integrada com criticidade — explorando seus limites e vieses", s: {dimensions: {conscienciosidade: 5, curiosidade: 5}}},
+                            {t: "Ameaça a essência da expressão artística genuinamente humana", s: {artisticAxes: {tradicaoInovacao: -10}, dimensions: {neuroticismo: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TECNOLOGIA E FUTURO",
+                        q: "Como você vê a relação entre corpo humano e tecnologia na arte?",
+                        a: [
+                            {t: "A fusão cyborg é inevitável e esteticamente fascinante", s: {styleScores: {cyberpunk: 10, giger: 5}, artisticAxes: {organicidadeMecanicidade: 15}}},
+                            {t: "A tecnologia deve ampliar o corpo sem apagar sua organicidade", s: {styleScores: {biomorphic: 8}, artisticAxes: {organicidadeMecanicidade: -3}}},
+                            {t: "A arte deve resistir ao determinismo tecnológico e reafirmar o corpo", s: {artisticAxes: {organicidadeMecanicidade: -10}, styleScores: {performance: 8}}},
+                            {t: "A tecnologia revela dimensões do corpo antes invisíveis", s: {dimensions: {curiosidade: 8}, artisticAxes: {realismoAbstracao: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TECNOLOGIA E FUTURO",
+                        q: "Que visão de futuro mais inspira seu trabalho criativo?",
+                        a: [
+                            {t: "Solarpunk — tecnologia em harmonia com natureza e coletividade", s: {styleScores: {solarpunk: 15}, artisticAxes: {organicidadeMecanicidade: -10, individualismoColetivismo: 10}}},
+                            {t: "Cyberpunk — sistemas de poder e resistência em megacidades digitais", s: {styleScores: {cyberpunk: 15}, artisticAxes: {organicidadeMecanicidade: 15, otimismoPessimismo: -10}}},
+                            {t: "Retrofuturismo — a nostalgia de futuros que nunca aconteceram", s: {styleScores: {artdeco: 5, steampunk: 8}, artisticAxes: {tradicaoInovacao: -5}}},
+                            {t: "Pós-apocalipse — beleza e ressignificação nos escombros", s: {styleScores: {darkfantasy: 8, brutalist: 5}, artisticAxes: {otimismoPessimismo: -15}}}
+                        ]
+                    },
+                    {
+                        category: "TECNOLOGIA E FUTURO",
+                        q: "Qual aspecto dos processos digitais mais influencia sua estética?",
+                        a: [
+                            {t: "Glitch e corrupção de dados como linguagem expressiva", s: {styleScores: {glitch: 15}, artisticAxes: {ordemCaos: 15, tradicaoInovacao: 10}}},
+                            {t: "A perfeição geométrica dos renders 3D e simulações físicas", s: {artisticAxes: {organicidadeMecanicidade: 10}, styleScores: {photorealism: 5}}},
+                            {t: "Interfaces e UX como linguagem visual contemporânea", s: {styleScores: {bauhaus: 3, constructivist: 5}, artisticAxes: {racionalEmocional: -5}}},
+                            {t: "A nostalgia pixelizada da computação primitiva", s: {styleScores: {vaporwave: 5}, artisticAxes: {tradicaoInovacao: -5, otimismoPessimismo: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TECNOLOGIA E FUTURO",
+                        q: "Como você vê o papel das redes sociais na produção e circulação da arte?",
+                        a: [
+                            {t: "Democratizaram o acesso mas achataram a profundidade estética", s: {dimensions: {neuroticismo: 3}, artisticAxes: {individualismoColetivismo: 5}}},
+                            {t: "Criaram uma nova estética nativa do digital com valor próprio", s: {artisticAxes: {tradicaoInovacao: 10}, styleScores: {urban: 5}}},
+                            {t: "São ferramentas neutras — o artista define seu uso estratégico", s: {discProfile: {adaptabilidade: 5}, dimensions: {conscienciosidade: 5}}},
+                            {t: "Devem ser subvertidas artisticamente, não simplesmente usadas", s: {styleScores: {conceptual: 8}, artisticAxes: {tradicaoInovacao: 8}}}
+                        ]
+                    },
+                    {
+                        category: "TECNOLOGIA E FUTURO",
+                        q: "Qual tecnologia emergente você considera mais artisticamente relevante?",
+                        a: [
+                            {t: "Realidade aumentada e espaços físico-digitais híbridos", s: {styleScores: {installation: 10}, artisticAxes: {realismoAbstracao: 10}}},
+                            {t: "Bioarte e interfaces com organismos vivos e DNA", s: {styleScores: {biomorphic: 10}, artisticAxes: {organicidadeMecanicidade: -8}}},
+                            {t: "NFTs e arte como protocolo de autoria descentralizada", s: {artisticAxes: {individualismoColetivismo: -5}, discProfile: {dominancia: 5}}},
+                            {t: "Computação generativa e suas implicações na criação algorítmica", s: {dimensions: {curiosidade: 10, abertura: 5}, artisticAxes: {tradicaoInovacao: 15}}}
+                        ]
+                    },
+                    // INFLUÊNCIAS CULTURAIS (35-40)
+                    {
+                        category: "INFLUÊNCIAS CULTURAIS",
+                        q: "Qual tradição artística cultural mais ressoa com sua visão criativa?",
+                        a: [
+                            {t: "Arte japonesa — wabi-sabi, ma (vazio) e atenção ao efêmero", s: {styleScores: {ukiyoe: 10, minimalist: 5}, artisticAxes: {simplicidadeComplexidade: -10, organicidadeMecanicidade: -5}}},
+                            {t: "Muralismo latinoamericano — arte como ato político e comunitário", s: {artisticAxes: {individualismoColetivismo: 15}, styleScores: {urban: 8}, dimensions: {empatia: 5}}},
+                            {t: "Vanguardas russas — suprematismo, construtivismo e utopia formal", s: {styleScores: {constructivist: 10, suprematist: 10}, artisticAxes: {ordemCaos: -10}}},
+                            {t: "Arte africana — geometria simbólica, ritmo e conexão espiritual", s: {artisticAxes: {concretismoSimbolismo: 10}, dimensions: {abertura: 5}}}
+                        ]
+                    },
+                    {
+                        category: "INFLUÊNCIAS CULTURAIS",
+                        q: "Qual movimento histórico da arte você sente maior afinidade estética?",
+                        a: [
+                            {t: "Surrealismo — o inconsciente como território de imagens impossíveis", s: {styleScores: {surreal: 15}, artisticAxes: {realismoAbstracao: 10, ordemCaos: 10}}},
+                            {t: "Bauhaus — funcionalidade, pedagogia e síntese das artes", s: {styleScores: {bauhaus: 15}, artisticAxes: {ordemCaos: -10, simplicidadeComplexidade: -5}}},
+                            {t: "Expressionismo alemão — distorção emocional da realidade", s: {styleScores: {expressionist: 15}, artisticAxes: {racionalEmocional: 15, realismoAbstracao: 5}}},
+                            {t: "Arte Pop — ironia, consumo e a estetização do banal", s: {styleScores: {popart: 15}, artisticAxes: {concretismoSimbolismo: -5, individualismoColetivismo: 10}}}
+                        ]
+                    },
+                    {
+                        category: "INFLUÊNCIAS CULTURAIS",
+                        q: "Qual subcultura ou movimento contracultural mais influencia sua estética?",
+                        a: [
+                            {t: "Punk — DIY, antiestética deliberada e rejeição do mercado", s: {styleScores: {urban: 8}, artisticAxes: {tradicaoInovacao: 15, ordemCaos: 15}, discProfile: {dominancia: 5}}},
+                            {t: "Rave e cultura eletrônica — éxtase coletivo, psicodelia e caos ordenado", s: {styleScores: {psychedelic: 10}, artisticAxes: {individualismoColetivismo: 10, racionalEmocional: 10}}},
+                            {t: "Gótico — romantismo sombrio, decadência e beleza da morte", s: {styleScores: {gothic: 12}, artisticAxes: {otimismoPessimismo: -15}}},
+                            {t: "Hip-hop — sampling, criatividade sob restrição e voz dos excluídos", s: {styleScores: {urban: 10}, artisticAxes: {individualismoColetivismo: 10}, dimensions: {empatia: 5}}}
+                        ]
+                    },
+                    {
+                        category: "INFLUÊNCIAS CULTURAIS",
+                        q: "Como você enxerga a relação entre arte popular e arte erudita?",
+                        a: [
+                            {t: "Toda hierarquia entre elas é construção ideológica e deve ser destruída", s: {artisticAxes: {tradicaoInovacao: 10}, styleScores: {dada: 5}, discProfile: {dominancia: 3}}},
+                            {t: "A maior arte emerge do atrito produtivo entre os dois universos", s: {dimensions: {abertura: 8, curiosidade: 5}, artisticAxes: {ordemCaos: 5}}},
+                            {t: "Arte popular carrega uma autenticidade que o erudito frequentemente perde", s: {artisticAxes: {individualismoColetivismo: 8}, dimensions: {empatia: 5}}},
+                            {t: "O rigor técnico da tradição erudita eleva qualquer expressão popular", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {tradicaoInovacao: -5}}}
+                        ]
+                    },
+                    {
+                        category: "INFLUÊNCIAS CULTURAIS",
+                        q: "Que papel a mitologia e o arquetípico desempenham na sua criação?",
+                        a: [
+                            {t: "São reservatórios inesgotáveis de símbolos e estruturas narrativas", s: {artisticAxes: {concretismoSimbolismo: 15}, styleScores: {magicalrealism: 8}}},
+                            {t: "Prefiro criar novas mitologias ao invés de reciclar as antigas", s: {dimensions: {abertura: 5, curiosidade: 5}, artisticAxes: {tradicaoInovacao: 10}}},
+                            {t: "Os arquétipos de Jung iluminam dimensões psíquicas universais", s: {dimensions: {curiosidade: 8}, artisticAxes: {concretismoSimbolismo: 10}, styleScores: {surreal: 5}}},
+                            {t: "Mitologia é decorativa — prefiro o presente concreto e cotidiano", s: {artisticAxes: {concretismoSimbolismo: -15, realismoAbstracao: -10}}}
+                        ]
+                    },
+                    {
+                        category: "INFLUÊNCIAS CULTURAIS",
+                        q: "Qual aspecto da cultura urbana contemporânea mais nutre sua visão artística?",
+                        a: [
+                            {t: "A arte de rua e o grafite como resistência no espaço público", s: {styleScores: {urban: 15}, artisticAxes: {individualismoColetivismo: 10}, discProfile: {dominancia: 3}}},
+                            {t: "A arquitetura brutalista e a beleza insolente do concreto", s: {styleScores: {brutalist: 12}, artisticAxes: {organicidadeMecanicidade: 10}}},
+                            {t: "A moda e a hipervisualidade das passarelas como arte performática", s: {styleScores: {performance: 5, artdeco: 5}, dimensions: {extroversao: 5}}},
+                            {t: "A fotografia documental e a poética do ordinário", s: {styleScores: {photorealism: 8}, artisticAxes: {realismoAbstracao: -10, concretismoSimbolismo: -5}}}
+                        ]
+                    },
+                    // TEORIA DA ARTE (41-46)
+                    {
+                        category: "TEORIA DA ARTE",
+                        q: "Qual das seguintes teorias estéticas mais se aproxima de sua visão artística?",
+                        a: [
+                            {t: "A arte como mimese — representação e espelho aprimorado do real", s: {artisticAxes: {realismoAbstracao: -20}, styleScores: {photorealism: 5}}},
+                            {t: "A arte como expressão — externalização da subjetividade interior", s: {artisticAxes: {racionalEmocional: 15}, dimensions: {neuroticismo: 3}, styleScores: {expressionist: 5}}},
+                            {t: "A arte como forma significante — relações estruturais que transcendem conteúdo", s: {styleScores: {abstract: 10, suprematist: 5}, artisticAxes: {concretismoSimbolismo: -10}}},
+                            {t: "A arte como ato institucional — o que é arte decide o contexto, não o objeto", s: {styleScores: {conceptual: 15}, dimensions: {curiosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TEORIA DA ARTE",
+                        q: "Qual sua posição sobre a morte do autor na interpretação da obra?",
+                        a: [
+                            {t: "A intenção do artista é essencial para a interpretação correta", s: {discProfile: {dominancia: 5}, artisticAxes: {individualismoColetivismo: -5}}},
+                            {t: "A obra ganha autonomia e múltiplos sentidos ao deixar o ateliê", s: {artisticAxes: {individualismoColetivismo: 5, ordemCaos: 5}, dimensions: {abertura: 5}}},
+                            {t: "Autor e obra existem em diálogo permanente — nem um domina o outro", s: {discProfile: {adaptabilidade: 5}, dimensions: {empatia: 5}}},
+                            {t: "O contexto cultural e histórico determina o sentido mais que o autor", s: {artisticAxes: {individualismoColetivismo: 10}, dimensions: {curiosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TEORIA DA ARTE",
+                        q: "Como você compreende o conceito de sublime na arte?",
+                        a: [
+                            {t: "O encontro com o que excede nossa capacidade de representação", s: {artisticAxes: {realismoAbstracao: 10, simplicidadeComplexidade: 10}, dimensions: {abertura: 5}}},
+                            {t: "A experiência de beleza intensa que provoca quase desconforto", s: {artisticAxes: {racionalEmocional: 10}, styleScores: {baroque: 5}}},
+                            {t: "O colapso da dicotomia entre sujeito e objeto — dissolução do eu", s: {artisticAxes: {concretismoSimbolismo: 10}, styleScores: {abstract: 5}}},
+                            {t: "Uma construção histórica e cultural que varia radicalmente entre culturas", s: {dimensions: {conscienciosidade: 5, curiosidade: 5}, artisticAxes: {individualismoColetivismo: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TEORIA DA ARTE",
+                        q: "O que você considera mais relevante em uma obra de arte conceitual?",
+                        a: [
+                            {t: "A ideia central deve ser potente o suficiente para dispensar execução impecável", s: {styleScores: {conceptual: 15}, artisticAxes: {realismoAbstracao: 10}}},
+                            {t: "A execução rigorosa é o que diferencia arte conceitual de especulação filosófica", s: {dimensions: {conscienciosidade: 8}, artisticAxes: {racionalEmocional: -10}}},
+                            {t: "O processo e a participação do espectador completam o trabalho", s: {styleScores: {performance: 8, installation: 8}, artisticAxes: {individualismoColetivismo: 10}}},
+                            {t: "A documentação e o contexto institucional legitimam o gesto artístico", s: {artisticAxes: {individualismoColetivismo: 5}, dimensions: {conscienciosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "TEORIA DA ARTE",
+                        q: "Qual é sua posição sobre originalidade versus apropriação na arte?",
+                        a: [
+                            {t: "Originalidade absoluta é um mito — toda arte é síntese do que a precede", s: {artisticAxes: {tradicaoInovacao: 5}, styleScores: {popart: 5, dada: 5}}},
+                            {t: "A citação e a apropriação são estratégias críticas legítimas e poderosas", s: {styleScores: {conceptual: 8}, artisticAxes: {individualismoColetivismo: 5}}},
+                            {t: "Busco uma voz tão singular que a influência se torne irreconhecível", s: {discProfile: {dominancia: 5}, artisticAxes: {individualismoColetivismo: -10}}},
+                            {t: "O diálogo explícito com a história da arte enriquece a obra", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {tradicaoInovacao: -5}}}
+                        ]
+                    },
+                    {
+                        category: "TEORIA DA ARTE",
+                        q: "Qual questão filosófica mais guia suas escolhas artísticas?",
+                        a: [
+                            {t: "O que constitui uma experiência estética genuína?", s: {dimensions: {abertura: 5, curiosidade: 5}, artisticAxes: {racionalEmocional: 5}}},
+                            {t: "Como a arte pode transformar a percepção e consciência do espectador?", s: {artisticAxes: {concretismoSimbolismo: 10}, styleScores: {psychedelic: 5}}},
+                            {t: "Qual a responsabilidade ética do artista em relação à sociedade?", s: {dimensions: {amabilidade: 5, empatia: 8}, artisticAxes: {individualismoColetivismo: 10}}},
+                            {t: "O que resta de específico na arte frente a outras formas de conhecimento?", s: {styleScores: {conceptual: 8}, dimensions: {curiosidade: 8}}}
+                        ]
+                    },
+                    // COMUNICAÇÃO VISUAL (47-52)
+                    {
+                        category: "COMUNICAÇÃO VISUAL",
+                        q: "Qual estratégia de composição você mais usa intuitivamente?",
+                        a: [
+                            {t: "Regra dos terços e pontos de tensão diagonal", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {ordemCaos: -10}}},
+                            {t: "Composição central com simetria radial", s: {artisticAxes: {ordemCaos: -15}, styleScores: {artdeco: 5, renaissance: 5}}},
+                            {t: "Composição caótica que força o olho a percorrer sem descanso", s: {artisticAxes: {ordemCaos: 20}, styleScores: {expressionist: 5, dada: 5}}},
+                            {t: "Espaço negativo dominante que faz o vazio comunicar", s: {styleScores: {minimalist: 10}, artisticAxes: {simplicidadeComplexidade: -15}}}
+                        ]
+                    },
+                    {
+                        category: "COMUNICAÇÃO VISUAL",
+                        q: "Em termos de ritmo visual, sua obra tende a ser:",
+                        a: [
+                            {t: "Sincopada e irregular — variações de ritmo que surpreendem", s: {artisticAxes: {ordemCaos: 10}, styleScores: {expressionist: 5}}},
+                            {t: "Regular e métrica — repetição que cria hipnose ou meditação", s: {artisticAxes: {ordemCaos: -10}, styleScores: {suprematist: 5, opart: 8}}},
+                            {t: "Progressiva — crescendo ou decrescendo de intensidade", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {simplicidadeComplexidade: 5}}},
+                            {t: "Sem ritmo deliberado — deixo que emerge do processo intuitivo", s: {artisticAxes: {racionalEmocional: 10}, dimensions: {abertura: 5}}}
+                        ]
+                    },
+                    {
+                        category: "COMUNICAÇÃO VISUAL",
+                        q: "Qual o papel do texto e da tipografia na sua produção visual?",
+                        a: [
+                            {t: "Elemento visual prioritário — a tipografia É a imagem", s: {styleScores: {bauhaus: 5, constructivist: 5}, artisticAxes: {ordemCaos: -5}}},
+                            {t: "Ausente ou mínimo — prefiro que a imagem opere sem mediação verbal", s: {artisticAxes: {concretismoSimbolismo: 5}, styleScores: {abstract: 5}}},
+                            {t: "Contrapontístico — texto e imagem em tensão produtiva e irônica", s: {styleScores: {conceptual: 5, popart: 5}, artisticAxes: {ordemCaos: 5}}},
+                            {t: "Complementar — texto aprofunda dimensões que a imagem não alcança", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {concretismoSimbolismo: 5}}}
+                        ]
+                    },
+                    {
+                        category: "COMUNICAÇÃO VISUAL",
+                        q: "Como você pensa o movimento e o tempo em obras estáticas?",
+                        a: [
+                            {t: "Crio direcionamentos cinéticos que guiam o olhar ativamente", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {racionalEmocional: -5}}},
+                            {t: "Capturo o instante decisivo — o antes e depois implícitos na imagem", s: {styleScores: {photorealism: 5}, artisticAxes: {realismoAbstracao: -5}}},
+                            {t: "Sobreponho múltiplos tempos — acumulação e palimpsesto visual", s: {artisticAxes: {simplicidadeComplexidade: 10}, styleScores: {cubist: 8, futurism: 8}}},
+                            {t: "Trabalho a tensão do congelado — a suspensão como poética", s: {artisticAxes: {ordemCaos: -5, racionalEmocional: 5}}}
+                        ]
+                    },
+                    {
+                        category: "COMUNICAÇÃO VISUAL",
+                        q: "Qual tipo de perspectiva ou ponto de vista você mais explora?",
+                        a: [
+                            {t: "Perspectiva worm's eye ou bird's eye — ângulos extremos e perturbadores", s: {artisticAxes: {tradicaoInovacao: 8, ordemCaos: 5}}},
+                            {t: "Perspectiva isométrica ou axonométrica sem ponto de fuga", s: {styleScores: {constructivist: 5, bauhaus: 3}, artisticAxes: {ordemCaos: -5}}},
+                            {t: "Perspectiva subjetiva — o olho como extensão do corpo do espectador", s: {dimensions: {empatia: 5}, artisticAxes: {racionalEmocional: 5}}},
+                            {t: "Múltiplas perspectivas simultâneas — cubismo e fragmentação visual", s: {styleScores: {cubist: 12}, artisticAxes: {ordemCaos: 10, simplicidadeComplexidade: 10}}}
+                        ]
+                    },
+                    {
+                        category: "COMUNICAÇÃO VISUAL",
+                        q: "Qual é sua relação com símbolos e ícones na comunicação visual?",
+                        a: [
+                            {t: "Crio sistemas simbólicos originais com sua própria semântica interna", s: {artisticAxes: {concretismoSimbolismo: 15}, dimensions: {curiosidade: 5}}},
+                            {t: "Subverto símbolos conhecidos para criar novos significados", s: {styleScores: {dada: 5, popad: 5}, artisticAxes: {tradicaoInovacao: 10}}},
+                            {t: "Evito símbolos — prefiro a especificidade do concreto e singular", s: {artisticAxes: {concretismoSimbolismo: -15, realismoAbstracao: -5}}},
+                            {t: "Uso símbolos arquetípicos como chaves para o inconsciente coletivo", s: {styleScores: {magicalrealism: 8, surreal: 5}, artisticAxes: {concretismoSimbolismo: 10}}}
+                        ]
+                    },
+                    // FILOSOFIA CRIATIVA (53-60)
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Qual é o papel do acaso e do aleatório na sua prática criativa?",
+                        a: [
+                            {t: "O acaso é um colaborador — acolho o inesperado como revelação", s: {artisticAxes: {ordemCaos: 15}, dimensions: {abertura: 8}}},
+                            {t: "Estruturo sistemas que permitem aleatoriedade controlada e frutuosa", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {ordemCaos: 5}}},
+                            {t: "Reduzo o acaso ao mínimo — a intenção deve prevalecer sobre o acidente", s: {artisticAxes: {ordemCaos: -15}, discProfile: {dominancia: 5}}},
+                            {t: "O acaso é inevitável — a questão é como reconhecer o significativo nele", s: {discProfile: {adaptabilidade: 5}, dimensions: {curiosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Como você compreende a relação entre dor, sofrimento e criação artística?",
+                        a: [
+                            {t: "A intensidade emocional — positiva ou negativa — alimenta a autenticidade", s: {artisticAxes: {racionalEmocional: 10}, dimensions: {neuroticismo: 3}}},
+                            {t: "O mito do artista sofredor é nocivo e romantiza o adoecimento mental", s: {dimensions: {resiliencia: 5, conscienciosidade: 3}, artisticAxes: {racionalEmocional: -5}}},
+                            {t: "A sublimação criativa transforma experiências difíceis em algo universal", s: {artisticAxes: {concretismoSimbolismo: 10}, dimensions: {resiliencia: 5}}},
+                            {t: "A distância emocional produz obras mais potentes que a imersão total", s: {artisticAxes: {racionalEmocional: -10}, dimensions: {conscienciosidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Qual é sua visão sobre autenticidade na prática artística?",
+                        a: [
+                            {t: "Autenticidade emerge da honestidade radical com a própria subjetividade", s: {artisticAxes: {individualismoColetivismo: -10}, dimensions: {neuroticismo: 3}}},
+                            {t: "Autenticidade é um ideal ilusório — toda expressão é construção cultural", s: {styleScores: {conceptual: 5}, artisticAxes: {concretismoSimbolismo: 5}}},
+                            {t: "A autenticidade existe no compromisso total com a visão, qualquer que seja", s: {discProfile: {dominancia: 5}, dimensions: {conscienciosidade: 5}}},
+                            {t: "Autenticidade emerge do engajamento profundo com o contexto social", s: {artisticAxes: {individualismoColetivismo: 10}, dimensions: {empatia: 5}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Qual é sua postura em relação ao mercado de arte?",
+                        a: [
+                            {t: "Navego estrategicamente sem comprometer a integridade da obra", s: {discProfile: {adaptabilidade: 5, assertividade: 3}, dimensions: {conscienciosidade: 3}}},
+                            {t: "O mercado corrompe inevitavelmente — busco circuitos alternativos", s: {artisticAxes: {individualismoColetivismo: -5, tradicaoInovacao: 8}, discProfile: {dominancia: 3}}},
+                            {t: "O mercado é um contexto como qualquer outro — parte integrante da obra", s: {styleScores: {popart: 5, conceptual: 5}, artisticAxes: {concretismoSimbolismo: 5}}},
+                            {t: "O sucesso comercial valida a comunicabilidade e alcance social da arte", s: {discProfile: {influencia: 5}, dimensions: {extroversao: 3}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Qual aspecto do processo criativo você considera mais sagrado?",
+                        a: [
+                            {t: "O momento de ruptura — quando algo inesperado emerge e muda tudo", s: {artisticAxes: {ordemCaos: 10}, dimensions: {abertura: 8}}},
+                            {t: "A disciplina silenciosa do trabalho cotidiano e do aperfeiçoamento técnico", s: {dimensions: {conscienciosidade: 10}, discProfile: {estabilidade: 5}}},
+                            {t: "O estado de flow — quando a separação entre artista e obra desaparece", s: {artisticAxes: {racionalEmocional: 10}, dimensions: {abertura: 5}}},
+                            {t: "O momento de compartilhar — quando a obra encontra o espectador pela primeira vez", s: {dimensions: {empatia: 8, extroversao: 5}, discProfile: {influencia: 5}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Como você vê a relação entre arte e transformação social?",
+                        a: [
+                            {t: "A arte tem o poder e a responsabilidade de questionar estruturas de poder", s: {artisticAxes: {individualismoColetivismo: 15}, dimensions: {empatia: 5}, discProfile: {dominancia: 3}}},
+                            {t: "A arte transforma pelo viés estético — mudando como percebemos o mundo", s: {artisticAxes: {concretismoSimbolismo: 8}, dimensions: {abertura: 5}}},
+                            {t: "A arte deve ser autônoma — instrumentalizá-la politicamente a enfraquece", s: {artisticAxes: {individualismoColetivismo: -10}, discProfile: {estabilidade: 3}}},
+                            {t: "A arte transforma ao criar comunidades de sentido e experiência compartilhada", s: {artisticAxes: {individualismoColetivismo: 10}, dimensions: {empatia: 8, amabilidade: 5}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "O que você considera a maior virtude de um artista?",
+                        a: [
+                            {t: "Coragem — de expor vulnerabilidades e desafiar o estabelecido", s: {discProfile: {dominancia: 8, assertividade: 5}, dimensions: {resiliencia: 5}}},
+                            {t: "Sensibilidade — de perceber o que outros não notam no mundo", s: {dimensions: {abertura: 8, empatia: 5}, artisticAxes: {racionalEmocional: 5}}},
+                            {t: "Perseverança — de continuar criando apesar da incerteza e do fracasso", s: {dimensions: {resiliencia: 10, conscienciosidade: 5}, discProfile: {estabilidade: 5}}},
+                            {t: "Integridade — de manter coerência entre valores pessoais e obra", s: {dimensions: {conscienciosidade: 5}, discProfile: {dominancia: 3}, artisticAxes: {individualismoColetivismo: -3}}}
+                        ]
+                    },
+                    {
+                        category: "FILOSOFIA CRIATIVA",
+                        q: "Ao final, o que você quer que reste de seu trabalho artístico?",
+                        a: [
+                            {t: "Obras que resistam ao tempo e sejam redescobertos por gerações futuras", s: {dimensions: {conscienciosidade: 5}, artisticAxes: {tradicaoInovacao: -3}, discProfile: {dominancia: 5}}},
+                            {t: "Uma linguagem visual inconfundível que expanda o campo das possibilidades", s: {dimensions: {curiosidade: 5, abertura: 5}, artisticAxes: {tradicaoInovacao: 10}}},
+                            {t: "O impacto emocional profundo em cada pessoa que encontrar a obra", s: {dimensions: {empatia: 8}, artisticAxes: {racionalEmocional: 10}}},
+                            {t: "Uma contribuição ao diálogo coletivo sobre o que somos e podemos ser", s: {artisticAxes: {individualismoColetivismo: 10}, dimensions: {amabilidade: 5, empatia: 5}}}
+                        ]
+                    }
+                ];
+
+                this.questions = questionBank;
+                this.config.totalQuestions = this.questions.length;
+            },
+
+            updateDimensionDisplay: function() {
+                const display = document.getElementById('dimension-display');
+                if (!display) return;
+                display.innerHTML = `
+                    <div class="dimension">
+                        <div class="dimension-label">ABERTURA</div>
+                        <div class="dimension-value">${Math.round(this.config.dimensions.abertura)}</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-label">ORDEM/CAOS</div>
+                        <div class="dimension-value">${Math.round(this.config.artisticAxes.ordemCaos)}</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-label">REALISMO</div>
+                        <div class="dimension-value">${Math.round(this.config.artisticAxes.realismoAbstracao)}</div>
+                    </div>
+                    <div class="dimension">
+                        <div class="dimension-label">INOVAÇÃO</div>
+                        <div class="dimension-value">${Math.round(this.config.artisticAxes.tradicaoInovacao)}</div>
+                    </div>
+                `;
+            },
+
+            processAnswer: function(answer) {
+                const processScores = (obj, target) => {
+                    if (obj && target) {
+                        Object.entries(obj).forEach(([key, value]) => {
+                            if (target[key] !== undefined) {
+                                if (key in this.config.dimensions || key in this.config.artisticAxes) {
+                                    target[key] = Math.max(0, Math.min(100, target[key] + value));
+                                } else {
+                                    target[key] += value;
+                                }
+                            }
+                        });
+                    }
+                };
+                processScores(answer.s.dimensions, this.config.dimensions);
+                processScores(answer.s.artisticAxes, this.config.artisticAxes);
+                processScores(answer.s.discProfile, this.config.discProfile);
+                processScores(answer.s.styleScores, this.config.styleScores);
+                this.config.currentQuestion++;
+                this.updateDimensionDisplay();
+                if (this.config.currentQuestion >= this.config.totalQuestions) {
+                    this.showResults();
+                } else {
+                    this.showNextQuestion();
+                }
+            },
+
+            showNextQuestion: function() {
+                const question = this.questions[this.config.currentQuestion];
+                document.getElementById('category-label').textContent = question.category;
+                document.getElementById('q-number').textContent = `Q${this.config.currentQuestion + 1}`;
+                document.getElementById('q-text').textContent = question.q;
+                const progressPercent = (this.config.currentQuestion / this.config.totalQuestions) * 100;
+                document.getElementById('p-bar').style.width = `${progressPercent}%`;
+                document.getElementById('progress-counter').textContent = `Questão ${this.config.currentQuestion + 1}/${this.config.totalQuestions}`;
+                document.getElementById('progress-percent').textContent = `${Math.round(progressPercent)}%`;
+                const optionsContainer = document.getElementById('opts');
+                optionsContainer.innerHTML = '';
+                question.a.forEach((answer) => {
+                    const button = document.createElement('button');
+                    button.className = 'btn-option';
+                    button.innerHTML = `<span>${answer.t}</span>`;
+                    button.onclick = () => this.processAnswer(answer);
+                    button.tabIndex = 0;
+                    button.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') this.processAnswer(answer); };
+                    optionsContainer.appendChild(button);
+                });
+            },
+
+            showResults: function() {
+                document.getElementById('screen-quiz').classList.remove('active');
+                document.getElementById('screen-result').classList.add('active');
+                this.generatePersonaSummary();
+                this.createVisualizations();
+                this.generateFinalPrompt();
+            },
+
+            generatePersonaSummary: function() {
+                const topStyles = Object.entries(this.config.styleScores).sort(([,a], [,b]) => b - a).slice(0, 3);
+                const archetype = this.determineArchetype();
+                const colorPalette = this.determineColorPalette();
+                const discEntries = Object.entries(this.config.discProfile);
+                const primaryDisc = discEntries.sort(([,a], [,b]) => b - a)[0];
+                let styleTags = '';
+                topStyles.forEach(([style, score], index) => {
+                    let className = 'style-tag';
+                    if (index === 0) className += ' primary';
+                    styleTags += `<span class="${className}">${style.toUpperCase()}</span>`;
+                });
+                const genderInfo = this.config.selectedGender ?
+                    `<div style="margin-top: 10px; color: var(--accent2); font-size: 0.9rem;">GÊNERO: ${this.config.selectedGender.toUpperCase()}</div>` : '';
+                const summaryHTML = `
+                    <div class="summary-card">
+                        <div class="summary-title">ARQUÉTIPO PRINCIPAL</div>
+                        <div class="archetype-badge">${archetype}</div>
+                        ${genderInfo}
+                        <div style="margin-top: 10px; color: var(--text); font-size: 0.9rem;">${this.getArchetypeDescription(archetype)}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-title">ESTILOS DOMINANTES</div>
+                        <div class="style-tags">${styleTags}</div>
+                        <div style="margin-top: 15px;">
+                            <div style="color: var(--accent2); font-size: 0.9rem;">PALETA DE CORES</div>
+                            <div style="color: var(--text-light); font-size: 1.1rem; margin-top: 5px;">${colorPalette}</div>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-title">PERFIL COMPORTAMENTAL</div>
+                        <div style="color: var(--text-light); font-size: 1.2rem; margin: 10px 0;">${primaryDisc[0].toUpperCase()} — ${this.getDiscDescription(primaryDisc[0])}</div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 15px;">
+                            <div>
+                                <div style="color: var(--accent2); font-size: 0.8rem;">INOVAÇÃO</div>
+                                <div style="color: var(--text-light);">${this.config.artisticAxes.tradicaoInovacao >= 70 ? 'ALTA' : 'MODERADA'}</div>
+                            </div>
+                            <div>
+                                <div style="color: var(--accent2); font-size: 0.8rem;">COMPLEXIDADE</div>
+                                <div style="color: var(--text-light);">${this.config.artisticAxes.simplicidadeComplexidade >= 70 ? 'ALTA' : 'MODERADA'}</div>
+                            </div>
+                            <div>
+                                <div style="color: var(--accent2); font-size: 0.8rem;">EMOÇÃO</div>
+                                <div style="color: var(--text-light);">${this.config.artisticAxes.racionalEmocional >= 70 ? 'ALTA' : 'MODERADA'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('persona-summary').innerHTML = summaryHTML;
+            },
+
+            createVisualizations: function() {
+                Object.values(this.charts).forEach(chart => { if (chart) chart.destroy(); });
+                const commonOptions = {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: 'rgba(255, 255, 255, 0.7)' } } }
+                };
+                const psychologyCtx = document.getElementById('psychologyChart').getContext('2d');
+                this.charts.psychologyChart = new Chart(psychologyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Abertura', 'Conscienciosidade', 'Extroversão', 'Amabilidade', 'Neuroticismo', 'Curiosidade'],
+                        datasets: [{
+                            label: 'Pontuação',
+                            data: [this.config.dimensions.abertura, this.config.dimensions.conscienciosidade, this.config.dimensions.extroversao, this.config.dimensions.amabilidade, this.config.dimensions.neuroticismo, this.config.dimensions.curiosidade],
+                            backgroundColor: ['rgba(255,0,85,0.7)', 'rgba(0,204,255,0.7)', 'rgba(255,204,0,0.7)', 'rgba(0,255,136,0.7)', 'rgba(153,102,255,0.7)', 'rgba(255,159,64,0.7)'],
+                            borderColor: ['rgb(255,0,85)', 'rgb(0,204,255)', 'rgb(255,204,0)', 'rgb(0,255,136)', 'rgb(153,102,255)', 'rgb(255,159,64)'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: { ...commonOptions, scales: { y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } }, x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } } }, plugins: { legend: { display: false } } }
+                });
+                const artisticCtx = document.getElementById('artisticAxesChart').getContext('2d');
+                this.charts.artisticAxesChart = new Chart(artisticCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Ordem/Caos', 'Realismo/Abstração', 'Tradição/Inovação', 'Simplicidade/Complexidade', 'Otimismo/Pessimismo', 'Orgânico/Mecânico'],
+                        datasets: [{ label: 'Pontuação', data: [this.config.artisticAxes.ordemCaos, this.config.artisticAxes.realismoAbstracao, this.config.artisticAxes.tradicaoInovacao, this.config.artisticAxes.simplicidadeComplexidade, this.config.artisticAxes.otimismoPessimismo, this.config.artisticAxes.organicidadeMecanicidade], backgroundColor: 'rgba(0,204,255,0.6)', borderColor: 'rgb(0,204,255)', borderWidth: 1 }]
+                    },
+                    options: { indexAxis: 'y', ...commonOptions, scales: { x: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } }, y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'rgba(255,255,255,0.7)' } } }, plugins: { legend: { display: false } } }
+                });
+                const discCtx = document.getElementById('discChart').getContext('2d');
+                const discData = [this.config.discProfile.dominancia, this.config.discProfile.influencia, this.config.discProfile.estabilidade, this.config.discProfile.conformidade];
+                const discTotal = discData.reduce((a, b) => a + b, 0) || 1;
+                const normalizedDiscData = discData.map(value => Math.round((value / discTotal) * 100));
+                this.charts.discChart = new Chart(discCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Dominância', 'Influência', 'Estabilidade', 'Conformidade'],
+                        datasets: [{ data: normalizedDiscData, backgroundColor: ['rgba(255,0,85,0.8)', 'rgba(0,204,255,0.8)', 'rgba(255,204,0,0.8)', 'rgba(0,255,136,0.8)'], borderColor: ['rgb(255,0,85)', 'rgb(0,204,255)', 'rgb(255,204,0)', 'rgb(0,255,136)'], borderWidth: 2 }]
+                    },
+                    options: { ...commonOptions, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.7)', padding: 15 } } } }
+                });
+                const stylesCtx = document.getElementById('stylesChart').getContext('2d');
+                const topStyles = Object.entries(this.config.styleScores).sort(([,a], [,b]) => b - a).slice(0, 5);
+                this.charts.stylesChart = new Chart(stylesCtx, {
+                    type: 'polarArea',
+                    data: {
+                        labels: topStyles.map(([style]) => style.toUpperCase()),
+                        datasets: [{ data: topStyles.map(([,score]) => score), backgroundColor: ['rgba(255,0,85,0.7)', 'rgba(0,204,255,0.7)', 'rgba(255,204,0,0.7)', 'rgba(0,255,136,0.7)', 'rgba(153,102,255,0.7)'], borderColor: ['rgb(255,0,85)', 'rgb(0,204,255)', 'rgb(255,204,0)', 'rgb(0,255,136)', 'rgb(153,102,255)'], borderWidth: 2 }]
+                    },
+                    options: { ...commonOptions, scales: { r: { ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.1)' } } }, plugins: { legend: { position: 'right', labels: { color: 'rgba(255,255,255,0.7)', padding: 10, font: { size: 10 } } } } }
+                });
+                const radarCtx = document.getElementById('radarChart').getContext('2d');
+                this.charts.radarChart = new Chart(radarCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Inovação', 'Complexidade', 'Emoção', 'Orgânico', 'Realismo', 'Ordem'],
+                        datasets: [{
+                            label: 'Seu Perfil',
+                            data: [this.config.artisticAxes.tradicaoInovacao, this.config.artisticAxes.simplicidadeComplexidade, this.config.artisticAxes.racionalEmocional, this.config.artisticAxes.organicidadeMecanicidade, this.config.artisticAxes.realismoAbstracao, this.config.artisticAxes.ordemCaos],
+                            backgroundColor: 'rgba(255,0,85,0.2)', borderColor: 'rgb(255,0,85)', pointBackgroundColor: 'rgb(255,0,85)', pointBorderColor: '#fff', pointHoverBackgroundColor: '#fff', pointHoverBorderColor: 'rgb(255,0,85)'
+                        }, {
+                            label: 'Média Global', data: [50, 50, 50, 50, 50, 50],
+                            backgroundColor: 'rgba(0,204,255,0.1)', borderColor: 'rgba(0,204,255,0.5)', pointBackgroundColor: 'rgba(0,204,255,0.5)', borderDash: [5, 5]
+                        }]
+                    },
+                    options: { ...commonOptions, scales: { r: { beginAtZero: true, max: 100, ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: 'rgba(255,255,255,0.7)', font: { size: 11 } } } } }
+                });
+            },
+
+            determineArchetype: function() {
+                const scores = {
+                    'VISIONÁRIO ABSTRATO': (this.config.dimensions.abertura + this.config.artisticAxes.realismoAbstracao) / 2,
+                    'PRECISIONISTA SISTEMÁTICO': (this.config.dimensions.conscienciosidade + (100 - this.config.artisticAxes.ordemCaos)) / 2,
+                    'COLABORADOR SOCIAL': (this.config.dimensions.extroversao + this.config.dimensions.empatia) / 2,
+                    'REALISTA ANALÍTICO': ((100 - this.config.artisticAxes.realismoAbstracao) + this.config.dimensions.conscienciosidade) / 2,
+                    'EXPERIMENTADOR RADICAL': (this.config.artisticAxes.tradicaoInovacao + this.config.dimensions.curiosidade) / 2,
+                    'NATURALISTA UTOPISTA': (this.config.artisticAxes.organicidadeMecanicidade + this.config.artisticAxes.otimismoPessimismo) / 2,
+                    'SÍNTESE EQUILIBRADA': 50
+                };
+                return Object.entries(scores).sort(([,a], [,b]) => b - a)[0][0];
+            },
+
+            determineColorPalette: function() {
+                const palettes = ['PASTÉIS ORGÂNICOS', 'NEONS VIBRANTES', 'TERROSOS PROFUNDOS', 'MONOCROMÁTICO SOMBRIO', 'NATURAIS HARMÔNICOS', 'METÁLICOS NEUTROS', 'PSICODÉLICO VIBRANTE'];
+                const inovacao = this.config.artisticAxes.tradicaoInovacao;
+                const emocao = this.config.artisticAxes.racionalEmocional;
+                const otimismo = this.config.artisticAxes.otimismoPessimismo;
+                if (inovacao > 70 && emocao > 60) return 'NEONS VIBRANTES';
+                if (otimismo < 40) return 'MONOCROMÁTICO SOMBRIO';
+                if (this.config.artisticAxes.organicidadeMecanicidade < 40) return 'NATURAIS HARMÔNICOS';
+                if (this.config.artisticAxes.simplicidadeComplexidade < 40) return 'METÁLICOS NEUTROS';
+                return palettes[Math.floor(Math.random() * palettes.length)];
+            },
+
+            getArchetypeDescription: function(archetype) {
+                const descriptions = {
+                    'VISIONÁRIO ABSTRATO': 'Combina alta abertura à experiência com forte tendência à abstração e ao simbolismo.',
+                    'PRECISIONISTA SISTEMÁTICO': 'Valoriza ordem, estrutura e perfeição técnica como fundamentos da expressão.',
+                    'COLABORADOR SOCIAL': 'Extrovertido e voltado para o coletivo, vê a arte como ato de conexão humana.',
+                    'REALISTA ANALÍTICO': 'Focado na representação precisa da realidade com rigor observacional.',
+                    'EXPERIMENTADOR RADICAL': 'Desafiador de convenções e buscador incessante de novas fronteiras expressivas.',
+                    'NATURALISTA UTOPISTA': 'Harmoniza elementos orgânicos com visões otimistas de mundos possíveis.',
+                    'SÍNTESE EQUILIBRADA': 'Combina múltiplas influências de forma harmoniosa e adaptativa.'
+                };
+                return descriptions[archetype] || 'Perfil criativo único e multidimensional.';
+            },
+
+            getDiscDescription: function(discType) {
+                const descriptions = {
+                    'dominancia': 'Focado em resultados, decisivo e assertivo',
+                    'influencia': 'Comunicativo, persuasivo e voltado para pessoas',
+                    'estabilidade': 'Paciente, consistente e previsível',
+                    'conformidade': 'Analítico, preciso e orientado por regras',
+                    'adaptabilidade': 'Flexível, ajustável e receptivo a mudanças',
+                    'assertividade': 'Direto, confiante e determinado'
+                };
+                return descriptions[discType] || 'Perfil comportamental equilibrado';
+            },
+
+            generateFinalPrompt: function() {
+                const archetype = this.determineArchetype();
+                const palette = this.determineColorPalette();
+                const gender = this.config.selectedGender ? this.config.selectedGender.toUpperCase() : 'NEUTRO';
+                const topStylesList = Object.entries(this.config.styleScores).sort(([,a], [,b]) => b - a).slice(0, 3).map(([style]) => style.toUpperCase()).join(' + ');
+                const top2Styles = Object.entries(this.config.styleScores).sort(([,a], [,b]) => b - a).slice(0, 2).map(([style]) => style).join(' e ');
+
+                const prompt = `=== PROMPT OTIMIZADO PARA ${this.config.selectedGenerator.toUpperCase()} ===
+
+ARQUÉTIPO: ${archetype}
+GÊNERO: ${gender}
+PALETA DE CORES: ${palette}
+ESTILOS DOMINANTES: ${topStylesList}
+
+PROMPT COMPLETO:
+Uma representação artística profunda do arquétipo "${archetype}" 
+${this.config.selectedGender ? `com características ${this.config.selectedGender === 'masculino' ? 'masculinas' : 'femininas'} expressivas, ` : ''}
+usando uma paleta de cores ${palette.toLowerCase()}. 
+Estilo visual que combina elementos de ${top2Styles}.
+
+DETALHES TÉCNICOS:
+• Resolução 8K, qualidade de obra-prima
+• Iluminação cinematográfica, atmosfera imersiva
+• Detalhes complexos, texturas ricas
+• Composição dinâmica e equilibrada
+${this.config.selectedGender === 'masculino' ? '• Features masculinas definidas, postura assertiva' : ''}
+${this.config.selectedGender === 'feminino' ? '• Features femininas elegantes, graça composicional' : ''}
+
+CONFIGURAÇÕES ESPECÍFICAS:
+${this.getGeneratorSpecificSettings()}
+
+=== ANÁLISE PSICO-ARTÍSTICA ===
+• Abertura: ${Math.round(this.config.dimensions.abertura)}/100
+• Conscienciosidade: ${Math.round(this.config.dimensions.conscienciosidade)}/100
+• Extroversão: ${Math.round(this.config.dimensions.extroversao)}/100
+• Empatia: ${Math.round(this.config.dimensions.empatia)}/100
+• Curiosidade: ${Math.round(this.config.dimensions.curiosidade)}/100
+• Inovação: ${Math.round(this.config.artisticAxes.tradicaoInovacao)}/100
+• Complexidade: ${Math.round(this.config.artisticAxes.simplicidadeComplexidade)}/100
+• Emoção: ${Math.round(this.config.artisticAxes.racionalEmocional)}/100`;
+
+                document.getElementById('result-box').textContent = prompt;
+            },
+
+            getGeneratorSpecificSettings: function() {
+                const settings = {
+                    'mj': '--ar 16:9 --style raw --stylize 1000 --v 6.1 --chaos 25',
+                    'flux': 'Hyper-detailed, photorealistic, 8K, Unreal Engine 5 render',
+                    'dalle': 'Detailed artistic illustration with deep symbolic meaning',
+                    'sd': 'masterpiece, best quality, intricate details, professional'
+                };
+                return settings[this.config.selectedGenerator] || 'Configurações padrão';
+            },
+
+            restart: function() {
+                this.config.currentQuestion = 0;
+                this.config.selectedGenerator = '';
+                this.config.selectedGender = '';
+                Object.keys(this.config.dimensions).forEach(key => this.config.dimensions[key] = 50);
+                Object.keys(this.config.artisticAxes).forEach(key => this.config.artisticAxes[key] = 50);
+                Object.keys(this.config.discProfile).forEach(key => this.config.discProfile[key] = 0);
+                Object.keys(this.config.styleScores).forEach(key => this.config.styleScores[key] = 0);
+                Object.values(this.charts).forEach(chart => { if (chart) chart.destroy(); });
+                document.getElementById('screen-result').classList.remove('active');
+                document.getElementById('screen-quiz').classList.remove('active');
+                document.getElementById('screen-gender').classList.remove('active');
+                document.getElementById('screen-start').classList.add('active');
+                document.querySelectorAll('input[name="gender"]').forEach(radio => radio.checked = false);
+                this.updateDimensionDisplay();
+            }
+        };
+
+        NexusSystem.init();
+
+        function selectPlatform(platform) {
+            NexusSystem.config.selectedGenerator = platform;
+            const platformNames = { 'mj': 'MIDJOURNEY V6.1', 'flux': 'FLUX.1 PRO', 'dalle': 'DALL-E 3', 'sd': 'STABLE DIFFUSION XL' };
+            document.getElementById('selected-platform-display').textContent = platformNames[platform] || platform;
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-gender').classList.add('active');
+        }
+
+        function backToPlatform() {
+            document.getElementById('screen-gender').classList.remove('active');
+            document.getElementById('screen-start').classList.add('active');
+            NexusSystem.config.selectedGenerator = '';
+        }
+
+        function confirmGender() {
+            const selectedGender = document.querySelector('input[name="gender"]:checked');
+            if (!selectedGender) { showNotification('Por favor, selecione uma opção de gênero para continuar'); return; }
+            NexusSystem.config.selectedGender = selectedGender.value;
+            document.getElementById('screen-gender').classList.remove('active');
+            document.getElementById('screen-quiz').classList.add('active');
+            NexusSystem.showNextQuestion();
+        }
+
+        function copyToClipboard() {
+            const text = document.getElementById('result-box').textContent;
+            const promptOnly = text.split('=== ANÁLISE')[0].trim();
+            navigator.clipboard.writeText(promptOnly)
+                .then(() => showNotification('Prompt copiado para a área de transferência!'))
+                .catch(err => showNotification('Erro ao copiar. Tente novamente.'));
+        }
+
+        function downloadAnalysis() {
+            const text = document.getElementById('result-box').textContent;
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nexus-persona-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showNotification('Análise baixada com sucesso!');
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            document.getElementById('notification-text').textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => notification.classList.remove('show'), 3000);
+        }
+
+        function restartSystem() { NexusSystem.restart(); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('p-bar').style.width = '0%';
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (document.getElementById('screen-quiz').classList.contains('active')) {
+                        if (confirm('Deseja realmente sair? O progresso será perdido.')) restartSystem();
+                    } else if (document.getElementById('screen-gender').classList.contains('active')) {
+                        backToPlatform();
+                    }
+                }
+            });
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', (e) => {
+                const now = Date.now();
+                if (now - lastTouchEnd <= 300) e.preventDefault();
+                lastTouchEnd = now;
+            }, { passive: false });
+
+            const demoButton = document.createElement('button');
+            demoButton.className = 'btn-primary';
+            demoButton.style.marginTop = '20px';
+            demoButton.textContent = '🚀 VER DEMONSTRAÇÃO RÁPIDA';
+            demoButton.onclick = () => {
+                NexusSystem.config.selectedGenerator = 'mj';
+                NexusSystem.config.selectedGender = 'masculino';
+                Object.keys(NexusSystem.config.dimensions).forEach(key => NexusSystem.config.dimensions[key] = 30 + Math.random() * 70);
+                Object.keys(NexusSystem.config.artisticAxes).forEach(key => NexusSystem.config.artisticAxes[key] = 30 + Math.random() * 70);
+                Object.keys(NexusSystem.config.discProfile).forEach(key => NexusSystem.config.discProfile[key] = Math.random() * 100);
+                ['surreal', 'cyberpunk', 'minimalist', 'expressionist', 'biomorphic'].forEach(style => {
+                    if (NexusSystem.config.styleScores[style] !== undefined) NexusSystem.config.styleScores[style] = 50 + Math.random() * 100;
+                });
+                NexusSystem.showResults();
+            };
+            document.getElementById('screen-start').appendChild(demoButton);
+        });
+    </script>
+</body>
+</html>

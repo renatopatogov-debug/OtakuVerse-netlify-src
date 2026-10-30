@@ -1,0 +1,2387 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SUECA_SYSTEM_V6</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="description" content="Sueca System - Drink Game Terminal Edition">
+    <meta name="theme-color" content="#CC0000">
+    <link rel="manifest" href="data:application/json,{%22name%22:%22Sueca%20System%20V6%22,%22short_name%22:%22SuecaV6%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%230a0a0a%22,%22theme_color%22:%22%23CC0000%22}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        /* ============================================ */
+        /* CSS VARIABLES - LIGHT & DARK THEMES          */
+        /* ============================================ */
+        :root {
+            --bg-color: #ECECE8;
+            --bg-secondary: #fff;
+            --ink-color: #1a1a1a;
+            --text-dim: #666;
+            --red-alert: #CC0000;
+            --green-ok: #2E7D32;
+            --accent: #FFD700;
+            --border-color: #1a1a1a;
+            --shadow-color: rgba(0,0,0,0.15);
+            --card-bg: #fff;
+            --input-bg: #fff;
+            --modal-bg: rgba(0,0,0,0.85);
+            --font-main: 'JetBrains Mono', 'Courier New', monospace;
+            --shadow-depth: 5px;
+            --transition: all 0.15s ease;
+            --glow: none;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --ink-color: #00ff88;
+            --text-dim: #00aa55;
+            --red-alert: #ff4444;
+            --green-ok: #00ff88;
+            --accent: #ff00ff;
+            --border-color: #00ff88;
+            --shadow-color: rgba(0,255,136,0.2);
+            --card-bg: #111;
+            --input-bg: #0a0a0a;
+            --modal-bg: rgba(0,0,0,0.95);
+            --glow: 0 0 10px currentColor;
+        }
+
+        [data-theme="matrix"] {
+            --bg-color: #000000;
+            --bg-secondary: #001100;
+            --ink-color: #00ff00;
+            --text-dim: #008800;
+            --red-alert: #ff0000;
+            --green-ok: #00ff00;
+            --accent: #00ff00;
+            --border-color: #00ff00;
+            --shadow-color: rgba(0,255,0,0.3);
+            --card-bg: #000a00;
+            --input-bg: #000800;
+            --modal-bg: rgba(0,0,0,0.98);
+            --glow: 0 0 5px currentColor, 0 0 10px currentColor;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--ink-color);
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            height: 100dvh; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        h1, h2, h3 { margin: 0; text-transform: uppercase; letter-spacing: -1px; font-weight: 900; }
+        p { font-size: 1rem; line-height: 1.4; margin-bottom: 10px; }
+        
+        .hidden { display: none !important; }
+        .blink { animation: blinker 1s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+        
+        @keyframes slideUp {
+            from { transform: translateY(30px) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); text-shadow: var(--glow); }
+            50% { transform: scale(1.05); text-shadow: var(--glow); }
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); filter: hue-rotate(0deg); }
+            20% { transform: translate(-2px, 2px); filter: hue-rotate(90deg); }
+            40% { transform: translate(-2px, -2px); filter: hue-rotate(180deg); }
+            60% { transform: translate(2px, 2px); filter: hue-rotate(270deg); }
+            80% { transform: translate(2px, -2px); filter: hue-rotate(360deg); }
+            100% { transform: translate(0); filter: hue-rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes timerPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(204, 0, 0, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(204, 0, 0, 0); }
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            padding: 20px;
+            width: 100%;
+            position: absolute;
+            top: 0; left: 0;
+            background-color: var(--bg-color);
+            z-index: 1;
+            transition: background-color 0.3s;
+        }
+        
+        .active { display: flex; z-index: 10; }
+
+        .scroll-box {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: inset 4px 4px 0px var(--shadow-color);
+        }
+
+        .scroll-box::-webkit-scrollbar { width: 8px; }
+        .scroll-box::-webkit-scrollbar-track { background: var(--bg-color); }
+        .scroll-box::-webkit-scrollbar-thumb { background: var(--border-color); }
+
+        button {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            color: var(--ink-color);
+            padding: 18px;
+            font-family: inherit;
+            font-weight: 900;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: var(--shadow-depth) var(--shadow-depth) 0px var(--border-color);
+            transition: var(--transition);
+            width: 100%;
+            margin-bottom: 12px;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translate(-2px, -2px);
+            box-shadow: calc(var(--shadow-depth) + 2px) calc(var(--shadow-depth) + 2px) 0px var(--border-color);
+        }
+
+        button:active:not(:disabled) {
+            box-shadow: 0px 0px 0px var(--border-color);
+            transform: translate(var(--shadow-depth), var(--shadow-depth));
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-black { background: var(--ink-color); color: var(--bg-color); }
+        .btn-black:hover:not(:disabled) { filter: brightness(1.2); }
+        .btn-red { background: var(--red-alert); color: #fff; border-color: var(--border-color); }
+        .btn-green { background: var(--green-ok); color: #000; border-color: var(--border-color); }
+        .btn-gold { background: var(--accent); color: #000; border-color: var(--border-color); }
+        .btn-small { padding: 10px; font-size: 0.9rem; box-shadow: 3px 3px 0px var(--border-color); }
+        .btn-purple { background: #764ba2; color: #fff; border-color: var(--border-color); }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid var(--border-color);
+            background: var(--input-bg);
+            color: var(--ink-color);
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 10px;
+            border-radius: 0;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2);
+        }
+
+        .card-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 10px 0;
+            width: 100%; 
+            position: relative;
+        }
+
+        .game-card {
+            border: 3px solid var(--border-color);
+            background: var(--card-bg);
+            padding: 25px 20px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            box-shadow: 8px 8px 0px var(--shadow-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 280px; 
+            animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+
+        .game-card.shake { animation: shake 0.5s ease-in-out; }
+
+        .card-hardcore {
+            background-color: var(--ink-color) !important;
+            color: #fff !important;
+            border-color: var(--red-alert) !important;
+            box-shadow: 8px 8px 0px var(--red-alert) !important;
+        }
+        .card-hardcore h3 { color: var(--red-alert); border-bottom: 2px solid var(--red-alert); display: inline-block; padding-bottom: 5px;}
+        .card-hardcore .tag-top { background: var(--red-alert); color: #fff; border: 1px solid #fff; }
+        .card-hardcore #cardPunish { color: #fff; border-top-color: #444; }
+
+        .card-special {
+            background-color: #0a0a3a !important;
+            color: #00ff88 !important;
+            border-color: #00ff88 !important;
+            box-shadow: 8px 8px 0px #00ff88 !important;
+        }
+        .card-special h3 { color: #00ff88; border-bottom: 2px solid #00ff88; display: inline-block; padding-bottom: 5px;}
+        .card-special .tag-top { background: #00ff88; color: #0a0a3a; border: 1px solid #0a0a3a; }
+        .card-special #cardPunish { color: #aaffcc; border-top-color: #005533; }
+
+        .card-challenge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: #fff !important;
+            border-color: #764ba2 !important;
+            box-shadow: 8px 8px 0px #667eea !important;
+        }
+        .card-challenge h3 { color: #FFE44D; border-bottom: 2px solid #FFE44D; }
+        .card-challenge .tag-top { background: #FFE44D; color: #000; }
+        .card-challenge #cardPunish { color: #FFE44D; border-top-color: rgba(255,255,255,0.3); }
+
+        .tag-top {
+            background: var(--ink-color);
+            color: var(--bg-color);
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 15px;
+            align-self: center;
+            border: 1px solid transparent;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .status-bar {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+            border-bottom: 3px solid var(--border-color);
+            padding-bottom: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .status-info {
+            font-size: 0.85rem;
+            font-weight: bold;
+            background: var(--bg-secondary);
+            color: var(--ink-color);
+            padding: 6px 10px;
+            border: 2px solid var(--border-color);
+            min-width: fit-content;
+        }
+
+        /* LEVEL UP ALERT - CORRIGIDO */
+        .level-alert-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--red-alert);
+            color: #fff;
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            border: 5px double #fff;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .level-alert-box {
+            border: 3px solid #fff;
+            padding: 25px;
+            background: rgba(0,0,0,0.3);
+            width: 95%;
+            max-width: 400px;
+        }
+
+        .level-alert-box button {
+            background: #fff;
+            color: var(--red-alert);
+            border: 2px solid #fff;
+            margin-top: 15px;
+            cursor: pointer;
+            padding: 15px 30px;
+            font-weight: 900;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            font-family: inherit;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+
+        .level-alert-box button:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px rgba(0,0,0,0.3);
+        }
+
+        .level-alert-box button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0 0 0;
+        }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--modal-bg);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9998;
+            backdrop-filter: blur(6px);
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-box {
+            background: var(--bg-color);
+            border: 3px solid var(--border-color);
+            padding: 25px;
+            width: 92%;
+            max-height: 85%;
+            overflow-y: auto;
+            box-shadow: 12px 12px 0px var(--border-color);
+            animation: slideUp 0.3s ease;
+            color: var(--ink-color);
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px dashed var(--text-dim);
+            padding: 14px 0;
+            transition: background 0.2s;
+        }
+        .player-item:hover { background: var(--bg-secondary); }
+
+        .rank-item {
+            border: 3px solid var(--border-color);
+            margin-bottom: 10px;
+            background: var(--bg-secondary);
+            padding: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 5px 5px 0px var(--shadow-color);
+            transition: transform 0.2s;
+        }
+        .rank-item:hover { transform: translate(-2px, -2px); }
+
+        .patch-badge {
+            display: inline-block;
+            background: var(--green-ok);
+            color: #000;
+            font-size: 0.65rem;
+            font-weight: bold;
+            padding: 3px 8px;
+            vertical-align: middle;
+            margin-left: 8px;
+            border: 2px solid var(--border-color);
+            letter-spacing: 1px;
+            animation: pulse 2s infinite;
+        }
+
+        /* TOAST */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 90%;
+            max-width: 400px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--ink-color);
+            color: var(--bg-color);
+            padding: 14px 20px;
+            border-radius: 0;
+            border-left: 5px solid var(--accent);
+            box-shadow: 6px 6px 0px var(--shadow-color);
+            font-size: 0.9rem;
+            font-weight: bold;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+            text-align: center;
+            letter-spacing: 0.5px;
+            pointer-events: auto;
+        }
+
+        .toast.success { border-left-color: var(--green-ok); }
+        .toast.error { border-left-color: var(--red-alert); }
+        .toast.warning { border-left-color: var(--accent); }
+
+        @keyframes toastIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes toastOut {
+            to { transform: translateY(-20px); opacity: 0; }
+        }
+
+        /* Progress Bar */
+        .level-progress {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            margin-top: 8px;
+        }
+        .level-progress-bar {
+            height: 100%;
+            background: var(--red-alert);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        /* Timer Styles */
+        .timer-container {
+            background: var(--bg-secondary);
+            border: 3px solid var(--border-color);
+            padding: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .timer-display {
+            font-size: 1.8rem;
+            font-weight: 900;
+            font-family: var(--font-main);
+            min-width: 80px;
+            text-align: center;
+            color: var(--ink-color);
+        }
+
+        .timer-display.warning { color: var(--red-alert); animation: timerPulse 1s infinite; }
+        .timer-display.danger { color: #fff; background: var(--red-alert); padding: 5px 10px; }
+
+        .timer-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .timer-btn {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            margin: 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Players Indicator */
+        .players-indicator {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 8px;
+        }
+        .player-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--green-ok);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+        }
+        .player-dot.danger { background: var(--red-alert); animation: blinker 1s infinite; }
+
+        .skip-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: 2px solid var(--text-dim);
+            box-shadow: none;
+            margin: 0;
+        }
+        .skip-btn:hover { border-color: var(--red-alert); color: var(--red-alert); transform: none; box-shadow: none; }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            position: fixed;
+            bottom: 70px;
+            right: 15px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            color: var(--ink-color);
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            box-shadow: 3px 3px 0px var(--shadow-color);
+            transition: var(--transition);
+        }
+        .theme-toggle:hover { transform: scale(1.1); }
+
+        .sound-toggle {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--ink-color);
+            color: var(--bg-color);
+            border: 2px solid var(--bg-color);
+            cursor: pointer;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            box-shadow: 3px 3px 0px var(--shadow-color);
+            transition: var(--transition);
+        }
+        .sound-toggle:hover { transform: scale(1.1); }
+
+        /* Confetti */
+        .confetti-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 9997;
+            overflow: hidden;
+            display: none;
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            animation: confettiFall 3s linear forwards;
+        }
+        @keyframes confettiFall {
+            to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Pack Editor Styles */
+        .editor-form { margin-bottom: 15px; }
+        .editor-form input, .editor-form select, .editor-form textarea {
+            margin-bottom: 10px;
+        }
+        .pack-item {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            padding: 12px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pack-item:hover { border-color: var(--accent); }
+
+        /* Multiplayer */
+        .room-code {
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-align: center;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 3px dashed var(--accent);
+            margin: 15px 0;
+            user-select: all;
+        }
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--red-alert);
+        }
+        .status-dot.connected { background: var(--green-ok); animation: blinker 2s infinite; }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            .screen { padding: 15px; }
+            button { padding: 14px; font-size: 1rem; }
+            .game-card { padding: 18px 15px; min-height: 250px; }
+            h1 { font-size: 1.6rem !important; }
+            .modal-box { padding: 18px; width: 95%; }
+            .status-info { font-size: 0.75rem; padding: 4px 6px; }
+            .theme-toggle, .sound-toggle { width: 40px; height: 40px; font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+   style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+   onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Confetti Container -->
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <!-- Sound Toggle -->
+    <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" title="Som ON/OFF">🔊</button>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle" onclick="cycleTheme()" title="Mudar Tema">☀️</button>
+
+    <!-- TELA: TERMOS -->
+    <div id="screen-terms" class="screen active" role="dialog" aria-label="Termos de uso">
+        <h1 style="font-size: 2.2rem; margin-bottom: 15px; text-align: center;">
+            SYSTEM<br>SUECA<span class="patch-badge">V6</span>
+        </h1>
+        <div class="scroll-box">
+            <p style="color: var(--green-ok); font-weight: bold;">>> SISTEMA INICIALIZADO...</p>
+            <p><strong>1.</strong> O SISTEMA É A LEI ABSOLUTA.</p>
+            <p><strong>2.</strong> A DIFICULDADE É PROGRESSIVA E IMPLACÁVEL.</p>
+            <p><strong>3.</strong> PUNIÇÕES SÃO CUMULATIVAS E IRREVERSÍVEIS.</p>
+            <p><strong>4.</strong> TOTAL DE REGRAS NO BANCO: <span style="color:var(--red-alert)">150+</span></p>
+            <hr style="border: 1px dashed var(--text-dim); margin: 15px 0;">
+            <p style="font-weight: bold; color: var(--ink-color);">PATCH V6 - ULTIMATE EDITION:</p>
+            <p>✓ Dark Mode / Matrix Mode / Cyberpunk</p>
+            <p>✓ Pack Editor (Crie suas próprias cartas!)</p>
+            <p>✓ Timer System (Cronômetro por rodada)</p>
+            <p>✓ PWA Instalável (App no celular!)</p>
+            <p>✓ Multiplayer Online (PeerJS!)</p>
+            <p>✓ Novos Packs: RPG, Música, Memória, Físico</p>
+            <p>✓ Confete & Som & Toast & Undo</p>
+            <hr style="border: 1px dashed var(--text-dim); margin: 15px 0;">
+            <p style="font-weight: bold;">PACKS DISPONÍVEIS:</p>
+            <p>► PACK: ORIGINAIS (Core)</p>
+            <p>► PACK: OFFICE/TECH</p>
+            <p>► PACK: SOCIAL ENGINEERING</p>
+            <p>► PACK: HARDWARE FAILURE</p>
+            <p>► PACK: MULTIPLAYER CHAOS</p>
+            <p>► PACK: TERMINAL MODE</p>
+            <p>► <span style="color:var(--accent)">PACK: RPG (NOVO!)</span></p>
+            <p>► <span style="color:var(--accent)">PACK: MUSICAL (NOVO!)</span></p>
+            <p>► <span style="color:var(--accent)">PACK: MEMÓRIA (NOVO!)</span></p>
+            <p>► <span style="color:var(--accent)">PACK: FÍSICO (NOVO!)</span></p>
+            <br>
+            <p style="font-weight: bold; color: var(--red-alert); background: var(--bg-secondary); padding: 10px; border: 2px solid var(--red-alert);">
+                ⚠️ AVISO: CONSUMO RESPONSÁVEL.<br>
+                SE BEBER, NÃO DIRIJA.<br>
+                MAIOR DE 18 ANOS.
+            </p>
+        </div>
+        <button onclick="goTo('screen-setup')" class="btn-black btn-gold">>> ACEITAR CONTRATO [ENTER]</button>
+        <button onclick="loadGame()" class="btn-black" id="loadGameBtn" style="display:none;margin-top:8px;">>> CARREGAR PARTIDA SALVA</button>
+    </div>
+
+    <!-- TELA: SETUP -->
+    <div id="screen-setup" class="screen" role="form" aria-label="Configuração">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <h2>CADASTRO DE USUÁRIOS</h2>
+            <p style="font-size: 0.85rem; color: var(--text-dim);">INSIRA OS NOMES DOS JOGADORES (MÍN: 2)</p>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="inputName" placeholder="DIGITE O NOME..." onkeydown="handleEnter(event)" autocomplete="off" aria-label="Nome do jogador" maxlength="20">
+            <button onclick="addPlayer()" class="btn-black" style="width: 70px; padding: 0; font-size: 1.6rem;" aria-label="Adicionar jogador">+</button>
+        </div>
+
+        <div class="scroll-box" id="playersListSetup" aria-live="polite">
+            <p style="color: var(--text-dim); text-align: center; padding-top: 20px;">> AGUARDANDO DADOS... <</p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:bold; cursor:pointer;">
+                <input type="checkbox" id="safeModeCheck" style="width:auto;"> 🛡️ MODO SEGURO (Remove Hardcore)
+            </label>
+            
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                <label style="font-size:0.85rem; font-weight:bold;">⏱️ TIMER POR RODADA:</label>
+                <select id="timerSelect" style="width:100%;">
+                    <option value="0">∞ Sem Timer</option>
+                    <option value="15">15 segundos (Speed Run!)</option>
+                    <option value="30" selected>30 segundos (Padrão)</option>
+                    <option value="60">1 minuto (Relaxado)</option>
+                    <option value="120">2 minutos (Debate)</option>
+                    <option value="300">5 minutos (Livre)</option>
+                </select>
+            </div>
+
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; font-weight:bold; cursor:pointer;">
+                <input type="checkbox" id="multiplayerCheck" style="width:auto;" onchange="toggleMultiplayerUI()"> 🌐 Modo Multiplayer Online
+            </label>
+            
+            <div id="multiplayerUI" style="display:none; border: 2px dashed var(--border-color); padding: 10px; margin-top: 5px;">
+                <button onclick="createRoom()" class="btn-purple btn-small" style="margin-bottom:8px;">🏠 CRIAR SALA (Host)</button>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="joinCodeInput" placeholder="CÓDIGO DA SALA..." style="margin:0;font-size:0.9rem;padding:10px;">
+                    <button onclick="joinRoom()" class="btn-green btn-small" style="width:auto;margin:0;">ENTRAR</button>
+                </div>
+                <div class="connection-status" id="connStatus">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="connStatusText">Desconectado</span>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="startGame()" class="btn-green" id="startBtn" disabled>INICIAR SISTEMA [ENTER]</button>
+        <button onclick="goTo('screen-editor')" class="btn-small" style="margin-top: 5px;background:var(--purple);color:#fff;border-color:var(--purple);">📝 EDITOR DE PACKS</button>
+        <button onclick="goTo('screen-terms')" class="btn-small" style="margin-top: 5px;">← VOLTAR</button>
+    </div>
+
+    <!-- TELA: JOGO -->
+    <div id="screen-game" class="screen" role="main" aria-label="Área de jogo">
+        
+        <!-- Level Up Overlay -->
+        <div id="levelAlert" class="level-alert-overlay" role="alertdialog" aria-modal="true">
+            <div class="level-alert-box">
+                <h1 class="blink" style="font-size: 3rem; margin-bottom: 10px;">⚠ ALERT!</h1>
+                <h2>NÍVEL AUMENTADO</h2>
+                <hr style="border: 2px solid #fff; margin: 15px 0;">
+                <p style="font-size: 1.2rem;">O SISTEMA FICOU MAIS AGRESSIVO.</p>
+                <p id="levelAlertText" style="font-weight: bold; font-size: 2.5rem; color: #FFE44D;">NÍVEL: 02</p>
+                <div class="level-progress" style="background: rgba(255,255,255,0.2); border-color: #fff; margin: 15px 0;">
+                    <div class="level-progress-bar" style="background: #fff;"></div>
+                </div>
+                <button id="dismissLevelBtn" onclick="dismissLevelAlert()">[ CONTINUAR ]</button>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <span class="status-info" id="levelDisplay" style="background: var(--ink-color); color:var(--bg-color);">LVL.01</span>
+                <span class="status-info" id="roundCounter">T.01</span>
+                <span class="status-info" id="deckCount" style="background: var(--accent); color:#000;">📦 99</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <button onclick="openRulesModal()" class="btn-small" style="width:auto;margin:0;padding:5px 10px;font-size:0.75rem;" title="Ver regras ativas">📋 REGRAS</button>
+                <button onclick="finishGame()" class="btn-small" style="width:auto;margin:0;padding:5px 10px;background:var(--red-alert);color:#fff;border-color:#000;">SAIR</button>
+            </div>
+        </div>
+        
+        <!-- Timer -->
+        <div class="timer-container" id="timerContainer" style="display:none;">
+            <span style="font-weight:bold;font-size:0.85rem;">⏱️ RODADA:</span>
+            <div class="timer-display" id="timerDisplay">00:30</div>
+            <div class="timer-controls">
+                <button class="timer-btn btn-small" onclick="toggleTimer()" id="timerToggleBtn" title="Play/Pause">▶️</button>
+                <button class="timer-btn btn-small" onclick="resetTimer()" title="Reset">🔄</button>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="level-progress">
+            <div class="level-progress-bar" id="progressBar"></div>
+        </div>
+
+        <!-- Card Area -->
+        <div class="card-area">
+            <div id="currentPlayerBar" style="background: linear-gradient(90deg, #111, #333); color: #fff; padding: 12px; width: 100%; text-align: center; margin-bottom: 12px; font-weight: bold; border: 3px solid #000; font-size: 1.1rem; letter-spacing: 2px;">
+                VEZ DE: ...
+            </div>
+            
+            <div class="game-card" id="mainCard" role="article" aria-label="Carta atual">
+                <button class="skip-btn" onclick="skipCard()" title="Pular carta (Shift+Space)">⏭</button>
+                
+                <span class="tag-top" id="cardType">TIPO</span>
+                <h3 id="cardTitle" style="text-decoration: underline; margin-bottom: 18px; font-size: 1.5rem; line-height: 1.2;">TÍTULO</h3>
+                <p id="cardDesc" style="font-size: 1.15rem; font-weight: bold; line-height: 1.5;">Carregando...</p>
+                <div id="cardPunish" style="font-size: 0.9rem; color: var(--red-alert); margin-top: auto; border-top: 2px solid var(--text-dim); padding-top:15px; width: 100%; font-weight: bold; text-align: left;">
+                    > PENALIDADE: ...
+                </div>
+            </div>
+
+            <div class="players-indicator" id="playersIndicator" title="Status dos jogadores"></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px;">
+            <button onclick="openPunishModal()" class="btn-red" style="flex: 1;" id="punishBtn">PUNIR (+1)</button>
+            <button onclick="nextTurn()" class="btn-green" style="flex: 2;" id="nextBtn">PRÓXIMA >></button>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 8px;">
+            <button onclick="saveGame()" class="btn-small" style="flex:1;">💾 SALVAR</button>
+            <button onclick="undoLastAction()" class="btn-small" style="flex:1;" id="undoBtn" disabled>↩ DESFAZER</button>
+        </div>
+    </div>
+
+    <!-- TELA: RANKING -->
+    <div id="screen-ranking" class="screen" role="region" aria-label="Relatório final">
+        <h1 style="border-bottom: 4px solid var(--border-color); padding-bottom: 12px; margin-bottom: 12px; text-align: center;">
+            RELATÓRIO FINAL <span class="patch-badge">END</span>
+        </h1>
+        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <span id="finalLevelReport" style="background: var(--ink-color); color: var(--bg-color); padding: 5px 10px; border: 2px solid var(--border-color);">NÍVEL: 01</span>
+            <span id="finalRoundsReport" style="background: var(--accent); color: #000; padding: 5px 10px; border: 2px solid var(--border-color);">RODADAS: 0</span>
+            <span style="background: var(--green-ok); color: #000; padding: 5px 10px; border: 2px solid var(--border-color);">STATUS: ENCERRADO</span>
+        </div>
+        
+        <div class="scroll-box" id="rankingList" style="background: var(--bg-color); border: none;"></div>
+
+        <button onclick="location.reload()" class="btn-black btn-gold">REINICIAR SISTEMA</button>
+        <button onclick="shareResults()" class="btn-black" style="margin-top: 8px;">📤 COMPARTILHAR RESULTADO</button>
+    </div>
+
+    <!-- TELA: EDITOR DE PACKS -->
+    <div id="screen-editor" class="screen" role="form" aria-label="Editor de packs">
+        <h2 style="text-align:center; margin-bottom:15px;">📝 EDITOR DE PACKS</h2>
+        
+        <div class="scroll-box" style="max-height: 300px;">
+            <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent);">CRIAR NOVA CARTA:</h3>
+            <div class="editor-form">
+                <input type="text" id="editTitle" placeholder="TÍTULO (ex: MINHA REGRA)" maxlength="30">
+                <textarea id="editDesc" placeholder="DESCRIÇÃO (o que acontece)" rows="3" maxlength="200"></textarea>
+                <select id="editType">
+                    <option value="ATAQUE">ATAQUE</option>
+                    <option value="GERAL">GERAL</option>
+                    <option value="STATUS">STATUS</option>
+                    <option value="JOGO">JOGO</option>
+                    <option value="REFLEXO">REFLEXO</option>
+                    <option value="DESAFIO">DESAFIO</option>
+                    <option value="HARDCORE">HARDCORE</option>
+                    <option value="REGRA">REGRA</option>
+                    <option value="VOTAÇÃO">VOTAÇÃO</option>
+                    <option value="SORTE">SORTE</option>
+                    <option value="CRIATIVO">CRIATIVO</option>
+                </select>
+                <input type="text" id="editPunish" placeholder="PENALIDADE (ex: Bebe 2x)" maxlength="50">
+                <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;">
+                    <input type="checkbox" id="editHardcore" style="width:auto;"> Carta Hardcore?
+                </label>
+                <button onclick="addCustomCard()" class="btn-green btn-small">+ ADICIONAR CARTA</button>
+            </div>
+
+            <hr style="border:1px dashed var(--text-dim); margin:20px 0;">
+
+            <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent);">CARTAS CUSTOMIZADAS (<span id="customCount">0</span>):</h3>
+            <div id="customCardsList">
+                <p style="color:var(--text-dim); text-align:center;">Nenhuma carta customizada ainda.</p>
+            </div>
+
+            <hr style="border:1px dashed var(--text-dim); margin:20px 0;">
+
+            <h3 style="font-size:1rem; margin-bottom:10px; color:var(--accent);">EXPORTAR/IMPORTAR:</h3>
+            <button onclick="exportPack()" class="btn-purple btn-small" style="margin-bottom:8px;">📤 EXPORTAR PACK (JSON)</button>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="importPackInput" placeholder="Cole o código do pack aqui..." style="margin:0;font-size:0.85rem;padding:10px;">
+                <button onclick="importPack()" class="btn-green btn-small" style="width:auto;margin:0;">📥 IMPORTAR</button>
+            </div>
+        </div>
+
+        <button onclick="goTo('screen-setup')" class="btn-black">← VOLTAR AO SETUP</button>
+    </div>
+
+    <!-- MODAL: PUNIÇÃO -->
+    <div id="modal-punish" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <h3 style="background: var(--red-alert); color: #fff; padding: 8px; text-align: center; margin-bottom: 15px; font-size: 1.1rem;">REGISTRAR DOSE</h3>
+            <p style="font-size: 0.9rem; margin-bottom: 15px; text-align: center; color: var(--text-dim);">QUEM FALHOU COM O SISTEMA?</p>
+            <div id="punishList"></div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button onclick="punishAll()" class="btn-red">TODOS (+1)</button>
+                <button onclick="closePunishModal()" class="btn-black">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: REGRAS ATIVAS -->
+    <div id="modal-rules" class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <h3 style="background: var(--ink-color); color: var(--bg-color); padding: 8px; text-align: center; margin-bottom: 15px;">REGRAS ATIVAS</h3>
+            <div id="activeRulesList" style="font-size: 0.9rem;">
+                <p style="color: var(--text-dim); text-align: center;">Nenhuma regra ativa registrada.</p>
+            </div>
+            <button onclick="closeRulesModal()" class="btn-black" style="margin-top: 15px;">FECHAR</button>
+        </div>
+    </div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ==========================================
+    // BANCO DE DADOS COMPLETO (150+ REGRAS)
+    // ==========================================
+    const rulesDB = [
+        // --- PACK: ORIGINAIS ---
+        { title: "ALVO IDENTIFICADO", desc: "Escolha uma pessoa. Ela bebe agora.", punish: "Ação Imediata", type: "ATAQUE", hardcore: false },
+        { title: "DANO EM ÁREA", desc: "Todos os jogadores bebem 1 dose.", punish: "Todos Bebem", type: "GERAL", hardcore: false },
+        { title: "FILTRO (M)", desc: "Somente os homens bebem.", punish: "Homens Bebem", type: "GERAL", hardcore: false },
+        { title: "FILTRO (F)", desc: "Somente as mulheres bebem.", punish: "Mulheres Bebem", type: "GERAL", hardcore: false },
+        { title: "EU NUNCA", desc: "Diga algo que nunca fez. Quem já fez, bebe.", punish: "Quem fez bebe", type: "JOGO", hardcore: false },
+        { title: "VOTAÇÃO", desc: "No 3, apontem para quem é mais provável de fazer merda.", punish: "Mais votado bebe", type: "VOTAÇÃO", hardcore: false },
+        { title: "MODO MUDO", desc: "Você não pode falar nada até sua próxima vez.", punish: "Falou = Bebe 2x", type: "STATUS", hardcore: false },
+        { title: "PALAVRA PROIBIDA", desc: "Proibido falar 'NÃO' ou 'SIM' até a próxima rodada.", punish: "Falou = Bebe", type: "STATUS", hardcore: false },
+        { title: "ERRO DE SINTAXE", desc: "Proibido chamar pessoas pelo nome. Use apelidos.", punish: "Errou = Bebe", type: "STATUS", hardcore: false },
+        { title: "MÃO INVERTIDA", desc: "Todos bebem com a mão não-dominante agora.", punish: "Errou = Bebe Dobro", type: "GERAL", hardcore: false },
+        { title: "CONTATO VISUAL", desc: "Você não pode olhar nos olhos de ninguém por 1 rodada.", punish: "Olhou = Bebe", type: "STATUS", hardcore: false },
+        { title: "NOVA LEGISLAÇÃO", desc: "Crie uma regra agora. Ela vale até o fim do jogo.", punish: "Quem quebrar bebe", type: "REGRA", hardcore: false },
+        { title: "REVOGAR", desc: "Anule uma regra criada anteriormente.", punish: "Benefício", type: "REGRA", hardcore: false },
+        { title: "MESTRE DA RIMA", desc: "Diga uma palavra. Sigam a roda rimando.", punish: "Travou = Bebe", type: "JOGO", hardcore: false },
+        { title: "CATEGORIA", desc: "Escolha um tema (ex: Carros). Sigam a roda citando.", punish: "Repetiu = Bebe", type: "JOGO", hardcore: false },
+        { title: "CUPIDO", desc: "Escolha um parceiro. Se você bebe, ele bebe.", punish: "Vínculo", type: "STATUS", hardcore: false },
+        { title: "MÍMICA", desc: "Faça um gesto. Todos devem copiar. O último bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "BATERIA FRACA", desc: "Último a encostar a tela do celular na testa bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "MODO AVIÃO", desc: "Todos tiram o pé do chão. O último bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "PING ALTO", desc: "Você deve falar gaguejando até a próxima vez.", punish: "Falou normal = Bebe", type: "STATUS", hardcore: false },
+        { title: "PERGUNTA?", desc: "Faça uma pergunta a alguém. Ela deve responder com outra pergunta.", punish: "Errou = Bebe", type: "JOGO", hardcore: false },
+        { title: "DEDO NERVOSO", desc: "Coloque o dedo na mesa discretamente. O último a notar bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "MEDUSA", desc: "Todos abaixam a cabeça. No 3, levantam olhando alguém. Se cruzar olhar, bebe.", punish: "Par bebe", type: "SORTE", hardcore: false },
+        { title: "T-REX", desc: "Você deve manter os cotovelos colados no corpo até a próxima vez.", punish: "Descolou = Bebe", type: "STATUS", hardcore: false },
+        { title: "ROLETA RUSSA", desc: "Seu vizinho da direita serve uma dose surpresa. Você bebe.", punish: "Azar", type: "HARDCORE", hardcore: true },
+        
+        // --- PACK: OFFICE/TECH ---
+        { title: "CAPS LOCK", desc: "Você só pode falar GRITANDO até sua próxima vez.", punish: "Falou baixo = Bebe", type: "STATUS", hardcore: false },
+        { title: "POP-UP", desc: "Toda vez que alguém beber, você deve levantar e dar um 'joinha'.", punish: "Esqueceu = Bebe", type: "STATUS", hardcore: false },
+        { title: "SPAM", desc: "Escolha uma palavra comum. Sempre que alguém falar, você grita 'SPAM!'.", punish: "Quem falou bebe", type: "JOGO", hardcore: false },
+        { title: "CTRL+Z", desc: "Você pode anular a punição de alguém (ou a sua) uma vez.", punish: "Benefício", type: "REGRA", hardcore: false },
+        { title: "FIREWALL", desc: "Ninguém pode falar diretamente com você. Devem usar intermediários.", punish: "Falou = Bebe", type: "STATUS", hardcore: false },
+        { title: "LAG MENTAL", desc: "Você deve responder tudo com 3 segundos de atraso.", punish: "Respondeu rápido = Bebe", type: "STATUS", hardcore: false },
+        { title: "REUNIÃO DE EMERGÊNCIA", desc: "Todos devem tocar o chão. O último a tocar bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        
+        // --- PACK: SOCIAL & CAOS ---
+        { title: "AUDITORIA", desc: "Mostre as últimas 3 fotos da sua galeria ou beba 2 doses.", punish: "Recusou = Bebe 2x", type: "DESAFIO", hardcore: false },
+        { title: "VÍRUS", desc: "Toque em alguém. Essa pessoa foi infectada e bebe sempre que você beber.", punish: "Vínculo Eterno", type: "STATUS", hardcore: false },
+        { title: "TELEMARKETING", desc: "Ligue para um contato aleatório e tente vender algo por 30s.", punish: "Desistiu = Bebe", type: "HARDCORE", hardcore: true },
+        { title: "COPYRIGHT", desc: "Você é dono de uma marca (ex: Nike). Quem usar algo da marca bebe.", punish: "Vestuário", type: "GERAL", hardcore: false },
+        { title: "GÊMEOS SIAMESES", desc: "Escolha alguém. Vocês devem ficar de braços dados até a próxima rodada.", punish: "Separou = Ambos Bebem", type: "STATUS", hardcore: false },
+        { title: "INQUÉRITO", desc: "Faça uma pergunta pessoal para a roda. Quem se recusar a responder, bebe.", punish: "Segredo = Bebe", type: "JOGO", hardcore: false },
+
+        // --- PACK: HABILIDADE & FÍSICO ---
+        { title: "MODO VIBRACALL", desc: "Você não pode rir. Se rir, bebe.", punish: "Riu = Bebe", type: "STATUS", hardcore: false },
+        { title: "SISTEMA TRAVADO", desc: "Fique parado como estátua. Quem falar com você sem perceber que travou, bebe.", punish: "Desatento = Bebe", type: "JOGO", hardcore: false },
+        { title: "MOUSE INVERTIDO", desc: "Você deve segurar seu copo usando apenas os cotovelos/braços.", punish: "Derrubou = Bebe Tudo", type: "DESAFIO", hardcore: false },
+        { title: "GLITCH VISUAL", desc: "Tire uma peça de roupa ou beba 2 doses.", punish: "Tímido = Bebe 2x", type: "HARDCORE", hardcore: true },
+        { title: "DITADO", desc: "Quem estiver digitando no celular agora, bebe.", punish: "Viciado = Bebe", type: "GERAL", hardcore: false },
+
+        // --- PACK: HARDCORE EXTRA ---
+        { title: "TELA AZUL", desc: "Vire o seu copo inteiro agora. O sistema precisa reiniciar.", punish: "FATAL ERROR", type: "HARDCORE", hardcore: true },
+        { title: "WATER COOLER", desc: "Vá até a geladeira e faça um drink misturando 3 coisas para o vizinho da esquerda.", punish: "Azar", type: "CRIATIVO", hardcore: false },
+        { title: "FORMATAR C:", desc: "Todos esquecem quem são. Devem se chamar por apelidos novos criados agora.", punish: "Errou = Bebe", type: "REGRA", hardcore: false },
+
+        // --- PACK: SYSTEM UPDATE ---
+        { title: "ESTAGIÁRIO", desc: "Você deve buscar/servir a bebida de quem pedir até sua próxima vez.", punish: "Negou = Bebe", type: "STATUS", hardcore: false },
+        { title: "MEMÓRIA RAM", desc: "Fui ao mercado e comprei... (Lista cumulativa). Quem esquecer, bebe.", punish: "Erro de Leitura", type: "JOGO", hardcore: false },
+        { title: "PHISHING", desc: "Tente fazer alguém pegar seu celular na mão. Se pegarem, eles bebem.", punish: "Engenharia Social", type: "DESAFIO", hardcore: false },
+        { title: "DEBUG", desc: "Aponte um defeito em alguém. A pessoa se defende. O grupo vota quem ganha.", punish: "Perdedor Bebe", type: "VOTAÇÃO", hardcore: false },
+        { title: "TELA DE BLOQUEIO", desc: "Todos colocam o celular na mesa. O primeiro a receber notificação bebe.", punish: "Popular = Bebe", type: "SORTE", hardcore: false },
+        { title: "OVERCLOCK", desc: "Você deve falar extremamente rápido até sua próxima vez.", punish: "Lag = Bebe", type: "STATUS", hardcore: false },
+        { title: "DOIS FATORES (2FA)", desc: "Para beber ou falar, você precisa de 'autorização' (aperto de mão) de outro player.", punish: "Esqueceu = Bebe 2x", type: "STATUS", hardcore: false },
+        { title: "USER ERROR", desc: "Tente lamber seu próprio cotovelo. Se não conseguir, bebe.", punish: "Limitação de Hardware", type: "DESAFIO", hardcore: false },
+        { title: "ROTEADOR", desc: "Você é o Wi-Fi. Quem estiver sentado ao seu lado (Esq/Dir) bebe junto com você.", punish: "Área de Efeito", type: "GERAL", hardcore: false },
+        { title: "MODO ANÔNIMO", desc: "Cubra o rosto com a mão ou camisa sempre que for falar.", punish: "Revelou = Bebe", type: "STATUS", hardcore: false },
+        { title: "TERMOS DE USO", desc: "Leia o rótulo de uma bebida em voz alta e dramática, como um poema.", punish: "Sem Emoção = Bebe", type: "CRIATIVO", hardcore: false },
+        { title: "LATÊNCIA ALTA", desc: "Tudo o que você fizer deve ser em câmera lenta (slow motion).", punish: "Acelerou = Bebe", type: "STATUS", hardcore: false },
+        { title: "SYSTEM RESTORE", desc: "Todos devem trocar de lugar com a pessoa à sua frente.", punish: "Troca Física", type: "GERAL", hardcore: false },
+        { title: "TELA TOUCH", desc: "Você não pode usar as mãos para beber (use antebraços/cotovelos).", punish: "Derrubou = Bebe Tudo", type: "DESAFIO", hardcore: false },
+        { title: "CTR+C / CTRL+V", desc: "Imite exatamente o gesto/fala da pessoa que jogou antes de você.", punish: "Errou = Bebe", type: "REFLEXO", hardcore: false },
+
+        // === PACK: SOCIAL ENGINEERING ===
+        { title: "ENGENHARIA SOCIAL", desc: "Convença alguém a fazer um gesto ridículo sem explicar por quê. Quem recusar, bebe.", punish: "Teimoso = Bebe", type: "DESAFIO", hardcore: false },
+        { title: "HONEYPOT", desc: "Finja estar mandando mensagem. O primeiro a perguntar 'pra quem?' bebe.", punish: "Curioso = Bebe", type: "JOGO", hardcore: false },
+        { title: "BRUTE FORCE", desc: "Tente adivinhar o PIN ou senha do celular de alguém. 3 tentativas. Errou = você bebe.", punish: "Falhou = Bebe", type: "DESAFIO", hardcore: false },
+        { title: "TROJAN", desc: "Dê seu celular desbloqueado para o jogador da esquerda por 30s. Ele pode fazer qualquer coisa no WhatsApp.", punish: "Coragem ou Bebe 3x", type: "HARDCORE", hardcore: true },
+        { title: "ZERO-DAY", desc: "Revele algo que ninguém aqui sabe sobre você. Quem julgar em voz alta, bebe.", punish: "Sem Julgamento", type: "JOGO", hardcore: false },
+        { title: "SPOOFING", desc: "Imite a voz de alguém da mesa. O grupo vota quem foi mais convincente. Perdedor bebe.", punish: "Pior imitação = Bebe", type: "VOTAÇÃO", hardcore: false },
+        { title: "SOCIAL MEDIA", desc: "Poste algo constrangedor no story de quem tiver o celular mais perto de você, ou beba 3x.", punish: "Tímido = Bebe 3x", type: "HARDCORE", hardcore: true },
+        { title: "CLICKBAIT", desc: "Diga uma frase dramática que começa com 'Você não vai acreditar...' e não termine. Quem pedir continuação, bebe.", punish: "Curioso = Bebe", type: "JOGO", hardcore: false },
+        { title: "DARK PATTERN", desc: "O jogador da sua escolha deve executar qualquer pedido simples seu por 2 rodadas.", punish: "Recusou = Bebe 2x", type: "STATUS", hardcore: false },
+
+        // === PACK: HARDWARE FAILURE ===
+        { title: "SUPERAQUECIMENTO", desc: "Você deve ficar em pé até sua próxima vez. Sentou = bebe.", punish: "Sentou = Bebe", type: "STATUS", hardcore: false },
+        { title: "FONTE QUEIMADA", desc: "Ninguém pode encher o copo de mais ninguém por 2 rodadas. Cada um por si.", punish: "Ajudou = Bebe", type: "REGRA", hardcore: false },
+        { title: "CHIP DANIFICADO", desc: "Você deve usar somente 3 palavras por resposta pelo resto da rodada.", punish: "Falou mais = Bebe", type: "STATUS", hardcore: false },
+        { title: "PLACA-MÃE", desc: "Você é o controlador. Distribua 3 doses para quem quiser (pode ser tudo em 1).", punish: "Poder Total", type: "ATAQUE", hardcore: false },
+        { title: "HD CORROMPIDO", desc: "Tente lembrar o número de celular de alguém da mesa. Errou = você bebe.", punish: "Amnésia = Bebe", type: "DESAFIO", hardcore: false },
+        { title: "BUFFER OVERFLOW", desc: "Fique repetindo a última palavra que alguém disse até a próxima vez.", punish: "Parou = Bebe", type: "STATUS", hardcore: false },
+        { title: "RESET DE FÁBRICA", desc: "Todos voltam para suas cadeiras originais (posição do início do jogo).", punish: "Recusou = Bebe", type: "GERAL", hardcore: false },
+        { title: "DRIVER AUSENTE", desc: "Você fica sem a função de apontar o dedo para qualquer coisa por 2 rodadas.", punish: "Apontou = Bebe", type: "STATUS", hardcore: false },
+        { title: "CABO FROUXO", desc: "Toda vez que alguém tocar em você, você deve dar uma trombada (leve) de volta.", punish: "Não reagiu = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "FAN SPEED", desc: "Escolha alguém para fazer vento em você por 1 minuto completo ou beba 2 doses cada.", punish: "Parou antes = Bebe 2x", type: "DESAFIO", hardcore: false },
+
+        // === PACK: MULTIPLAYER CHAOS ===
+        { title: "PVP ATIVADO", desc: "Dois jogadores fazem par de braço de ferro. O perdedor bebe 2 doses.", punish: "Derrota = Bebe 2x", type: "DESAFIO", hardcore: false },
+        { title: "TEAM KILL", desc: "Você deve punir o seu aliado de Cupido (se não tiver, escolha alguém).", punish: "Traição = +1", type: "ATAQUE", hardcore: false },
+        { title: "RAID", desc: "O grupo inteiro vota num alvo. O mais votado bebe 3 doses.", punish: "Alvo = Bebe 3x", type: "VOTAÇÃO", hardcore: false },
+        { title: "GUILD", desc: "Forme um time de 2. Por 3 rodadas, se um bebe, o outro bebe também.", punish: "Aliança Forçada", type: "STATUS", hardcore: false },
+        { title: "PING PONG", desc: "Você e o jogador da direita ficam se passando doses entre si por 3 rodadas. Toda punição vai para um dos 2.", punish: "Área de Risco", type: "GERAL", hardcore: false },
+        { title: "SPECTATOR MODE", desc: "Você está de espectador. Não pode ser punido nesta rodada, mas também não pode falar.", punish: "Falou = Bebe 2x", type: "STATUS", hardcore: false },
+        { title: "SPLIT SCREEN", desc: "Escolha 2 pessoas. Elas devem debater um tema absurdo por 1 minuto. O grupo vota o vencedor. Perdedor bebe.", punish: "Debate Obrigatório", type: "VOTAÇÃO", hardcore: false },
+        { title: "LAST MAN STANDING", desc: "Todos ficam de pé. Pode sentar só quando tomar uma dose. Último em pé distribui 3 doses.", punish: "Resistência", type: "DESAFIO", hardcore: false },
+        { title: "KILL STREAK", desc: "Você pode escolher 3 pessoas para beber agora. Mas escolha rápido — 5 segundos.", punish: "Lento = Bebe Você", type: "ATAQUE", hardcore: false },
+        { title: "RESPAWN", desc: "O jogador com mais doses bebidas até agora tem todas as punições zeradas. Fresh start.", punish: "Benefício ao Líder Negativo", type: "REGRA", hardcore: false },
+
+        // === PACK: TERMINAL MODE ===
+        { title: "SUDO", desc: "Por esta rodada, você tem poder absoluto. Pode criar, revogar ou inventar qualquer regra.", punish: "Poder Total", type: "REGRA", hardcore: false },
+        { title: "KILL -9", desc: "Escolha um player. Ele fica completamente 'fora do jogo' (sem beber, sem jogar) por 2 rodadas.", punish: "Processo Morto", type: "ATAQUE", hardcore: false },
+        { title: "SSH REMOTO", desc: "Sussurre uma ordem no ouvido de alguém. Essa pessoa deve executá-la agora sem questionar.", punish: "Recusou = Bebe 3x", type: "HARDCORE", hardcore: true },
+        { title: "ALIAS", desc: "Crie um apelido degradante para si mesmo. Todos devem te chamar assim por 3 rodadas.", punish: "Errou o Nome = Bebe", type: "CRIATIVO", hardcore: false },
+        { title: "CRONTAB", desc: "Toda vez que alguém disser a palavra 'beber' ou 'dose', bata na mesa. Quem bater por último, bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "FORK BOMB", desc: "Escolha 1 player. Essa pessoa deve escolher outra. Essa escolhe mais uma. Todas as 3 bebem.", punish: "Propagação = Bebe", type: "GERAL", hardcore: false },
+        { title: "ROOT ACCESS", desc: "Você ganha imunidade total desta rodada. Não bebe por NADA.", punish: "Benefício Máximo", type: "REGRA", hardcore: false },
+        { title: "SYNTAX ERROR", desc: "Até a próxima vez, você não pode usar verbos. Descreva tudo com substantivos e gestos.", punish: "Usou verbo = Bebe", type: "STATUS", hardcore: false },
+        { title: "LOG FILE", desc: "Recite em voz alta os últimos 5 eventos que aconteceram no jogo. Errou algum = bebe.", punish: "Memória Fraca = Bebe", type: "DESAFIO", hardcore: false },
+        { title: "SEGFAULT", desc: "Sem aviso, bata na mesa. O último a bater (ou quem não bater em 3s) bebe 2 doses.", punish: "Lento = Bebe 2x", type: "REFLEXO", hardcore: false },
+        { title: "LOOP INFINITO", desc: "Conte de 1 até 10 no ritmo que o grupo bater palma. Errou o ritmo? Recomeça. 3 falhas = bebe.", punish: "Falhou 3x = Bebe", type: "JOGO", hardcore: false },
+        { title: "GARBAGE COLLECTOR", desc: "Esvazie seu copo de uma vez ou alguém tem que completar o que sobrou.", punish: "Copo Cheio = Problema", type: "HARDCORE", hardcore: true },
+
+        // ============================================
+        // === PACK: RPG (NOVO!) ====================
+        // ============================================
+        { title: "TESTE DE ATRIBUTO", desc: "Escolha um atributo (Força, Destreza, Inteligência...). O grupo define seu valor (1-20). Se for menor que 10, beba.", punish: "Fraco = Bebe", type: "JOGO", hardcore: false },
+        { title: "DADO DA SORTE", desc: "Role um dado invisível (1-6). Par = você distribui 1 dose. Ímpar = você bebe.", punish: "Azar do Dado", type: "SORTE", hardcore: false },
+        { title: "MISSÃO SECRETÁRIA", desc: "Receba uma missão secreta (escreva num papel). Complete até o fim do jogo ou beba 3 doses.", punish: "Falhou Missão", type: "DESAFIO", hardcore: false },
+        { title: "INVENTÁRIO", desc: "Escolha 3 itens da mesa como seu inventário. Se alguém tocar sem permissão, bebe.", punish: "Invasão de Inventário", type: "STATUS", hardcore: false },
+        { title: "CURSEIRO", desc: "Preveja quem será o próximo a ser punido. Se acertar, distribua 2 doses. Se errar, beba 2.", punish: "Profecia Falha", type: "SORTE", hardcore: false },
+        { title: "BUFF/DEBUFF", desc: "Dê um buff (+1 dose imune) pra alguém e um debuff (+1 dose obrigatória) pra outro.", spell: "Gerenciamento", type: "REGRA", hardcore: false },
+        { title: "BOSS FIGHT", desc: "Todos contra você! Cada pessoa tenta fazer você rir em 10s. Se ninguém conseguir, você distribui 3 doses.", punish: "Derrota do Boss", type: "DESAFIO", hardcore: false },
+        { title: "LOOT DROP", desc: "O jogador à sua direita te dá um 'item' (objeto real). Use-o criativamente ou beba.", prize: "Item Obtido", type: "CRIATIVO", hardcore: false },
+        { title: "NPC", desc: "Você é um NPC agora. Só fale quando perguntarem. Respostas monossilábicas.", punish: "Quebrou Personagem", type: "STATUS", hardcore: false },
+        { title: "SAVE POINT", desc: "Marque seu score atual. Se passar de X doses, volta pro save point. (Uma vez por jogo)", punish: "Benefício Único", type: "REGRA", hardcore: false },
+
+        // ============================================
+        // === PACK: MUSICAL (NOVO!) ================
+        // ============================================
+        { title: "KARAOKE FORÇADO", desc: "Cante um trecho de qualquer música. Grupo vota: bom = próximo bebe, ruim = você bebe.", punish: "Voz Ruim = Bebe", type: "VOTAÇÃO", hardcore: false },
+        { title: "ADIVINHE A MÚSICA", desc: "Hummingue (não cante!) uma música. Quem adivinhar primeiro distribui 1 dose. Ninguém em 30s = você bebe.", punish: "Música Desconhecida", type: "JOGO", hardcore: false },
+        { title: "PLAYLIST CURSEADA", desc: "Adicione uma música vergonhosa alheia à playlist do grupo. Ela deve tocar nas próximas 3 rodadas.", punish: "Música Ativada", type: "STATUS", hardcore: false },
+        { title: "AIR GUITAR", desc: "Todo mundo deve fazer air guitar por 15 segundos. O menos entusiasmado bebe.", punish: "Sem Energia = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "LETRA MODIFICADA", desc: "Cante uma música conhecida mudando a letra para algo sobre o grupo. Se rirem, bem. Se não, beba.", punish: "Letra Ruim = Bebe", type: "CRIATIVO", hardcore: false },
+        { title: "RITMO IMPOSSÍVEL", desc: "Bata um ritmo complexo. Todos devem repetir. Quem errar 2 vezes bebe.", punish: "Sem Ritmo = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "DJ SORTE", desc: "Você é o DJ. Escolha a próxima música/tipo de som ambiente por 3 rodadas.", punish: "Poder Musical", type: "REGRA", hardcore: false },
+        { title: "MUTE GLOBAL", desc: "Ninguém pode cantar/humminguar por 2 rodadas. Quem fizer barulho musical, bebe.", punish: "Barulho Proibido = Bebe", type: "STATUS", hardcore: false },
+        { title: "DUETO FORÇADO", desc: "Escolha alguém. Vocês devem cantar JUNTOS (mesma música) em harmonia. Grupo vota.", punish: "Duelo Vocal", type: "DESAFIO", hardcore: false },
+        { title: "SHAZAM", desc: "Alguém canta/produz som. Primeiro a identificar a fonte/melodia distribui 1 dose.", punish: "Ouvido Ruim = Bebe", type: "JOGO", hardcore: false },
+
+        // ============================================
+        // === PACK: MEMÓRIA (NOVO!) ================
+        // ============================================
+        { title: "MEMÓRIA RAM", desc: "Fui ao mercado e comprei... (Lista cumulativa). Quem esquecer a sequência, bebe.", punish: "Erro de Leitura", type: "JOGO", hardcore: false },
+        { title: "SIMON DIZ", desc: "Você é o Simon. Crie uma sequência de gestos (máx 5). Repetir errado = bebe.", punish: "Sequência Quebrada", type: "JOGO", hardcore: false },
+        { title: "FLASHBACK", desc: "Nomeie algo que aconteceu há exatamente X minutos atrás (defina tempo). Errou = bebe.", punish: "Amnésia Aguda", type: "DESAFIO", hardcore: false },
+        { title: "PALAVRA-CHAVE", desc: "Diga uma palavra-chave. Todos devem lembrar qual foi a última carta com essa palavra no título. Não lembra = bebe.", punish: "Memória Falha", type: "JOGO", hardcore: false },
+        { title: "TELEPATIA", desc: "Pense em um número 1-10. Escreva no papel. Compare com a pessoa da direita. Diferença > 3 = ambos bebem.", punish: "Conexão Fraca", type: "SORTE", hardcore: false },
+        { title: "ARQUIVO MORTO", desc: "Recite as últimas 3 cartas sorteadas (título + tipo). Errou = bebe.", punish: "Dados Corrompidos", type: "DESAFIO", hardcore: false },
+        { title: "MNEMÔNICO", desc: "Crie uma frase mnemônica usando a primeira letra de cada nome dos jogadores. Esqueceu = bebe.", punish: "Técnica Falhou", type: "JOGO", hardcore: false },
+        { title: "DÉJÀ VU", desc: "Alguém diz uma frase. Repita EXATAMENTE igual após 3 pessoas falarem. Errou = bebe.", punish: "Echo Distorcido", type: "STATUS", hardcore: false },
+        { title: "CACHE LIMPO", desc: "Todos esquecem temporariamente os nomes uns dos outros. Use apelidos novos por 1 rodada.", punish: "Identidade Resetada", type: "REGRA", hardcore: false },
+        { title: "TESTE DE VELOCIDADE", desc: "Faça 5 perguntas rápidas (quem tem olhos azuis? etc.). Menos acertos = bebe.", punish: "Reflexo Lento", type: "JOGO", hardcore: false },
+
+        // ============================================
+        // === PACK: FÍSICO (NOVO!) ================
+        // ============================================
+        { title: "EQUILÍBRIO", desc: "Fique em um pé só por 30 segundos. Caiu ou tocou o chão = bebe.", punish: "Gravidade Venceu", type: "DESAFIO", hardcore: false },
+        { title: "ESTÁTUA HUMANA", desc: "Congele numa pose. Outros tentam fazer você mover/rir. 30 segundos. Moveu = bebe.", punish: "Movimento Detectado", type: "REFLEXO", hardcore: false },
+        { title: "YOGA DO DRINK", desc: "Faça uma pose de yoga enquanto bebe. Queda ou derramada = beba dobrado.", punish: "Pose Imperfeita", type: "DESAFIO", hardcore: false },
+        { title: "CORRIDA DE DEDO", desc: "Competição: dedo empurrando dedo na mesa. Perdedor bebe 2 doses.", punish: "Dedo Fraco", type: "DESAFIO", hardcore: false },
+        { title: "OLHO TEMPLÁRIO", desc: "Encoste a testa no dedo indicador (braço esticado). Segure 20s. Desistiu = bebe.", punish: "Concentração Falhou", type: "DESAFIO", hardcore: false },
+        { title: "MIRAGE", desc: "Tente pegar uma moeda/jóia do seu ombro usando só a boca (sem mãos!). Não conseguiu = bebe.", punish: "Flexibilidade Zero", type: "DESAFIO", hardcore: false },
+        { title: "TÚNEL HUMANO", desc: "Forme um túnel com as pernas (sentado). Alguém deve rastejar por baixo. Ambos bebem se falhar.", punish: "Obstrução", type: "DESAFIO", hardcore: false },
+        { title: "GRAVIDADE ZERO", desc: "Levante-se da cadeira SEM usar as mãos. Impossível? Use criatividade. Não conseguiu = bebe.", punish: "Lei da Física", type: "DESAFIO", hardcore: false },
+        { title: "REFLEXO DE GATO", desc: "Deixe cair um objeto (caneta). Tente pegar antes de tocar o chão. Deixou cair = bebe.", punish: "Reflexo Lento", type: "REFLEXO", hardcore: false },
+        { title: "TORCIDA OLÍMPICA", desc: "Faça a melhor celebração esportiva possível em 5s. Grupo vota o vencedor. Perdedor bebe.", punish: "Comemoração Fraca", type: "VOTAÇÃO", hardcore: false }
+    ];
+
+    // ==========================================
+    // ESTADO DO JOGO
+    // ==========================================
+    let players = [];
+    let deck = [];
+    let turnIndex = 0;
+    let roundCount = 0;
+    let currentLevel = 1;
+    const roundsPerLevel = 10;
+    let safeMode = false;
+    let soundEnabled = true;
+    let lastAction = null;
+    let activeCustomRules = [];
+    let gameHistory = [];
+    let customCards = []; // Cartas criadas pelo usuário
+    
+    // Timer state
+    let timerDuration = 30;
+    let timerRemaining = 30;
+    let timerInterval = null;
+    let timerRunning = false;
+
+    // Multiplayer state
+    let peer = null;
+    let conn = null;
+    let isHost = false;
+    let roomCode = '';
+    let multiplayerMode = false;
+
+    // Theme state
+    let currentThemeIndex = 0;
+    const themes = ['', 'dark', 'matrix'];
+    const themeIcons = ['☀️', '🌙', '💚'];
+
+    // ==========================================
+    // SISTEMA DE SOM
+    // ==========================================
+    let audioCtx = null;
+
+    function getAudioContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return audioCtx;
+    }
+
+    function playSound(type) {
+        if (!soundEnabled) return;
+        
+        try {
+            const ctx = getAudioContext();
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            switch(type) {
+                case 'next':
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'sine';
+                    gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                    oscillator.start(ctx.currentTime);
+                    oscillator.stop(ctx.currentTime + 0.1);
+                    break;
+                case 'punish':
+                    oscillator.frequency.value = 200;
+                    oscillator.type = 'square';
+                    gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    oscillator.start(ctx.currentTime);
+                    oscillator.stop(ctx.currentTime + 0.3);
+                    break;
+                case 'levelup':
+                    oscillator.frequency.value = 523.25;
+                    oscillator.type = 'triangle';
+                    gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+                    
+                    setTimeout(() => { oscillator.frequency.value = 659.25; }, 100);
+                    setTimeout(() => { oscillator.frequency.value = 783.99; }, 200);
+                    setTimeout(() => { oscillator.frequency.value = 1046.50; }, 300);
+                    
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    oscillator.start(ctx.currentTime);
+                    oscillator.stop(ctx.currentTime + 0.5);
+                    break;
+                case 'click':
+                    oscillator.frequency.value = 1000;
+                    oscillator.type = 'square';
+                    gainNode.gain.setValueAtTime(0.05, ctx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+                    oscillator.start(ctx.currentTime);
+                    oscillator.stop(ctx.currentTime + 0.05);
+                    break;
+                case 'timer':
+                    oscillator.frequency.value = 440;
+                    oscillator.type = 'sine';
+                    gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                    oscillator.start(ctx.currentTime);
+                    oscillator.stop(ctx.currentTime + 0.2);
+                    break;
+                case 'alarm':
+                    for(let i = 0; i < 3; i++) {
+                        setTimeout(() => {
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.frequency.value = 880;
+                            osc.type = 'square';
+                            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                            osc.start(ctx.currentTime);
+                            osc.stop(ctx.currentTime + 0.15);
+                        }, i * 200);
+                    }
+                    return;
+            }
+        } catch(e) {}
+    }
+
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        document.getElementById('soundToggle').textContent = soundEnabled ? '🔊' : '🔇';
+        showToast(soundEnabled ? 'SOM ATIVADO' : 'SOM DESATIVADO', 'info');
+        if (soundEnabled) playSound('click');
+    }
+
+    // ==========================================
+    // SISTEMA DE TEMA
+    // ==========================================
+    function cycleTheme() {
+        currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+        const theme = themes[currentThemeIndex];
+        
+        if (theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        
+        document.getElementById('themeToggle').textContent = themeIcons[currentThemeIndex];
+        localStorage.setItem('sueca_theme', theme || 'light');
+        playSound('click');
+        showToast(`TEMA: ${theme ? theme.toUpperCase() : 'CLARO'}`, 'success');
+    }
+
+    function loadTheme() {
+        const saved = localStorage.getItem('sueca_theme') || 'light';
+        if (saved !== 'light') {
+            currentThemeIndex = themes.indexOf(saved);
+            if (currentThemeIndex === -1) currentThemeIndex = 0;
+            else {
+                document.documentElement.setAttribute('data-theme', saved);
+                document.getElementById('themeToggle').textContent = themeIcons[currentThemeIndex];
+            }
+        }
+    }
+
+    // ==========================================
+    // TOAST NOTIFICATIONS
+    // ==========================================
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 3000);
+    }
+
+    // ==========================================
+    // CONFETTI SYSTEM
+    // ==========================================
+    function spawnConfetti() {
+        const container = document.getElementById('confettiContainer');
+        container.style.display = 'block';
+        container.innerHTML = '';
+        
+        const colors = ['#CC0000', '#FFD700', '#2E7D32', '#00ff88', '#667eea'];
+        
+        for (let i = 0; i < 50; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            confetti.style.left = Math.random() * 100 + '%';
+            confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.animationDelay = Math.random() * 0.5 + 's';
+            confetti.style.width = (Math.random() * 10 + 5) + 'px';
+            confetti.style.height = (Math.random() * 10 + 5) + 'px';
+            container.appendChild(confetti);
+        }
+        
+        setTimeout(() => {
+            container.style.display = 'none';
+        }, 3500);
+    }
+
+    // ==========================================
+    // NAVEGAÇÃO
+    // ==========================================
+    function goTo(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        const target = document.getElementById(screenId);
+        if (target) {
+            target.classList.add('active');
+            playSound('click');
+        }
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            addPlayer();
+        }
+    }
+
+    // ==========================================
+    // JOGADORES
+    // ==========================================
+    function addPlayer() {
+        const input = document.getElementById('inputName');
+        const rawName = input.value.trim();
+        
+        if (!rawName) {
+            showToast('DIGITE UM NOME VÁLIDO!', 'warning');
+            input.focus();
+            return;
+        }
+
+        if (players.some(p => p.name === rawName.toUpperCase())) {
+            showToast('JOGADOR JÁ CADASTRADO!', 'error');
+            input.value = '';
+            input.focus();
+            return;
+        }
+
+        if (players.length >= 20) {
+            showToast('MÁXIMO DE 20 JOGADORES!', 'error');
+            return;
+        }
+
+        players.push({ name: rawName.toUpperCase(), score: 0 });
+        input.value = '';
+        updatePlayerList();
+        updateStartButton();
+        input.focus();
+        playSound('click');
+        showToast(`${rawName.toUpperCase()} ADICIONADO!`, 'success');
+
+        // Sync multiplayer
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'playersUpdate', players: players });
+        }
+    }
+
+    function removePlayer(index) {
+        const name = players[index].name;
+        players.splice(index, 1);
+        updatePlayerList();
+        updateStartButton();
+        showToast(`${name} REMOVIDO`, 'info');
+
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'playersUpdate', players: players });
+        }
+    }
+
+    function updatePlayerList() {
+        const list = document.getElementById('playersListSetup');
+        if (players.length === 0) {
+            list.innerHTML = '<p style="color: var(--text-dim); text-align: center; padding-top: 20px;">> AGUARDANDO DADOS... <</p>';
+            return;
+        }
+        list.innerHTML = players.map((p, i) => `
+            <div class="player-item">
+                <span style="font-weight:bold; font-size: 1.05rem;">${String(i+1).padStart(2,'0')}. ${escapeHtml(p.name)}</span>
+                <button onclick="removePlayer(${i})" style="width: auto; padding: 6px 14px; margin:0; font-size: 0.85rem; background: var(--red-alert); color: #fff; border-color: var(--border-color);">✕</button>
+            </div>
+        `).join('');
+    }
+
+    function updateStartButton() {
+        const btn = document.getElementById('startBtn');
+        if (players.length >= 2) {
+            btn.disabled = false;
+            btn.classList.remove('btn-black');
+            btn.classList.add('btn-green');
+        } else {
+            btn.disabled = true;
+            btn.classList.remove('btn-green');
+            btn.classList.add('btn-black');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ==========================================
+    // CORE DO JOGO
+    // ==========================================
+    function startGame() {
+        if (players.length < 2) {
+            showToast('ERRO: MÍNIMO 2 JOGADORES!', 'error');
+            return;
+        }
+
+        safeMode = document.getElementById('safeModeCheck').checked;
+        timerDuration = parseInt(document.getElementById('timerSelect').value) || 0;
+
+        // Build deck with custom cards
+        buildDeck();
+        
+        turnIndex = 0;
+        roundCount = 1;
+        currentLevel = 1;
+        gameHistory = [];
+        activeCustomRules = [];
+        
+        // Setup timer
+        setupTimer();
+
+        updateStatusDisplay();
+        updatePlayersIndicator();
+        loadCard();
+        goTo('screen-game');
+        showToast('SISTEMA INICIALIZADO! BOA SORTE!', 'success');
+        playSound('levelup');
+
+        // Sync start to multiplayer
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'gameStart', turnIndex, roundCount, currentLevel, deck: deck.length });
+        }
+    }
+
+    function buildDeck() {
+        deck = [...rulesDB, ...customCards];
+        
+        if (safeMode) {
+            deck = deck.filter(r => !r.hardcore);
+        }
+        
+        // Shuffle
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        
+        document.getElementById('deckCount').textContent = `📦 ${deck.length}`;
+    }
+
+    function setupTimer() {
+        const container = document.getElementById('timerContainer');
+        const display = document.getElementById('timerDisplay');
+        
+        if (timerDuration > 0) {
+            container.style.display = 'flex';
+            timerRemaining = timerDuration;
+            updateTimerDisplay();
+        } else {
+            container.style.display = 'none';
+            stopTimer();
+        }
+    }
+
+    function updateTimerDisplay() {
+        const display = document.getElementById('timerDisplay');
+        const mins = Math.floor(timerRemaining / 60);
+        const secs = timerRemaining % 60;
+        display.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        
+        display.classList.remove('warning', 'danger');
+        if (timerRemaining <= 5 && timerRemaining > 0) {
+            display.classList.add('danger');
+        } else if (timerRemaining <= 10) {
+            display.classList.add('warning');
+        }
+    }
+
+    function toggleTimer() {
+        if (timerRunning) {
+            stopTimer();
+        } else {
+            startTimer();
+        }
+    }
+
+    function startTimer() {
+        if (timerDuration === 0) return;
+        
+        stopTimer();
+        timerRunning = true;
+        document.getElementById('timerToggleBtn').textContent = '⏸️';
+        
+        timerInterval = setInterval(() => {
+            timerRemaining--;
+            updateTimerDisplay();
+            
+            if (timerRemaining <= 0) {
+                stopTimer();
+                playSound('alarm');
+                showToast('⏰ TEMPO ESGOTADO!', 'warning');
+                
+                // Auto next turn after alarm
+                setTimeout(() => {
+                    if (confirm('Tempo esgotado! Próxima rodada?')) {
+                        nextTurn();
+                    }
+                }, 500);
+            }
+        }, 1000);
+    }
+
+    function stopTimer() {
+        timerRunning = false;
+        clearInterval(timerInterval);
+        timerInterval = null;
+        document.getElementById('timerToggleBtn').textContent = '▶️';
+    }
+
+    function resetTimer() {
+        stopTimer();
+        timerRemaining = timerDuration;
+        updateTimerDisplay();
+        playSound('click');
+    }
+
+    function updateStatusDisplay() {
+        document.getElementById('levelDisplay').innerText = `LVL.${currentLevel.toString().padStart(2, '0')}`;
+        document.getElementById('roundCounter').innerText = `T.${roundCount.toString().padStart(2, '0')}`;
+        
+        const progress = ((roundCount - 1) % roundsPerLevel) / roundsPerLevel * 100;
+        document.getElementById('progressBar').style.width = `${progress}%`;
+    }
+
+    function updatePlayersIndicator() {
+        const container = document.getElementById('playersIndicator');
+        container.innerHTML = players.map(p => 
+            `<div class="player-dot ${p.score >= 5 ? 'danger' : ''}" title="${p.name}: ${p.score} doses"></div>`
+        ).join('');
+    }
+
+    function loadCard() {
+        if (deck.length === 0) {
+            buildDeck();
+            showToast('BARALHO RESHUFFLED!', 'warning');
+        }
+
+        const card = deck.pop();
+        const currentPlayer = players[turnIndex];
+
+        gameHistory.push({
+            round: roundCount,
+            player: currentPlayer.name,
+            card: card.title,
+            timestamp: new Date().toLocaleTimeString()
+        });
+
+        const gameCardDiv = document.getElementById('mainCard');
+        gameCardDiv.classList.remove('shake', 'card-hardcore', 'card-special', 'card-challenge');
+        void gameCardDiv.offsetHeight;
+        gameCardDiv.classList.add('shake');
+
+        document.getElementById('currentPlayerBar').innerHTML = `▶ VEZ DE: <strong>${currentPlayer.name}</strong>`;
+        document.getElementById('currentPlayerBar').style.background = getPlayerGradient(turnIndex);
+        
+        document.getElementById('cardType').innerText = card.type;
+        document.getElementById('cardTitle').innerText = card.title;
+        document.getElementById('cardDesc').innerText = `"${card.desc}"`;
+        document.getElementById('cardPunish').innerText = `> PENALIDADE: ${card.punish.toUpperCase()}`;
+
+        applyCardStyle(card);
+
+        document.getElementById('deckCount').textContent = `📦 ${deck.length}`;
+        document.getElementById('undoBtn').disabled = !lastAction;
+
+        // Reset and start timer
+        if (timerDuration > 0) {
+            resetTimer();
+            startTimer();
+        }
+
+        playSound('next');
+
+        // Sync card to multiplayer
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'cardLoaded', card: card, player: currentPlayer.name });
+        }
+    }
+
+    function getPlayerGradient(index) {
+        const colors = [
+            'linear-gradient(90deg, #1a1a1a, #444)',
+            'linear-gradient(90deg, #CC0000, #ff4444)',
+            'linear-gradient(90deg, #2E7D32, #4CAF50)',
+            'linear-gradient(90deg, #0a0a3a, #333)',
+            'linear-gradient(90deg, #667eea, #764ba2)',
+            'linear-gradient(90deg, #FFD700, #FFE44D)'
+        ];
+        return colors[index % colors.length];
+    }
+
+    function applyCardStyle(card) {
+        const gameCardDiv = document.getElementById('mainCard');
+        const punishEl = document.getElementById('cardPunish');
+
+        gameCardDiv.className = 'game-card shake';
+        punishEl.style.color = '';
+
+        if (card.type === "HARDCORE") {
+            gameCardDiv.classList.add('card-hardcore');
+        } else if (card.title === "SUDO" || card.title === "ROOT ACCESS") {
+            gameCardDiv.classList.add('card-special');
+            punishEl.style.color = '#aaffcc';
+        } else if (card.type === "DESAFIO") {
+            gameCardDiv.classList.add('card-challenge');
+        }
+    }
+
+    function nextTurn() {
+        stopTimer();
+
+        lastAction = {
+            type: 'turn',
+            turnIndex: turnIndex,
+            roundCount: roundCount,
+            level: currentLevel,
+            playersSnapshot: JSON.parse(JSON.stringify(players))
+        };
+
+        turnIndex++;
+        if (turnIndex >= players.length) turnIndex = 0;
+        roundCount++;
+
+        const calculatedLevel = Math.floor((roundCount - 1) / roundsPerLevel) + 1;
+        
+        if (calculatedLevel > currentLevel) {
+            currentLevel = calculatedLevel;
+            showLevelUpAlert(currentLevel);
+        } else {
+            updateStatusDisplay();
+            updatePlayersIndicator();
+            loadCard();
+        }
+    }
+
+    function skipCard() {
+        showToast('CARTA PULADA!', 'warning');
+        loadCard();
+        playSound('click');
+    }
+
+    function showLevelUpAlert(lvl) {
+        const overlay = document.getElementById('levelAlert');
+        const txt = document.getElementById('levelAlertText');
+        txt.innerText = `NÍVEL: ${lvl.toString().padStart(2, '0')}`;
+        overlay.style.display = 'flex';
+        
+        playSound('levelup');
+        spawnConfetti();
+        showToast(`LEVEL UP! NÍVEL ${lvl}!`, 'success');
+    }
+
+    function dismissLevelAlert() {
+        const overlay = document.getElementById('levelAlert');
+        overlay.style.display = 'none';
+        updateStatusDisplay();
+        updatePlayersIndicator();
+        loadCard();
+    }
+
+    // ==========================================
+    // PUNIÇÃO
+    // ==========================================
+    function openPunishModal() {
+        const container = document.getElementById('punishList');
+        container.innerHTML = players.map((p, index) => `
+            <button id="btn-punish-${index}" onclick="window.punishPlayer(${index})" 
+                style="text-align:left; font-size: 0.95rem; padding: 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;"
+                onmouseover="this.style.background='var(--bg-secondary)'" 
+                onmouseout="this.style.background='var(--card-bg)'">
+                <span><strong>${escapeHtml(p.name)}</strong> <small style="color:var(--text-dim);">(${p.score} doses)</small></span>
+                <span style="color:var(--red-alert); font-weight:900;">+1</span>
+            </button>
+        `).join('');
+        document.getElementById('modal-punish').style.display = 'flex';
+        playSound('click');
+    }
+
+    function closePunishModal() {
+        document.getElementById('modal-punish').style.display = 'none';
+    }
+
+    window.punishPlayer = function(index) {
+        lastAction = {
+            type: 'punish',
+            playerIndex: index,
+            previousScore: players[index].score
+        };
+
+        players[index].score += 1;
+        const btn = document.getElementById(`btn-punish-${index}`);
+        const originalHTML = btn.innerHTML;
+        
+        btn.innerHTML = `<span style="color:var(--green-ok);">✓ REGISTRADO!</span>`;
+        btn.style.background = '#d4edda';
+        btn.disabled = true;
+        
+        updatePlayersIndicator();
+        playSound('punish');
+        showToast(`${players[index].name} RECEBEU +1 DOSE!`, 'error');
+
+        setTimeout(() => {
+            if (btn.parentNode) {
+                btn.innerHTML = originalHTML;
+                btn.style.background = 'var(--card-bg)';
+                btn.disabled = false;
+                btn.querySelector('small').textContent = `(${players[index].score} doses)`;
+            }
+        }, 800);
+
+        // Sync punishment
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'punishment', playerIndex: index, score: players[index].score });
+        }
+    };
+
+    function punishAll() {
+        lastAction = {
+            type: 'punishAll',
+            previousScores: JSON.parse(JSON.stringify(players.map(p => p.score)))
+        };
+
+        players.forEach(p => p.score += 1);
+        closePunishModal();
+        updatePlayersIndicator();
+        playSound('punish');
+        showToast('CAOS GERAL! TODOS +1!', 'error');
+
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'punishAll', scores: players.map(p => p.score) });
+        }
+    }
+
+    // ==========================================
+    // UNDO
+    // ==========================================
+    function undoLastAction() {
+        if (!lastAction) {
+            showToast('NADA A DESFAZER!', 'warning');
+            return;
+        }
+
+        if (lastAction.type === 'punish') {
+            players[lastAction.playerIndex].score = lastAction.previousScore;
+            showToast('PUNIÇÃO DESFEITA!', 'info');
+        } else if (lastAction.type === 'punishAll') {
+            players.forEach((p, i) => p.score = lastAction.previousScores[i]);
+            showToast('PUNIÇÃO EM MASSA DESFEITA!', 'info');
+        } else if (lastAction.type === 'turn') {
+            turnIndex = lastAction.turnIndex;
+            roundCount = lastAction.roundCount;
+            currentLevel = lastAction.level;
+            players = lastAction.playersSnapshot;
+            showToast('TORNADA DESFEITA!', 'info');
+            loadCard();
+        }
+
+        lastAction = null;
+        document.getElementById('undoBtn').disabled = true;
+        updatePlayersIndicator();
+        playSound('click');
+    }
+
+    // ==========================================
+    // SAVE/LOAD
+    // ==========================================
+    function saveGame() {
+        const saveData = {
+            players: players,
+            turnIndex: turnIndex,
+            roundCount: roundCount,
+            currentLevel: currentLevel,
+            deck: deck,
+            activeCustomRules: activeCustomRules,
+            customCards: customCards,
+            timestamp: new Date().toISOString()
+        };
+        
+        try {
+            localStorage.setItem('sueca_system_save_v6', JSON.stringify(saveData));
+            showToast('PARTIDA SALVA!', 'success');
+            playSound('click');
+        } catch(e) {
+            showToast('ERRO AO SALVAR!', 'error');
+        }
+    }
+
+    function loadGame() {
+        try {
+            const raw = localStorage.getItem('sueca_system_save_v6');
+            if (!raw) {
+                showToast('NENHUMA PARTIDA SALVA!', 'warning');
+                return;
+            }
+
+            const data = JSON.parse(raw);
+            players = data.players || [];
+            turnIndex = data.turnIndex || 0;
+            roundCount = data.roundCount || 1;
+            currentLevel = data.currentLevel || 1;
+            deck = data.deck || [];
+            activeCustomRules = data.activeCustomRules || [];
+            customCards = data.customCards || [];
+
+            if (players.length < 2) {
+                showToast('SAVE INVÁLIDO!', 'error');
+                localStorage.removeItem('sueca_system_save_v6');
+                return;
+            }
+
+            updateStatusDisplay();
+            updatePlayersIndicator();
+            loadCard();
+            goTo('screen-game');
+            showToast('PARTIDA CARREGADA!', 'success');
+            playSound('levelup');
+        } catch(e) {
+            showToast('ERRO AO CARREGAR!', 'error');
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        if (localStorage.getItem('sueca_system_save_v6')) {
+            document.getElementById('loadGameBtn').style.display = 'block';
+        }
+        loadTheme();
+    });
+
+    // ==========================================
+    // REGRAS MODAL
+    // ==========================================
+    function openRulesModal() {
+        const container = document.getElementById('activeRulesList');
+        
+        if (activeCustomRules.length === 0 && gameHistory.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-dim); text-align: center;">Nenhuma regra ativa registrada.</p>';
+        } else {
+            let html = '';
+            
+            if (activeCustomRules.length > 0) {
+                html += '<h4 style="color: var(--green-ok); margin-bottom: 10px;">REGRAS PERSONALIZADAS:</h4>';
+                activeCustomRules.forEach(rule => {
+                    html += `<p style="border-left: 3px solid var(--green-ok); padding-left: 10px; margin: 8px 0;"><strong>${escapeHtml(rule)}</strong></p>`;
+                });
+            }
+            
+            if (gameHistory.length > 0) {
+                html += '<h4 style="color: var(--ink-color); margin: 15px 0 10px;">ÚLTIMAS AÇÕES:</h4>';
+                const recentHistory = gameHistory.slice(-10).reverse();
+                recentHistory.forEach(h => {
+                    html += `<p style="font-size: 0.85rem; color: var(--text-dim); margin: 4px 0;">T.${h.round} | ${h.player} → ${h.card}</p>`;
+                });
+            }
+            
+            container.innerHTML = html;
+        }
+        
+        document.getElementById('modal-rules').style.display = 'flex';
+        playSound('click');
+    }
+
+    function closeRulesModal() {
+        document.getElementById('modal-rules').style.display = 'none';
+    }
+
+    // ==========================================
+    // FINALIZAR
+    // ==========================================
+    function finishGame() {
+        if (players.length === 0) return;
+        
+        if (!confirm('CONFIRMA O ENCERRAMENTO DO SISTEMA?\n\nTodo progresso será perdido.')) return;
+        
+        stopTimer();
+        players.sort((a, b) => b.score - a.score);
+        
+        document.getElementById('finalLevelReport').innerText = `NÍVEL ALCANÇADO: ${currentLevel.toString().padStart(2, '0')}`;
+        document.getElementById('finalRoundsReport').innerText = `RODADAS: ${roundCount}`;
+
+        const list = document.getElementById('rankingList');
+        list.innerHTML = players.map((p, i) => {
+            let icon = "";
+            let style = "";
+            const maxScore = Math.max(...players.map(pl => pl.score));
+            
+            if (i === 0) { icon = "👑 CAMPEÃO"; style = "border-color: #FFD700; background: linear-gradient(135deg, #FFF8E1, #FFECB3);"; }
+            else if (i === 1) { icon = "🥈 2º"; style = "border-color: #C0C0C0; background: #F5F5F5"; }
+            else if (i === 2) { icon = "🥉 3º"; style = "border-color: #CD7F32; background: #FFF3E0"; }
+            else if (p.score === 0) { icon = "🏆 SOBREVIVENTE"; style = "border-color: var(--green-ok); background: #E8F5E9"; }
+            else if (i === players.length - 1 && players.length > 2) { icon = "💀 ÚLTIMO"; style = "border-color: var(--red-alert); background: #FFEBEE"; }
+
+            const percentage = maxScore > 0 ? Math.round((p.score / maxScore) * 100) : 0;
+
+            return `<div class="rank-item" style="${style}">
+                        <div>
+                            <span style="font-size:0.8rem; display:block; color:var(--text-dim);">#${i+1} ${icon}</span>
+                            <strong style="font-size:1.2rem;">${escapeHtml(p.name)}</strong>
+                            <div style="width:100%;height:6px;background:var(--bg-secondary);margin-top:5px;border-radius:3px;overflow:hidden;">
+                                <div style="width:${percentage}%;height:100%;background:${i===0?'#FFD700':i===players.length-1?'var(--red-alert)':'var(--ink-color)'};transition:width 0.5s;"></div>
+                            </div>
+                        </div>
+                        <div style="text-align:right;">
+                            <strong style="font-size:1.8rem; color:${p.score>=5?'var(--red-alert)':'var(--ink-color)'};">${p.score}</strong><br>
+                            <span style="font-size:0.75rem; color:var(--text-dim);">DOSES</span>
+                        </div>
+                    </div>`;
+        }).join('');
+
+        localStorage.removeItem('sueca_system_save_v6');
+        
+        goTo('screen-ranking');
+        spawnConfetti();
+        playSound('levelup');
+    }
+
+    // ==========================================
+    // COMPARTILHAR
+    // ==========================================
+    function shareResults() {
+        const winner = players[0];
+        const loser = players[players.length - 1];
+        
+        const text = `🍺 SUECA SYSTEM V6 - RELATÓRIO FINAL 🍺\n` +
+                     `👑 Campeão: ${winner.name} (${winner.score} doses)\n` +
+                     `💀 Último: ${loser.name} (${loser.score} doses)\n` +
+                     `📊 Nível: ${currentLevel} | Rodadas: ${roundCount}\n` +
+                     `👥 Jogadores: ${players.length}\n\n` +
+                     `#SuecaSystem #DrinkGame`;
+        
+        if (navigator.share) {
+            navigator.share({ title: 'Sueca System - Resultados', text: text }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('RESULTADO COPIADO!', 'success');
+            }).catch(() => {
+                showToast('ERRO AO COPIAR!', 'error');
+            });
+        }
+    }
+
+    // ==========================================
+    // PACK EDITOR
+    // ==========================================
+    function addCustomCard() {
+        const title = document.getElementById('editTitle').value.trim();
+        const desc = document.getElementById('editDesc').value.trim();
+        const type = document.getElementById('editType').value;
+        const punish = document.getElementById('editPunish').value.trim() || 'Bebe';
+        const hardcore = document.getElementById('editHardcore').checked;
+
+        if (!title || !desc) {
+            showToast('PREENCHA TÍTULO E DESCRIÇÃO!', 'warning');
+            return;
+        }
+
+        const newCard = {
+            title: title.toUpperCase(),
+            desc: desc,
+            type: type,
+            punish: punish.toUpperCase(),
+            hardcore: hardcore,
+            custom: true
+        };
+
+        customCards.push(newCard);
+        
+        // Clear form
+        document.getElementById('editTitle').value = '';
+        document.getElementById('editDesc').value = '';
+        document.getElementById('editPunish').value = '';
+        document.getElementById('editHardcore').checked = false;
+
+        updateCustomCardsList();
+        showToast(`CARTA "${title.toUpperCase()}" CRIADA!`, 'success');
+        playSound('click');
+    }
+
+    function updateCustomCardsList() {
+        const container = document.getElementById('customCardsList');
+        document.getElementById('customCount').textContent = customCards.length;
+
+        if (customCards.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-dim); text-align:center;">Nenhuma carta customizada ainda.</p>';
+            return;
+        }
+
+        container.innerHTML = customCards.map((card, index) => `
+            <div class="pack-item">
+                <div>
+                    <strong>${escapeHtml(card.title)}</strong>
+                    <br><small style="color:var(--text-dim);">${card.type}${card.hardcore ? ' ⚠️HARDCORE' : ''}</small>
+                </div>
+                <button onclick="removeCustomCard(${index})" style="width:auto;padding:5px 10px;margin:0;font-size:0.8rem;background:var(--red-alert);color:#fff;border:none;">✕</button>
+            </div>
+        `).join('');
+    }
+
+    function removeCustomCard(index) {
+        const name = customCards[index].title;
+        customCards.splice(index, 1);
+        updateCustomCardsList();
+        showToast(`"${name}" REMOVIDA`, 'info');
+    }
+
+    function exportPack() {
+        if (customCards.length === 0) {
+            showToast('NENHUMA CARTA PARA EXPORTAR!', 'warning');
+            return;
+        }
+
+        const packData = {
+            name: 'Pack Customizado',
+            version: '1.0',
+            cards: customCards,
+            exportedAt: new Date().toISOString()
+        };
+
+        const json = JSON.stringify(packData);
+        
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(json).then(() => {
+                showToast('PACK COPIADO! COMPARTILHE O CÓDIGO!', 'success');
+            });
+        } else {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = json;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast('PACK COPIADO!', 'success');
+        }
+    }
+
+    function importPack() {
+        const input = document.getElementById('importPackInput').value.trim();
+        
+        if (!input) {
+            showToast('COLE O CÓDIGO DO PACK!', 'warning');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(input);
+            
+            if (!data.cards || !Array.isArray(data.cards)) {
+                throw new Error('Formato inválido');
+            }
+
+            const importedCount = data.cards.length;
+            customCards = [...customCards, ...data.cards];
+            
+            document.getElementById('importPackInput').value = '';
+            updateCustomCardsList();
+            showToast(`${importedCount} CARTAS IMPORTADAS!`, 'success');
+            playSound('levelup');
+        } catch(e) {
+            showToast('CÓDIGO INVÁLIDO! VERIFIQUE O JSON.', 'error');
+        }
+    }
+
+    // ==========================================
+    // MULTIPLAYER (PEERJS)
+    // ==========================================
+    function toggleMultiplayerUI() {
+        const ui = document.getElementById('multiplayerUI');
+        const checked = document.getElementById('multiplayerCheck').checked;
+        ui.style.display = checked ? 'block' : 'none';
+    }
+
+    function generateRoomCode() {
+        return 'SUECA-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    function createRoom() {
+        if (typeof Peer === 'undefined') {
+            showToast('PEERJS NÃO CARREGADO! VERIFIQUE INTERNET.', 'error');
+            return;
+        }
+
+        roomCode = generateRoomCode();
+        
+        try {
+            peer = new Peer(roomCode);
+            
+            peer.on('open', (id) => {
+                isHost = true;
+                multiplayerMode = true;
+                
+                document.querySelector('.room-code')?.remove();
+                const codeDiv = document.createElement('div');
+                codeDiv.className = 'room-code';
+                codeDiv.textContent = id;
+                codeDiv.onclick = () => {
+                    navigator.clipboard.writeText(id);
+                    showToast('CÓPIO COPIADO!', 'success');
+                };
+                document.getElementById('multiplayerUI').appendChild(codeDiv);
+                
+                updateConnectionStatus(true, `SALA CRIADA: ${id}`);
+                showToast('SALA CRIADA! COMPARTILHE O CÓDIGO!', 'success');
+                playSound('levelup');
+            });
+
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnectionHandlers();
+                showToast('JOGADOR CONECTADO!', 'success');
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                updateConnectionStatus(false, 'ERRO: ' + err.type);
+                showToast('ERRO AO CRIAR SALA!', 'error');
+            });
+
+        } catch(e) {
+            showToast('ERRO AO INICIALIZAR PEERJS!', 'error');
+        }
+    }
+
+    function joinRoom() {
+        if (typeof Peer === 'undefined') {
+            showToast('PEERJS NÃO CARREGADO!', 'error');
+            return;
+        }
+
+        const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+        
+        if (!code) {
+            showToast('DIGITE O CÓDIGO DA SALA!', 'warning');
+            return;
+        }
+
+        try {
+            peer = new Peer();
+            
+            peer.on('open', () => {
+                conn = peer.connect(code);
+                isHost = false;
+                multiplayerMode = true;
+                setupConnectionHandlers();
+                showToast('CONECTANDO...', 'info');
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                updateConnectionStatus(false, 'ERRO: ' + err.type);
+                showToast('ERRO AO CONECTAR!', 'error');
+            });
+
+        } catch(e) {
+            showToast('ERRO AO CONECTAR!', 'error');
+        }
+    }
+
+    function setupConnectionHandlers() {
+        conn.on('open', () => {
+            updateConnectionStatus(true, 'CONECTADO!');
+            showToast('CONEXÃO ESTABELECIDA!', 'success');
+            playSound('levelup');
+        });
+
+        conn.on('data', (data) => {
+            handleMultiplayerMessage(data);
+        });
+
+        conn.on('close', () => {
+            updateConnectionStatus(false, 'DESCONECTADO');
+            showToast('JOGADOR DESCONECTOU!', 'warning');
+        });
+    }
+
+    function handleMultiplayerMessage(data) {
+        switch(data.type) {
+            case 'playersUpdate':
+                players = data.players;
+                updatePlayerList();
+                updateStartButton();
+                break;
+            case 'gameStart':
+                turnIndex = data.turnIndex;
+                roundCount = data.roundCount;
+                currentLevel = data.currentLevel;
+                // Host manages deck
+                break;
+            case 'cardLoaded':
+                // Show same card
+                document.getElementById('cardType').innerText = data.card.type;
+                document.getElementById('cardTitle').innerText = data.card.title;
+                document.getElementById('cardDesc').innerText = `"${data.card.desc}"`;
+                document.getElementById('cardPunish').innerText = `> PENALIDADE: ${data.card.punish.toUpperCase()}`;
+                document.getElementById('currentPlayerBar').innerHTML = `▶ VEZ DE: <strong>${data.player}</strong>`;
+                applyCardStyle(data.card);
+                break;
+            case 'punishment':
+                players[data.playerIndex].score = data.score;
+                updatePlayersIndicator();
+                break;
+            case 'punishAll':
+                data.scores.forEach((score, i) => players[i].score = score);
+                updatePlayersIndicator();
+                break;
+            case 'nextTurn':
+                nextTurn();
+                break;
+        }
+    }
+
+    function updateConnectionStatus(connected, text) {
+        const dot = document.getElementById('statusDot');
+        const statusText = document.getElementById('connStatusText');
+        
+        if (connected) {
+            dot.classList.add('connected');
+        } else {
+            dot.classList.remove('connected');
+        }
+        statusText.textContent = text;
+    }
+
+    // ==========================================
+    // KEYBOARD SHORTCUTS
+    // ==========================================
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+            if (e.key === 'Escape') e.target.blur();
+            return;
+        }
+
+        const gameScreen = document.getElementById('screen-game');
+        if (!gameScreen.classList.contains('active')) return;
+
+        switch(e.key) {
+            case 'ArrowRight':
+            case 'Enter':
+            case ' ':
+                if (e.shiftKey) {
+                    skipCard();
+                } else {
+                    e.preventDefault();
+                    nextTurn();
+                }
+                break;
+            case 'ArrowLeft':
+                undoLastAction();
+                break;
+            case 'p':
+            case 'P':
+                openPunishModal();
+                break;
+            case 'r':
+            case 'R':
+                openRulesModal();
+                break;
+            case 's':
+            case 'S':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    saveGame();
+                }
+                break;
+            case 't':
+            case 'T':
+                cycleTheme();
+                break;
+            case 'Escape':
+                finishGame();
+                break;
+            case '?':
+                showToast('⌨️ Atalhos: →=Próximo | ←=Desfazer | P=Punir | R=Regras | S=Salvar | T=Tema | Esc=Sair', 'info');
+                break;
+        }
+    });
+
+    // ==========================================
+    // GLOBAL FUNCTIONS
+    // ==========================================
+    window.goTo = goTo;
+    window.handleEnter = handleEnter;
+    window.addPlayer = addPlayer;
+    window.removePlayer = removePlayer;
+    window.startGame = startGame;
+    window.nextTurn = nextTurn;
+    window.skipCard = skipCard;
+    window.dismissLevelAlert = dismissLevelAlert;
+    window.openPunishModal = openPunishModal;
+    window.closePunishModal = closePunishModal;
+    window.punishAll = punishAll;
+    window.finishGame = finishGame;
+    window.undoLastAction = undoLastAction;
+    window.saveGame = saveGame;
+    window.loadGame = loadGame;
+    window.openRulesModal = openRulesModal;
+    window.closeRulesModal = closeRulesModal;
+    window.shareResults = shareResults;
+    window.toggleSound = toggleSound;
+    window.cycleTheme = cycleTheme;
+    window.toggleMultiplayerUI = toggleMultiplayerUI;
+    window.createRoom = createRoom;
+    window.joinRoom = joinRoom;
+    window.addCustomCard = addCustomCard;
+    window.removeCustomCard = removeCustomCard;
+    window.exportPack = exportPack;
+    window.importPack = importPack;
+    window.toggleTimer = toggleTimer;
+    window.resetTimer = resetTimer;
+
+    // Init
+    updateStartButton();
+    updateCustomCardsList();
+
+    console.log('%c🍺 SUECA SYSTEM V6 - ULTIMATE EDITION', 'font-size: 24px; font-weight: bold; color: #CC0000; background: #fff; padding: 10px 20px;');
+    console.log('%cFeatures: Dark Mode | Pack Editor | Timer | PWA | Multiplayer | 150+ Regras', 'font-size: 11px; color: #666;');
+
+})();
+</script>
+</body>
+</html>

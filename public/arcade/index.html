@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acervo Digital | Eduardo</title>
+    <meta name="description" content="Hub pessoal de jogos, utilitários e experimentos: Spyfall, Sueca, Roguelike RPG, GhostChat, P2P Share e Nexus.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Acervo Digital | Eduardo">
+    <meta property="og:description" content="Hub pessoal de jogos, utilitários e experimentos.">
+    <meta name="theme-color" content="#0f0f12">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos Base */
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #0f0f12;
+            color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            margin: 50px 0 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            background: linear-gradient(45deg, #00adb5, #00767a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin: 0;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+
+        /* Grid de Cards */
+        .hub-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 25px;
+            width: 90%;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        /* Estilo do Card */
+        .game-card {
+            background: #1a1a1e;
+            border: 1px solid #2e2e33;
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            border-color: #00adb5;
+            box-shadow: 0 15px 30px rgba(0, 173, 181, 0.1);
+        }
+
+        .game-icon {
+            font-size: 55px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .game-card h2 {
+            margin: 10px 0;
+            font-size: 1.4rem;
+            color: #fff;
+        }
+
+        .game-card p {
+            font-size: 0.85rem;
+            color: #a0a0a0;
+            line-height: 1.5;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .badge-game { background: #28a74533; color: #28a745; }
+        .badge-util { background: #007bff33; color: #007bff; }
+        .badge-new { background: #ffc10733; color: #ffc107; }
+        .badge-test { background: #9c27b033; color: #e1bee7; }
+
+        @media (max-width: 600px) {
+            .hub-container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <a href="/" id="back-otakuverse" aria-label="Voltar ao OtakuVerse"
+       style="position:fixed;top:16px;left:16px;z-index:99999;font:600 12px/1 system-ui,sans-serif;letter-spacing:.05em;color:#e5e7eb;text-decoration:none;background:rgba(20,20,25,.85);border:1px solid rgba(168,85,247,.4);padding:8px 14px;border-radius:999px;backdrop-filter:blur(8px);transition:all .2s;display:inline-flex;align-items:center;gap:6px;"
+       onmouseover="this.style.borderColor='#d946ef';this.style.boxShadow='0 0 12px rgba(217,70,239,0.3)';"
+       onmouseout="this.style.borderColor='rgba(168,85,247,.4)';this.style.boxShadow='none';">
+       &larr; Voltar ao OtakuVerse
+    </a>
+
+    <header>
+        <h1>ACERVO DIGITAL</h1>
+        <p class="subtitle">Bem-vindo ao seu laboratório de experiências</p>
+    </header>
+
+    <main class="hub-container">
+        
+        <a href="./GAMES/SPYFALLS/SPYFALLS1+1.html" class="game-card">
+            <span class="badge badge-game">Jogo</span>
+            <span class="game-icon">🕵️‍♂️</span>
+            <h2>Spyfall</h2>
+            <p>O espião está entre nós. Descubra-o antes que o tempo acabe.</p>
+        </a>
+
+        <a href="./GAMES/SUECATXT/PRJB20.html" class="game-card">
+            <span class="badge badge-game">Jogo</span>
+            <span class="game-icon">🃏</span>
+            <h2>Sueca</h2>
+            <p>Estratégia e parceria no jogo de cartas mais famoso.</p>
+        </a>
+
+        <a href="./GAMES/ROGUELIKERPG/HUBROGUE.html" class="game-card">
+            <span class="badge badge-game">RPG</span>
+            <span class="game-icon">🕯️</span>
+            <h2>Roguelike RPG</h2>
+            <p>Terror psicológico em duas versões. Cuidado com as sombras.</p>
+        </a>
+
+        <a href="./GHOSTCHAT/GOHO1.html" class="game-card">
+            <span class="badge badge-new">Novo</span>
+            <span class="game-icon">👻</span>
+            <h2>GhostChat</h2>
+            <p>Chat P2P anônimo. Projeto ainda em beta, não tente usar as funções de pagamento por enquanto.</p>
+        </a>
+
+        <a href="./P2P/index.html" class="game-card">
+            <span class="badge badge-util">Utilitário</span>
+            <span class="game-icon">⚡</span>
+            <h2>Pure P2P Share</h2>
+            <p>Transferência direta de arquivos adaptativa e criptografada via QR ou código.</p>
+        </a>
+
+        <a href="./TESTEIMAGEM/NEXUS.html" class="game-card">
+            <span class="badge badge-test">Laboratório</span>
+            <span class="game-icon">🧠</span>
+            <h2>NEXUS</h2>
+            <p>Teste psicológico para geração de prompts de imagem.</p>
+        </a>
+
+        <a href="./ACERVOGAMES/Acervogames.html" class="game-card">
+            <span class="badge badge-util">Utilitário</span>
+            <span class="game-icon">🎲</span>
+            <h2>Acervo PnP</h2>
+            <p>Biblioteca de jogos print-and-play, indexada direto do Google Drive.</p>
+        </a>
+
+    </main>
+
+</body>
+</html>
