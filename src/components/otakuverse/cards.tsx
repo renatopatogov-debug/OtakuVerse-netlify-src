@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BookOpen, Clapperboard, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
