@@ -71,7 +71,7 @@ const ARCADE_ITEMS: GameItem[] = [
     category: "Utilitário",
     badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
     icon: "👻",
-    description: "Mensagens efêmeras e diretas via WebRTC P2P (modo experimental).",
+    description: "Chat P2P anônimo direto entre navegadores. Crie seu apelido e conecte por chave aleatória.",
     url: "/arcade/GHOSTCHAT/GOHO1.html",
   },
   {

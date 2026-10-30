@@ -2,100 +2,295 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Fast Share - Acervo</title>
-    <meta name="description" content="Transferência direta de arquivos entre navegadores via WebRTC, sem servidor de arquivos.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pure P2P Share — Acervo Digital</title>
+    <meta name="description" content="Transferência direta de arquivos entre navegadores via WebRTC ponto a ponto, sem intermediários.">
     <meta name="theme-color" content="#0f0f12">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
     <style>
         :root {
-            --bg: #0f172a; --card: #1e293b; --text: #f8fafc;
-            --primary: #00adb5; --primary-hover: #00767a;
-            --success: #10b981; --border: #334155;
-            --danger: #ef4444; --warning: #f59e0b;
+            --bg: #0f0f12;
+            --card: #1a1a1e;
+            --card-secondary: #25252b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #00adb5;
+            --primary-hover: #00767a;
+            --success: #10b981;
+            --border: #333339;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --radius: 16px;
+            --radius-sm: 8px;
         }
-        body {
-            font-family: 'Inter', system-ui, sans-serif; background-color: var(--bg); color: var(--text);
-            display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
         }
+
+        html, body {
+            min-height: 100%;
+            min-height: 100dvh;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+
         .container {
-            background-color: var(--card); padding: 2.5rem; border-radius: 20px;
-            width: 100%; max-width: 450px; text-align: center; border: 1px solid var(--border);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            background-color: var(--card);
+            padding: 2.2rem 1.8rem;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+            position: relative;
+            animation: fadeIn 0.3s ease;
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .hidden { display: none !important; }
-        .btn {
-            background-color: var(--primary); color: white; border: none; padding: 0.85rem 1.5rem;
-            border-radius: 10px; font-size: 1rem; cursor: pointer; font-weight: 600; width: 100%; margin-top: 15px;
-            transition: all 0.2s ease;
+
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            background: linear-gradient(45deg, #00adb5, #00d2dc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-        .btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+
+        .header-sub {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.85rem 1.4rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-weight: 600;
+            width: 100%;
+            margin-top: 14px;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
         .btn-success { background-color: var(--success); }
         .btn-success:hover { background-color: #059669; }
-        .btn-danger { background-color: transparent; border: 1px solid var(--danger); color: var(--danger); }
-        .btn-danger:hover { background-color: var(--danger); color: white; }
-        
-        .dropzone { 
-            border: 2px dashed var(--border); padding: 3rem 2rem; border-radius: 16px; 
-            cursor: pointer; margin-bottom: 15px; transition: all 0.3s ease; background: rgba(255,255,255,0.02);
+
+        .btn-danger {
+            background-color: transparent;
+            border: 1px solid var(--danger);
+            color: var(--danger);
         }
-        .dropzone:hover { background-color: rgba(0, 173, 181, 0.05); border-color: var(--primary); }
-        .dropzone-icon { font-size: 3rem; margin-bottom: 15px; display: block; }
-        
-        .qr-container { display: inline-block; margin: 20px 0; background: white; padding: 15px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        
-        .progress-box { text-align: left; margin-top: 20px; }
-        .progress-bar { width: 100%; background-color: var(--border); height: 10px; border-radius: 5px; overflow: hidden; margin: 12px 0; }
-        .progress-fill { width: 0%; height: 100%; background-color: var(--primary); transition: width 0.1s linear; }
-        .progress-fill.connecting { background-color: var(--warning); width: 100%; animation: pulse 1.5s infinite ease-in-out; }
-        
-        .link-box { background: rgba(0,0,0,0.2); padding: 12px; border-radius: 10px; border: 1px solid var(--border); font-size: 0.85rem; word-break: break-all; color: #cbd5e1; font-family: monospace; }
-        .status-msg { font-size: 0.9rem; color: #94a3b8; margin-top: 8px; font-weight: 500;}
-        
-        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+        .btn-danger:hover {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .dropzone { 
+            border: 2px dashed var(--border);
+            padding: 2.8rem 1.5rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .dropzone:hover, .dropzone.dragover {
+            background-color: rgba(0, 173, 181, 0.08);
+            border-color: var(--primary);
+        }
+
+        .dropzone-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .qr-container {
+            display: inline-block;
+            margin: 15px 0;
+            background: white;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .progress-box {
+            text-align: left;
+            margin-top: 15px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background-color: var(--card-secondary);
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 12px 0;
+            border: 1px solid var(--border);
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background-color: var(--primary);
+            transition: width 0.15s linear;
+        }
+
+        .progress-fill.connecting {
+            background-color: var(--warning);
+            width: 100%;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .link-box {
+            background: var(--card-secondary);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+            word-break: break-all;
+            color: #cbd5e1;
+            font-family: monospace;
+            user-select: all;
+            margin-bottom: 10px;
+        }
+
+        .status-msg {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            font-weight: 500;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
 
         .back-hub {
-            position: fixed; top: 16px; left: 16px; z-index: 100;
-            font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
-            color: #94a3b8; text-decoration: none; border: 1px solid var(--border);
-            padding: 7px 12px; border-radius: 999px; background: #0f172ad9;
-            backdrop-filter: blur(6px); transition: color 0.2s, border-color 0.2s;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 1000;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #e5e7eb;
+            text-decoration: none;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(15, 15, 18, 0.8);
+            backdrop-filter: blur(6px);
+            opacity: 0.7;
+            transition: all 0.2s ease;
         }
-        .back-hub:hover { color: #fff; border-color: var(--primary); }
+
+        .back-hub:hover {
+            opacity: 1;
+            border-color: var(--primary);
+            color: #fff;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .container {
+                padding: 1.8rem 1.2rem;
+                border-radius: 14px;
+            }
+            .header-title { font-size: 1.3rem; }
+            .back-hub {
+                top: 12px;
+                left: 12px;
+                padding: 6px 11px;
+                font-size: 10px;
+            }
+            .qr-container { padding: 10px; }
+            .dropzone { padding: 2.2rem 1rem; }
+        }
     </style>
 </head>
 <body>
 
+<a href="/arcade" class="back-hub">← Arcade</a>
+
 <div class="container">
-    <a href="/" class="back-hub">← Acervo</a>
-    <h2 style="margin-top: 0;">P2P Transfer⚡</h2>
-    <p style="color: #64748b; font-size: 0.9rem; margin-top: -15px; margin-bottom: 25px;">Conexão Direta Criptografada</p>
+    <h2 class="header-title">Pure P2P Share ⚡</h2>
+    <p class="header-sub">Transferência direta entre dispositivos via WebRTC</p>
     
+    <!-- Tela 1: Escolha do Arquivo (Remetente) -->
     <div id="viewSelection">
         <div class="dropzone" id="dropzone">
             <span class="dropzone-icon">📤</span>
-            <p style="margin: 0; font-weight: 500;">Clique ou arraste um arquivo</p>
-            <p style="margin: 5px 0 0 0; font-size: 0.8rem; color: #64748b;">Qualquer tamanho. Zero servidores.</p>
+            <p style="margin: 0; font-weight: 600;">Clique ou arraste um arquivo</p>
+            <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
+                Transmissão direta P2P. Sem armazenamento em nuvem.
+            </p>
             <input type="file" id="fileInput" style="display:none;">
         </div>
     </div>
 
+    <!-- Tela 2: Status / Compartilhamento de Sala -->
     <div id="viewStatus" class="hidden">
         <div id="boxShare">
-            <p style="font-size:0.9rem; color:#e2e8f0; margin-bottom: 5px;">Aponte a câmera ou compartilhe o link:</p>
+            <p style="font-size:0.85rem; color:#e2e8f0; margin-bottom: 8px; font-weight: 500;">
+                Aponte a câmera do celular ou copie o link:
+            </p>
             <div style="text-align: center;"><div id="shareQr" class="qr-container"></div></div>
-            <div id="shareLink" class="link-box">Gerando link seguro...</div>
-            <button class="btn" id="btnCopyLink" style="background-color: var(--border);">Copiar Link</button>
-            <hr style="border: 0; height: 1px; background: var(--border); margin: 25px 0;">
+            <div id="shareLink" class="link-box">Gerando sala segura...</div>
+            <button class="btn" id="btnCopyLink" style="background-color: var(--card-secondary); border: 1px solid var(--border);">
+                Copiar Link
+            </button>
+            <hr style="border: 0; height: 1px; background: var(--border); margin: 20px 0;">
         </div>
 
         <div class="progress-box">
-            <h3 id="progressTitle" style="margin: 0 0 5px 0; font-size: 1.1rem;">Aguardando Conexão...</h3>
-            <div id="fileMeta" style="font-size: 0.85rem; color: var(--primary); display:none; margin-bottom: 5px;"></div>
+            <h3 id="progressTitle" style="margin: 0 0 5px 0; font-size: 1.05rem;">Aguardando Conexão...</h3>
+            <div id="fileMeta" style="font-size: 0.85rem; color: var(--primary); display:none; margin-bottom: 5px; font-weight: 600;"></div>
             
             <div class="progress-bar"><div class="progress-fill connecting" id="progressBar"></div></div>
-            <div id="statusLabel" class="status-msg">Iniciando ambiente seguro...</div>
+            <div id="statusLabel" class="status-msg">Conectando à rede de sinalização...</div>
             
             <button id="downloadBtn" class="btn btn-success hidden">Salvar Arquivo</button>
             <button class="btn btn-danger" id="btnCancel">Cancelar Operação</button>
@@ -104,62 +299,83 @@
 </div>
 
 <script>
-    const CHUNK_SIZE = 64 * 1024; 
-    
-    // CONFIGURAÇÃO COMPLETA: STUN + TURN (Fura o bloqueio do 4G e redes diferentes)
+    // Configuração de Sinalização usando Firebase Realtime Database
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCZirWDZ2m55pnIOItpL8NkqJqlwntI1C0",
+        authDomain: "ghostapp-b5dfc.firebaseapp.com",
+        databaseURL: "https://ghostapp-b5dfc-default-rtdb.firebaseio.com",
+        projectId: "ghostapp-b5dfc"
+    };
+
+    const CHUNK_SIZE = 32 * 1024; // 32KB seguro para dados WebRTC
+
     const rtcConfig = { 
         iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-            { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" }
+            { urls: [
+                'stun:stun.l.google.com:19302',
+                'stun:stun1.l.google.com:19302',
+                'stun:stun2.l.google.com:19302',
+                'stun:stun3.l.google.com:19302'
+            ]}
         ]
     };
-    
-    // ATENÇÃO: o servidor de sinalização abaixo está OFFLINE (verificado em 29/10/2026).
-    // Era um Worker do Cloudflare de terceiros, fora do seu controle.
-    // Sem um servidor de sinalização próprio, o WebRTC não fecha conexão e a página não funciona.
-    // Substitua pela URL do SEU Worker (ou de outro backend de sinalização compatível).
-    const MY_SIGNAL_SERVER = "wss://servidor-de-sinal-p2p.renatopatogov.workers.dev";
-    
-    let peerConnection, dataChannel, ws;
+
+    let db = null;
+    let peerConnection, dataChannel;
     let selectedFile, role, roomId;
     let receivedChunks = [], receivedSize = 0, metaData = null;
-    let fileWritableStream = null, isAborted = false, readyInterval = null, handshakeStarted = false;
-    let transferenciaConcluida = false, signalWatchdog = null, tentativasEspera = 0;
+    let fileWritableStream = null, isAborted = false;
+    let handshakeStarted = false, transferenciaConcluida = false;
+    let signalWatchdog = null;
 
-    // ID único para ignorar o próprio eco do Worker
-    const myClientId = Math.random().toString(36).substring(2, 15);
-
+    const myClientId = Math.random().toString(36).substring(2, 12);
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
 
-    if (roomParam) {
-        role = "receiver";
-        roomId = roomParam;
-        document.getElementById('viewSelection').classList.add('hidden');
-        document.getElementById('viewStatus').classList.remove('hidden');
-        document.getElementById('boxShare').classList.add('hidden');
-        document.getElementById('progressTitle').innerText = "Preparando Download...";
-        document.getElementById('statusLabel').innerText = "Conectando ao remetente...";
-        inicializarP2P();
-    } else {
-        role = "sender";
-        configurarPainelEnvio();
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+        try {
+            firebase.initializeApp(FIREBASE_CONFIG);
+            db = firebase.database();
+            
+            if (roomParam) {
+                role = "receiver";
+                roomId = roomParam;
+                document.getElementById('viewSelection').classList.add('hidden');
+                document.getElementById('viewStatus').classList.remove('hidden');
+                document.getElementById('boxShare').classList.add('hidden');
+                document.getElementById('progressTitle').innerText = "Preparando Recepção...";
+                document.getElementById('statusLabel').innerText = "Conectando ao remetente...";
+                inicializarP2P();
+            } else {
+                role = "sender";
+                configurarPainelEnvio();
+            }
+        } catch(e) {
+            console.error(e);
+            falhaCritica("Falha ao inicializar serviço de rede.");
+        }
+    });
 
     function configurarPainelEnvio() {
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
+
         dropzone.onclick = () => fileInput.click();
-        dropzone.ondragover = (e) => { e.preventDefault(); dropzone.style.borderColor = "var(--primary)"; };
-        dropzone.ondragleave = () => { dropzone.style.borderColor = "var(--border)"; };
-        dropzone.ondrop = (e) => { e.preventDefault(); if(e.dataTransfer.files.length) prepararEnvio(e.dataTransfer.files[0]); };
-        fileInput.onchange = () => { if(fileInput.files.length) prepararEnvio(fileInput.files[0]); };
+        dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('dragover'); };
+        dropzone.ondragleave = () => { dropzone.classList.remove('dragover'); };
+        dropzone.ondrop = (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) prepararEnvio(e.dataTransfer.files[0]);
+        };
+        fileInput.onchange = () => {
+            if (fileInput.files.length) prepararEnvio(fileInput.files[0]);
+        };
     }
 
     function prepararEnvio(file) {
         selectedFile = file;
-        roomId = Math.random().toString(36).substring(2, 8); 
+        roomId = 'room_' + Math.random().toString(36).substring(2, 9);
         
         document.getElementById('viewSelection').classList.add('hidden');
         document.getElementById('viewStatus').classList.remove('hidden');
@@ -167,100 +383,107 @@
         const linkCompleto = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
         document.getElementById('shareLink').innerText = linkCompleto;
         
-        new QRCode(document.getElementById("shareQr"), { text: linkCompleto, width: 160, height: 160, colorDark : "#0f172a", colorLight : "#ffffff" });
+        const qrEl = document.getElementById("shareQr");
+        qrEl.innerHTML = '';
+        new QRCode(qrEl, { 
+            text: linkCompleto, 
+            width: 150, 
+            height: 150, 
+            colorDark: "#0f0f12", 
+            colorLight: "#ffffff" 
+        });
         
         document.getElementById('btnCopyLink').onclick = () => {
-            navigator.clipboard.writeText(linkCompleto).catch(() => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(linkCompleto);
+            } else {
                 const temp = document.createElement("textarea");
-                temp.value = linkCompleto; document.body.appendChild(temp);
-                temp.select(); document.execCommand("copy"); document.body.removeChild(temp);
-            });
+                temp.value = linkCompleto;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand("copy");
+                document.body.removeChild(temp);
+            }
             const btn = document.getElementById('btnCopyLink');
-            const originalText = btn.innerText;
-            btn.innerText = "Copiado!"; btn.style.backgroundColor = "var(--success)";
-            setTimeout(() => { btn.innerText = originalText; btn.style.backgroundColor = "var(--border)"; }, 2000);
+            const orig = btn.innerText;
+            btn.innerText = "Link Copiado!";
+            btn.style.backgroundColor = "var(--success)";
+            setTimeout(() => {
+                btn.innerText = orig;
+                btn.style.backgroundColor = "var(--card-secondary)";
+            }, 2000);
         };
 
         inicializarP2P();
     }
 
     function inicializarP2P() {
-        ws = new WebSocket(MY_SIGNAL_SERVER);
+        if (!db) return;
+        const roomRef = db.ref(`p2p_rooms/${roomId}`);
 
+        configurarWebRTC();
+
+        // Limite de espera para o par entrar
         signalWatchdog = setTimeout(() => {
-            if (!isAborted && !handshakeStarted && (!ws || ws.readyState !== WebSocket.OPEN)) {
-                falhaCritica("Servidor de sinalização indisponível. Sem ele não é possível negociar a conexão P2P.");
+            if (!isAborted && !handshakeStarted && (!dataChannel || dataChannel.readyState !== 'open')) {
+                document.getElementById('statusLabel').innerText = "Aguardando o outro dispositivo abrir o link...";
             }
-        }, 12000);
+        }, 8000);
 
-        ws.onopen = () => {
-            clearTimeout(signalWatchdog);
-            if (role === "receiver") {
-                enviarSinal({ action: "client_ready" });
-                if (!readyInterval) {
-                    readyInterval = setInterval(() => {
-                        if (isAborted || handshakeStarted) return;
-                        if (++tentativasEspera > 120) {
-                            clearInterval(readyInterval);
-                            falhaCritica("O remetente não apareceu. Verifique se o link ainda está válido e recarregue a página.");
-                            return;
-                        }
-                        enviarSinal({ action: "client_ready" });
-                    }, 1000);
+        // Notifica que o destinatário está online
+        if (role === "receiver") {
+            enviarSinal({ action: "client_ready" });
+        }
+
+        // Escuta os sinais de sinalização na sala
+        roomRef.on('child_added', async (snap) => {
+            const msg = snap.val();
+            if (!msg || msg.senderId === myClientId) return;
+
+            // Remove o sinal após o consumo
+            snap.ref.remove().catch(() => {});
+
+            if (msg.action === "client_ready" && role === "sender") {
+                if (!handshakeStarted) {
+                    handshakeStarted = true;
+                    clearTimeout(signalWatchdog);
+                    iniciarHandshake();
                 }
+            } else if (msg.sdp) {
+                if (msg.sdp.type === 'offer') {
+                    clearTimeout(signalWatchdog);
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    enviarSinal({ sdp: peerConnection.localDescription });
+                } else if (msg.sdp.type === 'answer') {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                }
+            } else if (msg.candidate) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate));
+                } catch(e) {}
             }
-            configurarWebRTC();
-        };
-
-        ws.onmessage = async (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-                
-                if (msg.room !== roomId) return;
-                if (msg.senderId === myClientId) return;
-                
-                if (msg.action === "client_ready" && role === "sender") {
-                    if (!handshakeStarted) {
-                        handshakeStarted = true;
-                        clearInterval(readyInterval); 
-                        iniciarHandshake();
-                    }
-                } else if (msg.sdp) {
-                    if (msg.sdp.type === 'offer') {
-                        clearInterval(readyInterval);
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-                        const answer = await peerConnection.createAnswer();
-                        await peerConnection.setLocalDescription(answer);
-                        enviarSinal({ sdp: peerConnection.localDescription });
-                    } else if (msg.sdp.type === 'answer') {
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-                    }
-                } else if (msg.candidate) {
-                    try { await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch(e){}
-                }
-            } catch (e) { console.error(e); }
-        };
-
-        ws.onerror = () => { if (!isAborted && !transferenciaConcluida) falhaCritica("Não foi possível falar com o servidor de sinalização."); };
-
-        ws.onclose = () => {
-            clearTimeout(signalWatchdog);
-            if (!isAborted && !transferenciaConcluida) falhaCritica("A conexão de sinalização caiu antes da transferência terminar.");
-        };
+        });
     }
 
     function configurarWebRTC() {
         peerConnection = new RTCPeerConnection(rtcConfig);
-        peerConnection.onicecandidate = (e) => { if (e.candidate) enviarSinal({ candidate: e.candidate }); };
+
+        peerConnection.onicecandidate = (e) => {
+            if (e.candidate) enviarSinal({ candidate: e.candidate });
+        };
 
         peerConnection.oniceconnectionstatechange = () => {
             const state = peerConnection.iceConnectionState;
             if (state === "connected" || state === "completed") {
                 document.getElementById('progressBar').classList.remove('connecting');
                 document.getElementById('statusLabel').style.color = "var(--success)";
-                if(role === "sender") document.getElementById('boxShare').classList.add('hidden'); 
+                if (role === "sender") document.getElementById('boxShare').classList.add('hidden');
             } else if (["failed", "closed"].includes(state)) {
-                if (!isAborted) falhaCritica("Conexão P2P bloqueada pela rede.");
+                if (!isAborted && !transferenciaConcluida) {
+                    falhaCritica("Conexão P2P interrompida.");
+                }
             }
         };
 
@@ -274,43 +497,47 @@
                 dataChannel = event.channel;
                 dataChannel.binaryType = "arraybuffer";
                 dataChannel.bufferedAmountLowThreshold = 256 * 1024;
-                clearInterval(readyInterval);
                 configurarRecebimento();
             };
         }
     }
 
     function iniciarHandshake() {
-        document.getElementById('statusLabel').innerText = "Sincronizando chaves...";
+        document.getElementById('statusLabel').innerText = "Negociando conexão direta P2P...";
         peerConnection.createOffer()
             .then(offer => peerConnection.setLocalDescription(offer))
             .then(() => enviarSinal({ sdp: peerConnection.localDescription }))
-            .catch(() => falhaCritica("Falha ao gerar protocolo P2P."));
+            .catch(() => falhaCritica("Falha ao gerar oferta P2P."));
     }
 
     function enviarSinal(dados) {
-        dados.room = roomId;
         dados.senderId = myClientId;
-        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(dados));
+        if (db && roomId) {
+            db.ref(`p2p_rooms/${roomId}`).push(dados);
+        }
     }
 
     async function transmitirArquivo() {
-        if(isAborted || !selectedFile) return;
-        clearInterval(readyInterval); 
+        if (isAborted || !selectedFile) return;
 
         const label = document.getElementById('statusLabel');
         const bar = document.getElementById('progressBar');
         document.getElementById('progressTitle').innerText = "Enviando Arquivo";
-        label.innerText = "Iniciando stream...";
+        label.innerText = "Iniciando transferência...";
         bar.style.width = "0%";
         
-        dataChannel.send(JSON.stringify({ type: "meta", name: selectedFile.name, size: selectedFile.size }));
+        dataChannel.send(JSON.stringify({ 
+            type: "meta", 
+            name: selectedFile.name, 
+            size: selectedFile.size 
+        }));
 
         let offset = 0;
-        const SAFE_BUFFER_LIMIT = 1024 * 1024; 
+        const SAFE_BUFFER_LIMIT = 512 * 1024;
 
         while (offset < selectedFile.size) {
-            if(isAborted) return;
+            if (isAborted) return;
+
             if (dataChannel.bufferedAmount > SAFE_BUFFER_LIMIT) {
                 await new Promise(resolve => {
                     let liberado = false;
@@ -321,8 +548,7 @@
                         clearTimeout(limite);
                         resolve();
                     };
-                    // Rede de segurança: nunca esperar para sempre pelo drenar do buffer
-                    const limite = setTimeout(concluir, 5000);
+                    const limite = setTimeout(concluir, 4000);
                     dataChannel.onbufferedamountlow = concluir;
                 });
             }
@@ -334,23 +560,25 @@
 
             const percent = Math.min((offset / selectedFile.size) * 100, 100);
             bar.style.width = `${percent}%`;
-            label.innerText = `${Math.round(percent)}% (${(offset / (1024*1024)).toFixed(1)} MB)`;
+            label.innerText = `${Math.round(percent)}% (${(offset / (1024*1024)).toFixed(1)} de ${(selectedFile.size / (1024*1024)).toFixed(1)} MB)`;
         }
         
         dataChannel.send(JSON.stringify({ type: "eof" }));
         transferenciaConcluida = true;
-        document.getElementById('progressTitle').innerText = "Envio Concluído!";
-        label.innerText = "O destinatário recebeu o arquivo com sucesso.";
-        document.getElementById('btnCancel').innerText = "Voltar ao Início";
-        document.getElementById('btnCancel').classList.replace("btn-danger", "btn");
-        setTimeout(() => { if(ws) ws.close(); }, 2000); 
+        document.getElementById('progressTitle').innerText = "Envio Concluído! 🎉";
+        label.innerText = "O arquivo foi entregue com sucesso.";
+        
+        const btnCancel = document.getElementById('btnCancel');
+        btnCancel.innerText = "Voltar ao Início";
+        btnCancel.classList.replace("btn-danger", "btn");
+        
+        // Limpa a sala do Firebase após o envio
+        if (db && roomId) db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{});
     }
 
     function configurarRecebimento() {
-        clearInterval(readyInterval); 
-        
         dataChannel.onmessage = async (e) => {
-            if(isAborted) return;
+            if (isAborted) return;
 
             if (typeof e.data === "string") {
                 const msg = JSON.parse(e.data);
@@ -360,51 +588,61 @@
                     bar.classList.remove('connecting');
                     bar.style.width = "0%";
                     
-                    document.getElementById('progressTitle').innerText = "Baixando Arquivo";
+                    document.getElementById('progressTitle').innerText = "Recebendo Arquivo";
                     document.getElementById('fileMeta').style.display = "block";
                     document.getElementById('fileMeta').innerText = `${msg.name} (${(msg.size / (1024*1024)).toFixed(2)} MB)`;
-                    document.getElementById('statusLabel').innerText = "Requisitando permissão de disco...";
+                    document.getElementById('statusLabel').innerText = "Baixando fluxo direto...";
 
+                    // Se suportado no desktop, usa stream direta em disco
                     if (window.showSaveFilePicker && window.isSecureContext) {
                         try {
                             const handle = await window.showSaveFilePicker({ suggestedName: metaData.name });
                             fileWritableStream = await handle.createWritable();
-                            document.getElementById('statusLabel').innerText = "Stream direta ativada (Modo Performance)";
+                            document.getElementById('statusLabel').innerText = "Stream direta em disco ativada";
                         } catch (err) { fileWritableStream = null; }
                     }
                 } else if (msg.type === "eof") {
                     transferenciaConcluida = true;
-                    document.getElementById('progressTitle').innerText = "Download Concluído!";
+                    document.getElementById('progressTitle').innerText = "Download Concluído! 🎉";
                     document.getElementById('statusLabel').style.color = "var(--success)";
-                    document.getElementById('btnCancel').innerText = "Voltar ao Início";
-                    document.getElementById('btnCancel').classList.replace("btn-danger", "btn");
+                    
+                    const btnCancel = document.getElementById('btnCancel');
+                    btnCancel.innerText = "Voltar ao Início";
+                    btnCancel.classList.replace("btn-danger", "btn");
 
                     if (fileWritableStream) {
                         await fileWritableStream.close();
                         fileWritableStream = null;
-                        document.getElementById('statusLabel').innerText = "Salvo diretamente no dispositivo.";
+                        document.getElementById('statusLabel').innerText = "Salvo diretamente no seu dispositivo.";
                     } else {
-                        document.getElementById('statusLabel').innerText = "Processando arquivo final...";
+                        document.getElementById('statusLabel').innerText = "Arquivo pronto para download!";
                         const blob = new Blob(receivedChunks, { type: "application/octet-stream" });
                         const url = URL.createObjectURL(blob);
                         const btn = document.getElementById('downloadBtn');
                         
                         btn.classList.remove('hidden');
-                        document.getElementById('statusLabel').innerText = "Clique acima para salvar.";
                         btn.onclick = () => {
-                            const a = document.createElement('a'); a.href = url; a.download = metaData.name;
-                            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                            setTimeout(() => URL.revokeObjectURL(url), 1000); 
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = metaData.name;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            setTimeout(() => URL.revokeObjectURL(url), 2000); 
                         };
                     }
-                    if(ws) ws.close();
+
+                    if (db && roomId) db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{});
                 }
             } else {
                 if (!metaData) return;
                 try {
                     if (fileWritableStream) await fileWritableStream.write(e.data);
                     else receivedChunks.push(e.data);
-                } catch (err) { falhaCritica("Sem espaço ou permissão no disco."); return; }
+                } catch (err) {
+                    falhaCritica("Sem espaço ou permissão para salvar no disco.");
+                    return;
+                }
                 
                 receivedSize += e.data.byteLength;
                 const percent = Math.min((receivedSize / metaData.size) * 100, 100);
@@ -417,29 +655,41 @@
     function falhaCritica(motivo) {
         if (isAborted) return;
         isAborted = true;
-        clearInterval(readyInterval);
         clearTimeout(signalWatchdog);
 
         const titulo = document.getElementById('progressTitle');
         const label = document.getElementById('statusLabel');
         const bar = document.getElementById('progressBar');
-        if (titulo) { titulo.innerText = "Falha na transferência"; titulo.style.color = "var(--danger)"; }
-        if (label) { label.innerText = motivo; label.style.color = "var(--danger)"; label.style.fontWeight = "600"; }
-        if (bar) { bar.classList.remove('connecting'); bar.style.width = "100%"; bar.style.background = "var(--danger)"; }
+        if (titulo) {
+            titulo.innerText = "Falha na transferência";
+            titulo.style.color = "var(--danger)";
+        }
+        if (label) {
+            label.innerText = motivo;
+            label.style.color = "var(--danger)";
+            label.style.fontWeight = "600";
+        }
+        if (bar) {
+            bar.classList.remove('connecting');
+            bar.style.width = "100%";
+            bar.style.background = "var(--danger)";
+        }
         const btn = document.getElementById('btnCancel');
-        if (btn) { btn.innerText = "Voltar ao Início"; btn.classList.remove('btn-danger'); }
+        if (btn) {
+            btn.innerText = "Voltar ao Início";
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn');
+        }
     }
 
     function voltarAoInicio() {
         isAborted = true;
-        clearInterval(readyInterval);
         clearTimeout(signalWatchdog);
-        if(fileWritableStream) { try { fileWritableStream.close(); } catch(e){} }
-        if(dataChannel) { try { dataChannel.close(); } catch(e){} }
-        if(peerConnection) { try { peerConnection.close(); } catch(e){} }
-        if(ws) ws.close();
+        if (fileWritableStream) { try { fileWritableStream.close(); } catch(e){} }
+        if (dataChannel) { try { dataChannel.close(); } catch(e){} }
+        if (peerConnection) { try { peerConnection.close(); } catch(e){} }
+        if (db && roomId) { db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{}); }
 
-        // Caminho relativo: funciona em qualquer domínio e em qualquer pasta
         window.location.href = window.location.pathname;
     }
 

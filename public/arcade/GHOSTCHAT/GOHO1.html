@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f0f12">
-    <meta name="description" content="Mensagens ponto a ponto no navegador, com cofre local cifrado em AES-GCM.">
+    <meta name="description" content="GhostChat — Chat P2P direto no navegador, anônimo e efêmero.">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -12,19 +12,26 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
-    <title>GhostChat — Chat P2P</title>
+    <title>GhostChat — Chat P2P Anônimo</title>
     
     <style>
         :root {
             --bg-primary: #0f0f12; --bg-secondary: #1a1a1e; --bg-tertiary: #25252b;
-            --primary: #7289da; --success: #43b581; --danger: #f04747; --warning: #faa61a;
+            --primary: #7289da; --primary-hover: #5b6eae; --success: #43b581; --danger: #f04747; --warning: #faa61a;
             --text-primary: #e0e0e0; --text-secondary: #a0a0a0; --text-muted: #666666;
             --border: #333333; --shadow: 0 10px 40px rgba(0,0,0,0.5);
             --radius: 12px; --radius-sm: 6px; --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-        html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg-primary); color: var(--text-primary); }
+        html, body { 
+            height: 100%; 
+            height: 100dvh; 
+            overflow: hidden; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background-color: var(--bg-primary); 
+            color: var(--text-primary); 
+        }
         ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-track { background: var(--bg-primary); } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
         #toast-container { position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -40,542 +47,1046 @@
         .loading-spinner { width: 50px; height: 50px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
 
         #auth-screen { position: fixed; inset: 0; background: var(--bg-primary); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .auth-container { width: 100%; max-width: 450px; }
-        .auth-logo { text-align: center; margin-bottom: 30px; } .auth-logo h1 { font-size: 2.5rem; color: var(--primary); }
-        .auth-tabs { display: flex; background: var(--bg-secondary); border-radius: var(--radius); padding: 5px; margin-bottom: 25px; border: 1px solid var(--border); }
-        .auth-tab { flex: 1; padding: 14px; border: none; background: transparent; color: var(--text-secondary); font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); transition: var(--transition); }
-        .auth-tab.active { background: var(--primary); color: white; }
-        .auth-card { background: var(--bg-secondary); padding: 40px; border-radius: var(--radius); border: 1px solid var(--border); text-align: center; }
-        .form-group { margin-bottom: 20px; text-align: left; } .form-group label { display: block; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); }
-        .form-group input { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); padding: 14px 16px; border-radius: var(--radius-sm); font-size: 14px; }
-        .btn { background: var(--primary); color: white; border: none; padding: 14px 24px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition); }
-        .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border); } .btn-success { background: var(--success); } .btn-full { width: 100%; }
+        .auth-container { width: 100%; max-width: 440px; }
+        .auth-logo { text-align: center; margin-bottom: 25px; } 
+        .auth-logo h1 { font-size: 2.2rem; color: var(--primary); display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .auth-logo p { color: var(--text-secondary); font-size: 13px; margin-top: 6px; }
+        .auth-card { background: var(--bg-secondary); padding: 32px 28px; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); }
         
-        .file-drop-zone { border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 40px 30px; cursor: pointer; margin-bottom: 20px; background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%); }
-        .file-drop-zone i { font-size: 48px; color: var(--text-muted); margin-bottom: 15px; } .file-name { color: var(--success); font-weight: 600; display: none; }
-        .file-drop-zone.has-file .file-name { display: block; }
+        .form-group { margin-bottom: 18px; text-align: left; } 
+        .form-group label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+        .form-group input { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); padding: 13px 15px; border-radius: var(--radius-sm); font-size: 14px; transition: var(--transition); }
+        .form-group input:focus { border-color: var(--primary); }
+        
+        .badge-hint { background: rgba(114, 137, 218, 0.12); border: 1px solid rgba(114, 137, 218, 0.3); border-radius: var(--radius-sm); padding: 12px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px; }
+        .badge-hint i { color: var(--primary); margin-right: 6px; }
+
+        .btn { background: var(--primary); color: white; border: none; padding: 13px 20px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition); font-size: 14px; }
+        .btn:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-secondary { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); } 
+        .btn-secondary:hover { background: #2d2d35; }
+        .btn-success { background: var(--success); } 
+        .btn-full { width: 100%; }
+        
         .hidden { display: none !important; }
 
-        .connection-panel { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 20px; display: flex; align-items: center; gap: 12px; font-size: 13px; z-index: 900; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; animation: pulse 2s infinite; }
-        .connection-panel.success .status-dot, .status-dot.online { background: var(--success); } .connection-panel.warning .status-dot { background: var(--warning); } .connection-panel.error .status-dot { background: var(--danger); } .status-dot.offline { background: var(--text-muted); }
+        .connection-panel { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 8px 18px; display: flex; align-items: center; gap: 10px; font-size: 12px; z-index: 900; box-shadow: var(--shadow); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s infinite; }
+        .connection-panel.success .status-dot, .status-dot.online { background: var(--success); } 
+        .connection-panel.warning .status-dot { background: var(--warning); } 
+        .connection-panel.error .status-dot { background: var(--danger); } 
+        .status-dot.offline { background: var(--text-muted); }
 
-        #app-container { display: none; width: 100%; height: 100%; } .app-layout { display: flex; height: 100%; }
+        #app-container { display: none; width: 100%; height: 100%; } 
+        .app-layout { display: flex; height: 100%; }
+        
         #sidebar { width: 320px; background: var(--bg-secondary); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.3s ease; flex-shrink: 0; }
         #sidebar.collapsed { width: 0; border: none; }
-        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .sidebar-actions button { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); width: 36px; height: 36px; border-radius: var(--radius-sm); cursor: pointer; }
+        .sidebar-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .user-tag { display: flex; flex-direction: column; }
+        .user-tag-name { font-weight: 600; font-size: 14px; color: #fff; }
+        .user-tag-status { font-size: 11px; color: var(--success); display: flex; align-items: center; gap: 5px; }
+        .sidebar-actions { display: flex; gap: 8px; }
+        .sidebar-actions button { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--text-primary); width: 34px; height: 34px; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); }
+        .sidebar-actions button:hover { border-color: var(--primary); }
+        
         .contact-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
-        .contact-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 5px; }
+        .contact-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 5px; transition: var(--transition); }
+        .contact-item:hover { background: var(--bg-tertiary); }
         .contact-item.active { background: rgba(114, 137, 218, 0.2); border: 1px solid var(--primary); }
-        .contact-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; }
+        .contact-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0; }
         .contact-avatar.group { background: var(--success); }
-        .contact-info { flex-grow: 1; } .contact-name { font-weight: 500; font-size: 14px; }
+        .contact-info { flex-grow: 1; min-width: 0; } 
+        .contact-name { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .contact-sub { font-size: 11px; color: var(--text-muted); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        #chat-main { flex-grow: 1; display: flex; flex-direction: column; background: var(--bg-primary); }
-        .chat-header { padding: 15px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; }
-        .menu-toggle { background: none; border: none; color: var(--text-primary); font-size: 20px; cursor: pointer; margin-right: 15px; }
-        #messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .message { max-width: 70%; padding: 12px 16px; border-radius: 18px; font-size: 14px; }
-        .message.sent { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 4px; }
-        .message.received { background: var(--bg-tertiary); align-self: flex-start; border-bottom-left-radius: 4px; }
-        .message-sender { font-size: 10px; color: var(--primary); font-weight: 600; margin-bottom: 4px; }
+        .sidebar-footer { padding: 16px; background: var(--bg-tertiary); border-top: 1px solid var(--border); text-align: center; }
+        .key-box { background: var(--bg-primary); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 10px; cursor: pointer; transition: var(--transition); }
+        .key-box:hover { border-color: var(--primary); }
+        .key-box-label { font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; }
+        .key-box-val { font-family: monospace; font-size: 13px; color: #fff; margin-top: 4px; word-break: break-all; }
         
-        .input-area { padding: 15px 20px; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-        .input-wrapper { flex-grow: 1; display: flex; align-items: center; gap: 10px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 24px; padding: 8px 16px; }
+        #chat-main { flex-grow: 1; display: flex; flex-direction: column; background: var(--bg-primary); position: relative; }
+        .chat-header { padding: 15px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .chat-header-info { display: flex; align-items: center; gap: 12px; }
+        .menu-toggle { background: none; border: none; color: var(--text-primary); font-size: 18px; cursor: pointer; padding: 6px; }
+        .chat-user-title { font-weight: 600; font-size: 15px; }
+        .chat-user-sub { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+        
+        #messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .empty-chat { margin: auto; text-align: center; color: var(--text-muted); font-size: 14px; }
+        .empty-chat i { font-size: 40px; margin-bottom: 15px; display: block; opacity: 0.4; }
+        
+        .message { max-width: 70%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.4; word-break: break-word; }
+        .message.sent { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 4px; color: white; }
+        .message.received { background: var(--bg-tertiary); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+        .message-sender { font-size: 11px; color: #9bb2ff; font-weight: 600; margin-bottom: 4px; }
+        .message-time { font-size: 10px; opacity: 0.65; margin-top: 5px; text-align: right; }
+        
+        .input-area { padding: 14px 20px; background: var(--bg-secondary); border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+        .input-wrapper { flex-grow: 1; display: flex; align-items: center; gap: 10px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 24px; padding: 6px 16px; transition: var(--transition); }
+        .input-wrapper:focus-within { border-color: var(--primary); }
         .input-wrapper input { flex-grow: 1; background: none; border: none; color: var(--text-primary); font-size: 14px; padding: 8px 0; }
-        .send-btn { background: var(--primary); border: none; color: white; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; }
+        .tool-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 6px; font-size: 15px; transition: var(--transition); }
+        .tool-btn:hover { color: var(--primary); }
+        .send-btn { background: var(--primary); border: none; color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+        .send-btn:hover { background: var(--primary-hover); transform: scale(1.05); }
 
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 500px; padding: 20px; }
-        .modal-header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
-        .my-id-text { font-size: 11px; color: var(--text-muted); word-break: break-all; background: var(--bg-primary); padding: 10px; border-radius: var(--radius-sm); margin: 10px 0; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); padding: 20px; }
+        .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 460px; padding: 24px; box-shadow: var(--shadow); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 16px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 18px; cursor: pointer; padding: 4px; }
+        .modal-close:hover { color: var(--text-primary); }
         
-        .qr-wrapper { background: white; padding: 15px; border-radius: var(--radius-sm); display: inline-block; margin-bottom: 15px; }
+        .my-id-text { font-size: 13px; font-family: monospace; color: #fff; word-break: break-all; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 12px 0; user-select: all; }
+        .qr-wrapper { background: white; padding: 12px; border-radius: var(--radius-sm); display: inline-block; margin: 10px auto; }
         
-        .group-members-list { max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; margin-top: 10px; background: var(--bg-primary); }
-        .group-member-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid var(--border); font-size: 12px; }
-
         @media (max-width: 768px) {
-            #sidebar { position: fixed; left: 0; top: 0; height: 100%; z-index: 500; }
-            #sidebar.collapsed { transform: translateX(-100%); width: 320px; }
-            .connection-panel { left: 10px; right: 10px; transform: none; width: auto; }
+            .app-layout { position: relative; width: 100%; height: 100%; overflow: hidden; }
+            #sidebar { 
+                position: fixed; 
+                left: 0; 
+                top: 0; 
+                bottom: 0;
+                width: 85%; 
+                max-width: 320px; 
+                height: 100%; 
+                height: 100dvh;
+                z-index: 1500; 
+                box-shadow: 10px 0 30px rgba(0,0,0,0.7);
+                transform: translateX(0);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            #sidebar.collapsed { 
+                transform: translateX(-100%); 
+                width: 85%; 
+                max-width: 320px; 
+            }
+            .sidebar-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.6);
+                backdrop-filter: blur(3px);
+                z-index: 1400;
+                display: none;
+            }
+            .sidebar-overlay.active {
+                display: block;
+            }
+            .connection-panel { 
+                left: 10px; 
+                right: 10px; 
+                transform: none; 
+                width: auto; 
+                justify-content: center; 
+                top: 10px;
+                padding: 6px 14px;
+                font-size: 11px;
+            }
+            #back-hub {
+                top: 10px;
+                left: 10px;
+                padding: 6px 10px;
+                font-size: 10px;
+            }
+            #chat-main { 
+                width: 100%; 
+                height: 100%; 
+                height: 100dvh;
+            }
+            .chat-header {
+                padding: 12px 14px;
+            }
+            .chat-user-title {
+                font-size: 14px;
+            }
+            .chat-user-sub {
+                font-size: 10px;
+            }
+            #messages {
+                padding: 14px 12px;
+                gap: 8px;
+            }
+            .message {
+                max-width: 88%;
+                padding: 8px 12px;
+                font-size: 13.5px;
+            }
+            .input-area {
+                padding: 10px 12px;
+                padding-bottom: max(10px, env(safe-area-inset-bottom));
+                gap: 8px;
+            }
+            .input-wrapper {
+                padding: 4px 12px;
+                gap: 6px;
+            }
+            .input-wrapper input {
+                font-size: 15px; /* Evita zoom automático no iOS Safari */
+                padding: 6px 0;
+            }
+            .tool-btn {
+                font-size: 16px;
+                padding: 6px 4px;
+            }
+            .send-btn {
+                width: 38px;
+                height: 38px;
+                flex-shrink: 0;
+            }
+            .auth-card {
+                padding: 24px 18px;
+            }
+            .modal {
+                padding: 18px;
+                max-width: 92%;
+            }
+            .mobile-close-btn {
+                display: inline-flex !important;
+                align-items: center;
+                justify-content: center;
+            }
+            #toast-container {
+                left: 12px;
+                right: 12px;
+                top: 12px;
+            }
+            .toast {
+                min-width: 0;
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="loading-overlay" id="loading-overlay"><div class="loading-spinner"></div><div class="loading-text">Conectando...</div></div>
-    <div id="toast-container"></div>
-    <div class="connection-panel warning" id="connection-panel"><div class="status-dot"></div><i class="fas fa-circle-notch fa-spin"></i><span id="connection-panel-text">Conectando ao Firebase...</span></div>
+    <!-- Botão de retorno ao Acervo -->
+    <a href="/arcade" id="back-hub" aria-label="Voltar ao Arcade"
+       style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
+       onmouseover="this.style.opacity='1';this.style.borderColor='#7289da'"
+       onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Arcade</a>
 
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Conectando à rede...</div>
+    </div>
+    
+    <div id="toast-container"></div>
+    
+    <div class="connection-panel warning" id="connection-panel">
+        <div class="status-dot"></div>
+        <i class="fas fa-circle-notch fa-spin"></i>
+        <span id="connection-panel-text">Conectando ao Firebase...</span>
+    </div>
+
+    <!-- Tela Inicial de Conexão (Sem login por senha) -->
     <div id="auth-screen">
         <div class="auth-container">
-            <div class="auth-logo"><h1><i class="fas fa-shield-halved"></i> GhostChat</h1><p>Cofre local AES-GCM · mensagens via WebRTC</p></div>
-            <div class="auth-tabs">
-                <button class="auth-tab active" id="tab-login" onclick="switchTab('login')"><i class="fas fa-lock"></i> Entrar</button>
-                <button class="auth-tab" id="tab-create" onclick="switchTab('create')"><i class="fas fa-user-plus"></i> Criar Cofre</button>
+            <div class="auth-logo">
+                <h1><i class="fas fa-ghost"></i> GhostChat</h1>
+                <p>Chat P2P direto entre navegadores · Sem senhas ou cadastro</p>
             </div>
             
-            <div class="auth-card" id="login-form">
-                <div class="file-drop-zone" id="file-drop-zone"><i class="fas fa-cloud-arrow-up"></i><p>Arraste seu .vchat ou clique</p><p class="file-name"></p><input type="file" id="file-input" accept=".vchat,.json" hidden></div>
-                <div class="form-group"><input type="password" id="login-pass" placeholder="Senha de acesso (Mín. 8 dígitos)"></div>
-                <button class="btn btn-full" onclick="handleLogin()"><i class="fas fa-unlock"></i> Desbloquear</button>
-            </div>
-            
-            <div class="auth-card hidden" id="create-form">
-                <div class="form-group"><input type="password" id="new-pass" placeholder="Senha de acesso"></div>
-                <div class="form-group"><input type="password" id="confirm-pass" placeholder="Confirmar senha"></div>
-                <button class="btn btn-full btn-success" onclick="handleCreate()"><i class="fas fa-wand-magic-sparkles"></i> Gerar ID</button>
-            </div>
-            
-            <div class="auth-card hidden" id="vault-created">
-                <h3><i class="fas fa-check-circle" style="color: var(--success);"></i> Cofre Criado!</h3>
-                <div class="qr-wrapper" id="qrcode-created"></div>
-                <div class="my-id-text" id="display-my-id-created"></div>
-                <div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">
-                    <button class="btn" onclick="copyMyId()"><i class="fas fa-copy"></i> Copiar ID</button>
-                    <button class="btn btn-secondary" onclick="downloadVault()"><i class="fas fa-download"></i> Baixar .vchat</button>
+            <div class="auth-card">
+                <div class="badge-hint">
+                    <i class="fas fa-info-circle"></i> A cada início você recebe uma nova <strong>Chave de Conexão aleatória</strong>. Basta compartilhar sua chave com a outra pessoa para conversar.
                 </div>
-                <button class="btn btn-full" onclick="startApp()"><i class="fas fa-arrow-right"></i> Acessar Chat</button>
+                
+                <div class="form-group">
+                    <label for="user-nick"><i class="fas fa-user"></i> Seu Apelido (Nickname)</label>
+                    <input type="text" id="user-nick" placeholder="Ex: Fantasma, Neo, Visitante..." maxlength="24" autofocus onkeypress="if(event.key === 'Enter') handleStartSession()">
+                </div>
+                
+                <button class="btn btn-full" onclick="handleStartSession()">
+                    <i class="fas fa-bolt"></i> Iniciar Sessão P2P
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Aplicação Principal do Chat -->
     <div id="app-container">
         <div class="app-layout">
-            <aside id="sidebar">
+            <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+            <aside id="sidebar" class="collapsed">
                 <div class="sidebar-header">
-                    <h2><i class="fas fa-comments"></i> Conversas</h2>
+                    <div class="user-tag">
+                        <span class="user-tag-name" id="display-my-nick">Usuário</span>
+                        <span class="user-tag-status"><span class="status-dot online"></span> Conectado</span>
+                    </div>
                     <div class="sidebar-actions">
-                        <button onclick="openNewChatModal()"><i class="fas fa-plus"></i></button>
-                        <button onclick="openSettingsModal()"><i class="fas fa-gear"></i></button>
+                        <button onclick="openNewChatModal()" title="Adicionar por Chave"><i class="fas fa-user-plus"></i></button>
+                        <button onclick="openMyKeyModal()" title="Ver Minha Chave"><i class="fas fa-key"></i></button>
+                        <button onclick="toggleSidebar()" title="Fechar Menu" class="mobile-close-btn" style="display:none;"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
-                <div class="contact-list" id="contact-list"></div>
-                <div style="padding: 20px; background: var(--bg-tertiary); text-align: center;">
-                    <div class="qr-wrapper" id="qrcode-sidebar" style="padding: 5px; margin-bottom: 10px;"></div>
-                    <button class="btn btn-full btn-secondary" onclick="copyMyId()"><i class="fas fa-copy"></i> Copiar Meu ID</button>
+                
+                <div class="contact-list" id="contact-list">
+                    <div style="text-align:center; color:var(--text-muted); font-size:13px; padding:30px 15px;">
+                        Nenhuma conversa ainda.<br>Clique em <strong>+</strong> acima para adicionar alguém pela chave!
+                    </div>
+                </div>
+                
+                <div class="sidebar-footer">
+                    <div class="key-box" onclick="copyMyKey()" title="Clique para copiar">
+                        <div class="key-box-label">Sua Chave Aleatória:</div>
+                        <div class="key-box-val" id="sidebar-my-key">...</div>
+                    </div>
+                    <button class="btn btn-full btn-secondary" onclick="copyMyKey()" style="font-size:12px; padding:10px;">
+                        <i class="fas fa-copy"></i> Copiar Minha Chave
+                    </button>
                 </div>
             </aside>
 
             <main id="chat-main">
                 <div class="chat-header">
-                    <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-                    <h3 id="chat-title-info">Selecione uma conversa</h3>
+                    <div class="chat-header-info">
+                        <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                        <div>
+                            <div class="chat-user-title" id="chat-title-info">Selecione uma conversa</div>
+                            <div class="chat-user-sub" id="chat-sub-info">P2P WebRTC</div>
+                        </div>
+                    </div>
+                    <div id="chat-peer-status" class="hidden">
+                        <span class="status-dot offline" id="peer-status-dot"></span>
+                        <span style="font-size: 12px; color: var(--text-secondary);" id="peer-status-text">Aguardando par</span>
+                    </div>
                 </div>
-                <div id="messages"><div style="text-align:center; color:var(--text-secondary); margin-top:50px;">Nenhuma conversa selecionada.</div></div>
+                
+                <div id="messages">
+                    <div class="empty-chat">
+                        <i class="fas fa-comments"></i>
+                        Selecione ou adicione um contato para iniciar a conversa P2P.
+                    </div>
+                </div>
+                
                 <div class="input-area">
                     <div class="input-wrapper">
-                        <input type="text" id="msg-input" placeholder="Digite..." onkeypress="handleKeyPress(event)">
-                        <button onclick="document.getElementById('hidden-file').click()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; margin-right: 5px;"><i class="fas fa-paperclip"></i></button>
-                        <button id="record-btn" onmousedown="AudioManager.start()" onmouseup="AudioManager.stop()" ontouchstart="AudioManager.start()" ontouchend="AudioManager.stop()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer;"><i class="fas fa-microphone"></i></button>
+                        <input type="text" id="msg-input" placeholder="Digite uma mensagem..." onkeypress="handleKeyPress(event)" disabled>
+                        <button class="tool-btn" onclick="document.getElementById('hidden-file').click()" title="Anexar arquivo" id="btn-attach" disabled>
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <button class="tool-btn" id="record-btn" onmousedown="AudioManager.start()" onmouseup="AudioManager.stop()" ontouchstart="AudioManager.start()" ontouchend="AudioManager.stop()" title="Segure para gravar áudio" disabled>
+                            <i class="fas fa-microphone"></i>
+                        </button>
                     </div>
                     <input type="file" id="hidden-file" class="hidden" onchange="handleFileSelect(event)">
-                    <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+                    <button class="send-btn" id="btn-send" onclick="sendMessage()" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
                 </div>
             </main>
         </div>
     </div>
 
+    <!-- Modal: Adicionar contato via Chave -->
     <div class="modal-overlay hidden" id="new-chat-modal">
         <div class="modal">
-            <div class="modal-header"><h3>Nova Conversa</h3><button class="modal-close" onclick="closeModal('new-chat-modal')"><i class="fas fa-times"></i></button></div>
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-user-plus"></i> Conectar com Alguém</div>
+                <button class="modal-close" onclick="closeModal('new-chat-modal')"><i class="fas fa-times"></i></button>
+            </div>
             
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <button class="btn btn-full" id="btn-individual" onclick="switchChatType('individual')">Individual</button>
-                <button class="btn btn-full btn-secondary" id="btn-group" onclick="switchChatType('group')">Grupo (Máx 5)</button>
+            <div class="form-group">
+                <label for="contact-key"><i class="fas fa-key"></i> Chave do Contato</label>
+                <input type="text" id="contact-key" placeholder="Cole a chave que a pessoa te passou (ex: gh_...)" autofocus>
             </div>
 
-            <div id="individual-chat-form">
-                <div class="form-group"><input type="text" id="contact-id" placeholder="ID do Contato"></div>
-                <div class="form-group"><input type="text" id="contact-nick" placeholder="Apelido / Nome"></div>
-            </div>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:18px;">
+                💡 Ao colar a chave e clicar em Conectar, o nickname da pessoa aparecerá automaticamente assim que a conexão P2P for estabelecida!
+            </p>
 
-            <div id="group-chat-form" class="hidden">
-                <div class="form-group"><input type="text" id="group-name" placeholder="Nome do Grupo"></div>
-                <div class="form-group">
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="member-id" placeholder="ID do membro">
-                        <input type="text" id="member-nick" placeholder="Nome" style="width: 100px;">
-                        <button class="btn" onclick="addGroupMember()"><i class="fas fa-plus"></i></button>
-                    </div>
-                </div>
-                <div class="group-members-list" id="group-members-list">
-                    <div style="text-align:center; color:var(--text-muted);">Nenhum membro (0/4 permitidos)</div>
-                </div>
-            </div>
-
-            <button class="btn btn-full" style="margin-top: 20px;" onclick="createChat()">Criar / Adicionar</button>
+            <button class="btn btn-full" onclick="createChatByKey()">
+                <i class="fas fa-link"></i> Conectar e Conversar
+            </button>
         </div>
     </div>
 
-    <div class="modal-overlay hidden" id="settings-modal">
-        <div class="modal">
-            <div class="modal-header"><h3>Configurações</h3><button class="modal-close" onclick="closeModal('settings-modal')"><i class="fas fa-times"></i></button></div>
-            <label style="font-size:12px; color:var(--text-secondary);">Seu ID de Contato:</label>
-            <div class="my-id-text" id="settings-my-id"></div>
-            <button class="btn btn-full" style="margin-bottom: 10px;" onclick="copyMyId()"><i class="fas fa-copy"></i> Copiar ID</button>
-            <button class="btn btn-secondary btn-full" onclick="downloadVault()"><i class="fas fa-download"></i> Exportar Backup (.vchat)</button>
+    <!-- Modal: Minha Chave e QR Code -->
+    <div class="modal-overlay hidden" id="my-key-modal">
+        <div class="modal" style="text-align: center;">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-qrcode"></i> Minha Chave de Conexão</div>
+                <button class="modal-close" onclick="closeModal('my-key-modal')"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="qr-wrapper" id="qrcode-container"></div>
+            
+            <div class="my-id-text" id="modal-my-key">...</div>
+            
+            <button class="btn btn-full" onclick="copyMyKey()">
+                <i class="fas fa-copy"></i> Copiar Chave
+            </button>
         </div>
     </div>
 
     <script>
         const FIREBASE_CONFIG = {
-            apiKey: "AIzaSyCZirWDZ2m55pnIOItpL8NkqJqlwntI1C0", authDomain: "ghostapp-b5dfc.firebaseapp.com",
-            databaseURL: "https://ghostapp-b5dfc-default-rtdb.firebaseio.com", projectId: "ghostapp-b5dfc"
+            apiKey: "AIzaSyCZirWDZ2m55pnIOItpL8NkqJqlwntI1C0",
+            authDomain: "ghostapp-b5dfc.firebaseapp.com",
+            databaseURL: "https://ghostapp-b5dfc-default-rtdb.firebaseio.com",
+            projectId: "ghostapp-b5dfc"
         };
 
-        let db = null; let firebaseInitialized = false;
+        let db = null;
+        let firebaseInitialized = false;
 
         const AppState = {
-            userData: null, activeChat: null, peerConnections: {},
-            incomingFiles: {}, cryptoKey: null, newChatType: 'individual', groupMembers: [],
-            mediaRecorder: null, audioChunks: [],
-            // Servidores STUN expandidos para melhorar o NAT Traversal em redes chatas
+            myKey: null,
+            myNick: 'Anônimo',
+            activeChat: null,
+            chats: [], // [{ key, nick, connected }]
+            peerConnections: {},
+            incomingFiles: {},
+            mediaRecorder: null,
+            audioChunks: [],
             webrtcConfig: { 
                 iceServers: [
-                    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302', 'stun:stun3.l.google.com:19302', 'stun:stun4.l.google.com:19302'] }
+                    { urls: [
+                        'stun:stun.l.google.com:19302',
+                        'stun:stun1.l.google.com:19302',
+                        'stun:stun2.l.google.com:19302',
+                        'stun:stun3.l.google.com:19302',
+                        'stun:stun4.l.google.com:19302'
+                    ] }
                 ] 
             }
         };
 
         const Utils = {
-            generateId: (len=16) => Array.from(crypto.getRandomValues(new Uint8Array(len/2)), b=>b.toString(16).padStart(2,'0')).join(''),
+            // Gera uma chave aleatória legível a cada sessão
+            generateKey: () => 'gh_' + Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2,'0')).join(''),
             formatTime: (d) => new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            getInitials: (n) => n.split(' ').map(x => x[0]).join('').toUpperCase().substring(0, 2),
+            getInitials: (n) => (n || '?').trim().substring(0, 2).toUpperCase(),
             escapeHtml: (t) => { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; },
             escapeAttr: (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
-            safeSrc: (u) => (typeof u === 'string' && /^data:(audio|video|image|application)\//i.test(u)) ? u : '',
-            copyToClipboard: async (text) => { navigator.clipboard.writeText(text); Toast.show('Copiado', 'ID Copiado com sucesso', 'success'); },
-            renderQR: (id, text) => { document.getElementById(id).innerHTML=''; new QRCode(document.getElementById(id), { text, width: 240, height: 240 }); }
+            safeSrc: (u) => {
+                if (typeof u !== 'string') return '';
+                // Suporta áudio/vídeo/imagem/aplicação e downloads genéricos
+                if (/^data:(audio|video|image|application|text)\/[a-zA-Z0-9.+-]+;base64,/i.test(u)) return u;
+                if (/^blob:/i.test(u)) return u;
+                return '';
+            },
+            copyToClipboard: async (text) => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    Toast.show('Copiado!', 'Chave copiada para a área de transferência', 'success');
+                } catch(e) {
+                    const temp = document.createElement("textarea");
+                    temp.value = text;
+                    document.body.appendChild(temp);
+                    temp.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(temp);
+                    Toast.show('Copiado!', 'Chave copiada', 'success');
+                }
+            },
+            renderQR: (id, text) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.innerHTML = '';
+                new QRCode(el, { text, width: 180, height: 180, colorDark: "#0f0f12", colorLight: "#ffffff" });
+            }
         };
 
         const Toast = {
             container: document.getElementById('toast-container'),
             show: (title, msg, type='info') => {
-                const t = document.createElement('div'); t.className = `toast ${type}`;
+                const t = document.createElement('div');
+                t.className = `toast ${type}`;
                 t.innerHTML = `<i class="fas fa-info-circle"></i><div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${msg}</div></div>`;
-                Toast.container.appendChild(t); setTimeout(() => t.remove(), 4000);
+                Toast.container.appendChild(t);
+                setTimeout(() => t.remove(), 4000);
             }
         };
 
-        const toggleSidebar = () => document.getElementById('sidebar').classList.toggle('collapsed');
+        const toggleSidebar = () => {
+            const sb = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const isCollapsed = sb.classList.toggle('collapsed');
+            if (overlay) {
+                if (!isCollapsed && window.innerWidth <= 768) {
+                    overlay.classList.add('active');
+                } else {
+                    overlay.classList.remove('active');
+                }
+            }
+        };
         const openModal = id => document.getElementById(id).classList.remove('hidden');
         const closeModal = id => document.getElementById(id).classList.add('hidden');
-        const openNewChatModal = () => openModal('new-chat-modal');
-        const openSettingsModal = () => { document.getElementById('settings-my-id').textContent = AppState.userData.id; openModal('settings-modal'); };
-        const copyMyId = () => Utils.copyToClipboard(AppState.userData.id);
+        const openNewChatModal = () => {
+            document.getElementById('contact-key').value = '';
+            openModal('new-chat-modal');
+        };
+        const openMyKeyModal = () => {
+            Utils.renderQR('qrcode-container', AppState.myKey);
+            document.getElementById('modal-my-key').textContent = AppState.myKey;
+            openModal('my-key-modal');
+        };
+        const copyMyKey = () => Utils.copyToClipboard(AppState.myKey);
 
-        function switchTab(tab) {
-            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
-            document.getElementById('create-form').classList.toggle('hidden', tab !== 'create');
-            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-            document.getElementById('tab-create').classList.toggle('active', tab === 'create');
+        // Inicializa uma sessão aleatória com nickname
+        function handleStartSession() {
+            const nickInput = document.getElementById('user-nick').value.trim();
+            AppState.myNick = nickInput || ('Ghost_' + Math.floor(100 + Math.random() * 900));
+            AppState.myKey = Utils.generateKey();
+            
+            document.getElementById('display-my-nick').textContent = AppState.myNick;
+            document.getElementById('sidebar-my-key').textContent = AppState.myKey;
+            
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            
+            // No mobile abre com o menu lateral visível para escolher/adicionar contato
+            if (window.innerWidth <= 768) {
+                const sb = document.getElementById('sidebar');
+                sb.classList.remove('collapsed');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (overlay) overlay.classList.add('active');
+            } else {
+                const sb = document.getElementById('sidebar');
+                sb.classList.remove('collapsed');
+            }
+            
+            Toast.show('Sessão Criada', `Conectado como ${AppState.myNick}`, 'success');
+            
+            if (firebaseInitialized) {
+                FirebaseSignaling.registerUser(AppState.myKey);
+            }
         }
 
-        const switchChatType = (type) => { 
-            AppState.newChatType = type; 
-            document.getElementById('individual-chat-form').classList.toggle('hidden', type!=='individual'); 
-            document.getElementById('group-chat-form').classList.toggle('hidden', type!=='group'); 
-            document.getElementById('btn-individual').classList.toggle('btn-secondary', type!=='individual');
-            document.getElementById('btn-group').classList.toggle('btn-secondary', type!=='group');
-        };
-
-        const addGroupMember = () => {
-            if(AppState.groupMembers.length >= 4) return Toast.show('Limite', 'O grupo só suporta você + 4 membros', 'warning');
-            const id = document.getElementById('member-id').value; const nick = document.getElementById('member-nick').value;
-            if(!id || !nick) return Toast.show('Erro', 'Preencha ID e Nome', 'error');
-            AppState.groupMembers.push({id, nick});
-            document.getElementById('member-id').value = ''; document.getElementById('member-nick').value = '';
-            renderGroupMembersList();
-        };
-
-        const renderGroupMembersList = () => {
-            const list = document.getElementById('group-members-list');
-            if(AppState.groupMembers.length === 0) return list.innerHTML = `<div style="text-align:center; color:var(--text-muted);">Nenhum membro (0/4 permitidos)</div>`;
-            list.innerHTML = AppState.groupMembers.map(m => `<div class="group-member-item"><span>${Utils.escapeHtml(m.nick)}</span> <span style="color:var(--text-secondary);">${Utils.escapeHtml(String(m.id).substring(0,8))}...</span></div>`).join('');
-        };
-
-        document.getElementById('file-drop-zone').addEventListener('click', () => document.getElementById('file-input').click());
-        document.getElementById('file-input').addEventListener('change', (e) => { 
-            if(e.target.files.length) { document.querySelector('.file-name').style.display = 'block'; document.querySelector('.file-name').textContent = e.target.files[0].name; }
-        });
-
-        const CryptoManager = {
-            deriveKey: async (pass) => {
-                const enc = new TextEncoder();
-                const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(pass), {name: "PBKDF2"}, false, ["deriveBits", "deriveKey"]);
-                return crypto.subtle.deriveKey({name: "PBKDF2", salt: enc.encode("VaultChat_V1"), iterations: 100000, hash: "SHA-256"}, keyMaterial, {name: "AES-GCM", length: 256}, false, ["encrypt", "decrypt"]);
-            },
-            encryptData: async (data, key) => {
-                const iv = crypto.getRandomValues(new Uint8Array(12));
-                const cipher = await crypto.subtle.encrypt({name: "AES-GCM", iv}, key, new TextEncoder().encode(JSON.stringify(data)));
-                return { iv: Array.from(iv), data: Array.from(new Uint8Array(cipher)) };
-            },
-            decryptData: async (enc, key) => {
-                const dec = await crypto.subtle.decrypt({name: "AES-GCM", iv: new Uint8Array(enc.iv)}, key, new Uint8Array(enc.data));
-                return JSON.parse(new TextDecoder().decode(dec));
-            }
-        };
-
-        const Storage = {
-            save: async () => {
-                if(!AppState.userData || !AppState.cryptoKey) return;
-                try {
-                    const enc = await CryptoManager.encryptData(AppState.userData, AppState.cryptoKey);
-                    localStorage.setItem('vaultchat_v1', JSON.stringify(enc));
-                } catch (e) {
-                    // QuotaExceededError: o histórico com mídia em base64 estourou a cota do navegador
-                    console.error('Falha ao gravar o cofre:', e);
-                    Toast.show('Cofre cheio', 'O histórico passou do limite do navegador (~5 MB). Exporte um backup e apague conversas antigas.', 'error');
-                }
-            },
-            loadEncrypted: () => { const d = localStorage.getItem('vaultchat_v1'); return d ? JSON.parse(d) : null; }
-        };
-
-        const handleCreate = async () => {
-            const pass = document.getElementById('new-pass').value;
-            if(pass.length < 8) return Toast.show('Erro', 'Senha mínima de 8 dígitos', 'error');
-            AppState.cryptoKey = await CryptoManager.deriveKey(pass);
-            AppState.userData = { id: Utils.generateId(24), chats: [], history: {} };
-            await Storage.save();
-            Utils.renderQR('qrcode-created', AppState.userData.id);
-            document.getElementById('display-my-id-created').textContent = AppState.userData.id;
-            switchTab('created'); document.getElementById('create-form').classList.add('hidden'); document.getElementById('vault-created').classList.remove('hidden');
-        };
-
-        const handleLogin = async () => {
-            const pass = document.getElementById('login-pass').value;
-            const file = document.getElementById('file-input').files[0];
-            if(pass.length < 8) return Toast.show('Erro', 'Senha muito curta', 'error');
-            try {
-                AppState.cryptoKey = await CryptoManager.deriveKey(pass);
-                let payload = file ? JSON.parse(await file.text()) : Storage.loadEncrypted();
-                if(!payload) throw new Error("Arquivo não selecionado");
-                AppState.userData = await CryptoManager.decryptData(payload, AppState.cryptoKey);
-                await Storage.save(); startApp();
-            } catch(e) { Toast.show('Falha Crítica', "Senha errada ou arquivo inválido", 'error'); }
-        };
-
-        const downloadVault = async () => {
-            const enc = await CryptoManager.encryptData(AppState.userData, AppState.cryptoKey);
-            const blob = new Blob([JSON.stringify(enc)], { type: 'application/json' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `meu_cofre.vchat`; a.click();
-        };
-
-        const startApp = () => {
-            document.getElementById('auth-screen').style.display = 'none'; document.getElementById('app-container').style.display = 'block';
-            Utils.renderQR('qrcode-sidebar', AppState.userData.id);
-            renderChats();
-            if(firebaseInitialized) FirebaseSignaling.registerUser(AppState.userData.id);
-        };
-
         const FirebaseSignaling = {
-            registerUser: (uid) => {
-                db.ref(`signals/${uid}/inbox`).on('child_added', snap => { FirebaseSignaling.process(snap.val().from, snap.val().data); snap.ref.remove(); });
+            registerUser: (key) => {
+                if (!db) return;
+                db.ref(`signals/${key}/inbox`).on('child_added', snap => {
+                    const val = snap.val();
+                    if (val && val.from && val.data) {
+                        FirebaseSignaling.process(val.from, val.data);
+                    }
+                    snap.ref.remove();
+                });
             },
-            send: async (to, data) => { db.ref(`signals/${to}/inbox`).push({ from: AppState.userData.id, data }); },
-            process: async (fromId, sig) => {
-                if(sig.type === 'group_invite') {
-                    if(!AppState.userData.chats.find(c => c.id === sig.group.id)) { AppState.userData.chats.push(sig.group); Storage.save(); renderChats(); Toast.show('Novo Grupo', `Adicionado a ${sig.group.name}`, 'info'); } return;
+            send: async (toKey, data) => {
+                if (!db) return;
+                db.ref(`signals/${toKey}/inbox`).push({
+                    from: AppState.myKey,
+                    data
+                });
+            },
+            process: async (fromKey, sig) => {
+                // Ao receber sinal de alguém novo, garante o contato na lista
+                let contact = AppState.chats.find(c => c.key === fromKey);
+                if (!contact) {
+                    contact = {
+                        key: fromKey,
+                        nick: sig.senderNick || 'Conectando...',
+                        messages: []
+                    };
+                    AppState.chats.push(contact);
+                    renderChats();
+                } else if (sig.senderNick && contact.nick !== sig.senderNick) {
+                    contact.nick = sig.senderNick;
+                    renderChats();
+                    if (AppState.activeChat && AppState.activeChat.key === fromKey) {
+                        document.getElementById('chat-title-info').textContent = contact.nick;
+                    }
                 }
-                if(!AppState.peerConnections[fromId]) await WebRTC.create(fromId);
-                const pc = AppState.peerConnections[fromId];
-                if(sig.type === 'offer') {
-                    await pc.setRemoteDescription(new RTCSessionDescription(sig)); const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
-                    FirebaseSignaling.send(fromId, { type: 'answer', sdp: ans.sdp });
-                } else if(sig.type === 'answer') { await pc.setRemoteDescription(new RTCSessionDescription(sig));
-                } else if(sig.type === 'candidate') { pc.addIceCandidate(new RTCIceCandidate(sig.candidate)).catch(()=>{}); }
+
+                if (!AppState.peerConnections[fromKey]) {
+                    await WebRTC.create(fromKey);
+                }
+                const pc = AppState.peerConnections[fromKey];
+
+                if (sig.type === 'offer') {
+                    // Garante que o SDP seja montado corretamente caso venha como objeto ou string
+                    const offerDesc = typeof sig.sdp === 'string' 
+                        ? { type: 'offer', sdp: sig.sdp } 
+                        : (sig.sdp?.sdp ? sig.sdp : sig);
+                    await pc.setRemoteDescription(new RTCSessionDescription(offerDesc));
+                    const ans = await pc.createAnswer();
+                    await pc.setLocalDescription(ans);
+                    FirebaseSignaling.send(fromKey, {
+                        type: 'answer',
+                        sdp: ans.sdp,
+                        senderNick: AppState.myNick
+                    });
+                } else if (sig.type === 'answer') {
+                    const ansDesc = typeof sig.sdp === 'string' 
+                        ? { type: 'answer', sdp: sig.sdp } 
+                        : (sig.sdp?.sdp ? sig.sdp : sig);
+                    await pc.setRemoteDescription(new RTCSessionDescription(ansDesc));
+                } else if (sig.type === 'candidate') {
+                    if (sig.candidate) {
+                        try {
+                            await pc.addIceCandidate(new RTCIceCandidate(sig.candidate));
+                        } catch (err) {
+                            console.warn('Falha ao adicionar ICE candidate:', err);
+                        }
+                    }
+                }
             }
         };
 
         const WebRTC = {
-            create: async (contactId) => {
-                const pc = new RTCPeerConnection(AppState.webrtcConfig); AppState.peerConnections[contactId] = pc;
-                const channel = pc.createDataChannel('chat'); pc.chatChannel = channel; WebRTC.setupChannel(channel, contactId);
-                pc.ondatachannel = e => { pc.chatChannel = e.channel; WebRTC.setupChannel(e.channel, contactId); };
-                pc.onicecandidate = e => { if(e.candidate) FirebaseSignaling.send(contactId, {type: 'candidate', candidate: e.candidate}); };
-                pc.onconnectionstatechange = () => WebRTC.updateStatus(contactId, pc.connectionState); return pc;
+            create: async (contactKey) => {
+                const pc = new RTCPeerConnection(AppState.webrtcConfig);
+                AppState.peerConnections[contactKey] = pc;
+
+                const channel = pc.createDataChannel('chat');
+                pc.chatChannel = channel;
+                WebRTC.setupChannel(channel, contactKey);
+
+                pc.ondatachannel = e => {
+                    pc.chatChannel = e.channel;
+                    WebRTC.setupChannel(e.channel, contactKey);
+                };
+
+                pc.onicecandidate = e => {
+                    if (e.candidate) {
+                        FirebaseSignaling.send(contactKey, {
+                            type: 'candidate',
+                            candidate: e.candidate,
+                            senderNick: AppState.myNick
+                        });
+                    }
+                };
+
+                pc.onconnectionstatechange = () => {
+                    WebRTC.updateStatus(contactKey, pc.connectionState);
+                };
+
+                return pc;
             },
-            call: async (id) => {
-                let pc = AppState.peerConnections[id]; if(pc && pc.connectionState === 'connected') return;
-                if(!pc) pc = await WebRTC.create(id);
-                const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-                FirebaseSignaling.send(id, { type: 'offer', sdp: offer.sdp });
+            call: async (contactKey) => {
+                let pc = AppState.peerConnections[contactKey];
+                if (pc && pc.connectionState === 'connected') return;
+                if (!pc) pc = await WebRTC.create(contactKey);
+
+                // Se já estiver negociando, evita duplicar oferta
+                if (pc.signalingState !== 'stable') return;
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                FirebaseSignaling.send(contactKey, {
+                    type: 'offer',
+                    sdp: offer.sdp,
+                    senderNick: AppState.myNick
+                });
             },
-            setupChannel: (ch, id) => {
-                ch.onopen = () => WebRTC.updateStatus(id, 'connected'); ch.onclose = () => WebRTC.updateStatus(id, 'disconnected');
-                ch.onmessage = e => MessageHandler.receive(JSON.parse(e.data));
+            setupChannel: (ch, contactKey) => {
+                ch.onopen = () => {
+                    WebRTC.updateStatus(contactKey, 'connected');
+                    // Envia mensagem de handshake com o nickname
+                    ch.send(JSON.stringify({
+                        type: 'peer_info',
+                        nick: AppState.myNick,
+                        key: AppState.myKey
+                    }));
+                };
+                ch.onclose = () => WebRTC.updateStatus(contactKey, 'disconnected');
+                ch.onmessage = e => {
+                    try {
+                        const msg = JSON.parse(e.data);
+                        if (msg.type === 'peer_info') {
+                            const chat = AppState.chats.find(c => c.key === contactKey);
+                            if (chat && msg.nick) {
+                                chat.nick = msg.nick;
+                                renderChats();
+                                if (AppState.activeChat && AppState.activeChat.key === contactKey) {
+                                    document.getElementById('chat-title-info').textContent = chat.nick;
+                                }
+                                Toast.show('P2P Conectado', `${chat.nick} entrou no chat!`, 'success');
+                            }
+                            return;
+                        }
+                        MessageHandler.receive(contactKey, msg);
+                    } catch (err) {
+                        console.error('Falha ao processar mensagem recebida:', err);
+                    }
+                };
             },
-            sendMsg: (id, msg) => { const pc = AppState.peerConnections[id]; if(pc && pc.chatChannel?.readyState === 'open') pc.chatChannel.send(JSON.stringify(msg)); },
-            updateStatus: (id, state) => { const el = document.querySelector(`[data-chat-id="${id}"] .status-dot`); if(el) el.className = `status-dot ${state === 'connected' ? 'online' : 'offline'}`; }
+            sendMsg: (contactKey, msg) => {
+                const pc = AppState.peerConnections[contactKey];
+                if (pc && pc.chatChannel && pc.chatChannel.readyState === 'open') {
+                    pc.chatChannel.send(JSON.stringify(msg));
+                    return true;
+                }
+                return false;
+            },
+            updateStatus: (contactKey, state) => {
+                const el = document.querySelector(`[data-chat-key="${contactKey}"] .status-dot`);
+                const isOnline = state === 'connected';
+                if (el) el.className = `status-dot ${isOnline ? 'online' : 'offline'}`;
+
+                if (AppState.activeChat && AppState.activeChat.key === contactKey) {
+                    const peerDot = document.getElementById('peer-status-dot');
+                    const peerText = document.getElementById('peer-status-text');
+                    const peerStatusBox = document.getElementById('chat-peer-status');
+                    peerStatusBox.classList.remove('hidden');
+                    if (isOnline) {
+                        peerDot.className = 'status-dot online';
+                        peerText.textContent = 'P2P Direto Ativo';
+                        peerText.style.color = 'var(--success)';
+                    } else {
+                        peerDot.className = 'status-dot offline';
+                        peerText.textContent = 'Aguardando / Desconectado';
+                        peerText.style.color = 'var(--text-muted)';
+                    }
+                }
+            }
         };
 
         const AudioManager = {
             start: async () => {
-                if(!AppState.activeChat) return Toast.show('Erro', 'Selecione um chat', 'warning');
+                if (!AppState.activeChat) return Toast.show('Aviso', 'Selecione um chat', 'warning');
+                const contactKey = AppState.activeChat.key;
+                const pc = AppState.peerConnections[contactKey];
+                if (!pc || !pc.chatChannel || pc.chatChannel.readyState !== 'open') {
+                    return Toast.show('Aguarde', 'Conexão P2P com o contato ainda não está ativa', 'warning');
+                }
+
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    AppState.mediaRecorder = new MediaRecorder(stream); AppState.audioChunks = [];
-                    AppState.mediaRecorder.ondataavailable = e => AppState.audioChunks.push(e.data);
+                    
+                    // Seleciona um mimeType suportado pelo navegador (Safari, Chrome, Firefox)
+                    let mimeType = 'audio/webm';
+                    if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                        if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+                        else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+                        else mimeType = '';
+                    }
+
+                    AppState.mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+                    AppState.audioChunks = [];
+                    
+                    AppState.mediaRecorder.ondataavailable = e => {
+                        if (e.data && e.data.size > 0) AppState.audioChunks.push(e.data);
+                    };
+                    
                     AppState.mediaRecorder.onstop = () => {
-                        const blob = new Blob(AppState.audioChunks, { type: 'audio/webm' });
+                        const finalType = AppState.mediaRecorder.mimeType || 'audio/webm';
+                        const ext = finalType.includes('mp4') ? 'mp4' : (finalType.includes('ogg') ? 'ogg' : 'webm');
+                        const blob = new Blob(AppState.audioChunks, { type: finalType });
+                        
                         const reader = new FileReader();
-                        reader.onload = e => FileUploader.sendBase64(e.target.result, 'audio', 'Audio.webm');
+                        reader.onload = e => FileUploader.sendBase64(e.target.result, 'audio', `Audio_${Date.now()}.${ext}`);
                         reader.readAsDataURL(blob);
                     };
-                    AppState.mediaRecorder.start(); document.getElementById('record-btn').style.color = 'var(--danger)';
-                } catch(e) { Toast.show('Erro', 'Sem acesso ao microfone', 'error'); }
+
+                    AppState.mediaRecorder.start();
+                    document.getElementById('record-btn').style.color = 'var(--danger)';
+                    Toast.show('Gravando...', 'Solte o botão para enviar o áudio', 'info');
+                } catch(e) {
+                    console.error('Erro ao acessar microfone:', e);
+                    Toast.show('Erro', 'Sem permissão ou sem microfone disponível', 'error');
+                }
             },
             stop: () => {
-                if(AppState.mediaRecorder && AppState.mediaRecorder.state !== 'inactive') {
-                    AppState.mediaRecorder.stop(); AppState.mediaRecorder.stream.getTracks().forEach(t => t.stop());
+                if (AppState.mediaRecorder && AppState.mediaRecorder.state !== 'inactive') {
+                    AppState.mediaRecorder.stop();
+                    AppState.mediaRecorder.stream.getTracks().forEach(t => t.stop());
                     document.getElementById('record-btn').style.color = 'var(--text-secondary)';
                 }
             }
         };
 
         const FileUploader = {
-            chunkSize: 16384,
+            chunkSize: 16384, // 16KB por chunk (seguro para RTCDataChannel)
             sendBase64: async (base64Data, type, fileName) => {
-                if(!AppState.activeChat) return;
-                const fileId = Utils.generateId(16);
-                const totalChunks = Math.ceil(base64Data.length / FileUploader.chunkSize);
-                Toast.show('Enviando...', 'Transferindo dados...', 'info');
+                if (!AppState.activeChat) return;
+                const contactKey = AppState.activeChat.key;
+                const pc = AppState.peerConnections[contactKey];
+                
+                if (!pc || !pc.chatChannel || pc.chatChannel.readyState !== 'open') {
+                    Toast.show('Erro no Envio', 'O canal P2P não está conectado no momento.', 'error');
+                    return;
+                }
 
+                const channel = pc.chatChannel;
+                const fileId = Utils.generateKey();
+                const totalChunks = Math.ceil(base64Data.length / FileUploader.chunkSize);
+                Toast.show('Enviando...', `Transferindo ${fileName || 'arquivo'} via P2P...`, 'info');
+
+                // Envia os pedaços controlando o buffer do canal WebRTC
                 for (let i = 0; i < totalChunks; i++) {
                     const chunk = base64Data.slice(i * FileUploader.chunkSize, (i + 1) * FileUploader.chunkSize);
-                    const msg = { type: 'file_chunk', fileId, chunkIndex: i, totalChunks, data: chunk, fileName, fileType: type, to: AppState.activeChat.id, from: AppState.userData.id };
-                    
-                    if (AppState.activeChat.isGroup) { AppState.activeChat.members.forEach(m => { if(m !== AppState.userData.id) WebRTC.sendMsg(m, msg); }); } 
-                    else { WebRTC.sendMsg(AppState.activeChat.id, msg); }
-                    
-                    await new Promise(r => setTimeout(r, 10)); 
+                    const msg = {
+                        type: 'file_chunk',
+                        fileId,
+                        chunkIndex: i,
+                        totalChunks,
+                        data: chunk,
+                        fileName,
+                        fileType: type,
+                        from: AppState.myKey
+                    };
+
+                    // Se o buffer estiver acumulando dados, espera esvaziar para não derrubar a conexão
+                    while (channel.bufferedAmount > 512 * 1024) {
+                        await new Promise(r => setTimeout(r, 20));
+                    }
+
+                    try {
+                        channel.send(JSON.stringify(msg));
+                    } catch (err) {
+                        console.error('Erro ao enviar chunk via DataChannel:', err);
+                        Toast.show('Falha', 'Erro na transmissão de dados P2P', 'error');
+                        return;
+                    }
+
+                    if (i % 5 === 0) {
+                        await new Promise(r => setTimeout(r, 5));
+                    }
                 }
-                const finalMsg = { id: fileId, from: AppState.userData.id, to: AppState.activeChat.id, type: type, content: base64Data, fileName, timestamp: Date.now() };
-                MessageHandler.saveAndRender(finalMsg, 'sent');
+
+                const finalMsg = {
+                    id: fileId,
+                    from: AppState.myKey,
+                    senderNick: AppState.myNick,
+                    type,
+                    content: base64Data,
+                    fileName,
+                    timestamp: Date.now()
+                };
+                MessageHandler.saveAndRender(contactKey, finalMsg, 'sent');
+                Toast.show('Enviado', `${fileName || 'Arquivo'} enviado com sucesso!`, 'success');
             },
-            receiveChunk: (msg) => {
-                if(!AppState.incomingFiles[msg.fileId]) AppState.incomingFiles[msg.fileId] = { chunks: [], received: 0 };
-                const fileRec = AppState.incomingFiles[msg.fileId]; fileRec.chunks[msg.chunkIndex] = msg.data; fileRec.received++;
-                if(fileRec.received === msg.totalChunks) {
-                    const finalMsg = { id: msg.fileId, from: msg.from, to: msg.to, type: msg.fileType, content: fileRec.chunks.join(''), fileName: msg.fileName, timestamp: Date.now() };
-                    delete AppState.incomingFiles[msg.fileId]; MessageHandler.saveAndRender(finalMsg, 'received'); Toast.show('Recebido', `Mídia recebida!`, 'success');
+            receiveChunk: (contactKey, msg) => {
+                if (!AppState.incomingFiles[msg.fileId]) {
+                    AppState.incomingFiles[msg.fileId] = { 
+                        chunks: new Array(msg.totalChunks), 
+                        received: 0 
+                    };
+                }
+                const fileRec = AppState.incomingFiles[msg.fileId];
+                
+                if (!fileRec.chunks[msg.chunkIndex]) {
+                    fileRec.chunks[msg.chunkIndex] = msg.data;
+                    fileRec.received++;
+                }
+
+                if (fileRec.received === msg.totalChunks) {
+                    const finalMsg = {
+                        id: msg.fileId,
+                        from: msg.from,
+                        senderNick: (AppState.chats.find(c => c.key === contactKey)?.nick) || 'Contato',
+                        type: msg.fileType,
+                        content: fileRec.chunks.join(''),
+                        fileName: msg.fileName,
+                        timestamp: Date.now()
+                    };
+                    delete AppState.incomingFiles[msg.fileId];
+                    MessageHandler.saveAndRender(contactKey, finalMsg, 'received');
+                    Toast.show('Recebido', `${msg.fileName || 'Arquivo'} recebido com sucesso!`, 'success');
                 }
             }
         };
 
         const MessageHandler = {
             sendText: (txt) => {
-                if(!AppState.activeChat) return;
-                const msg = { id: Utils.generateId(16), from: AppState.userData.id, to: AppState.activeChat.id, type: 'text', content: txt, timestamp: Date.now(), senderNick: 'Eu' };
-                if (AppState.activeChat.isGroup) { AppState.activeChat.members.forEach(m => { if(m !== AppState.userData.id) WebRTC.sendMsg(m, msg); }); } 
-                else { WebRTC.sendMsg(AppState.activeChat.id, msg); }
-                MessageHandler.saveAndRender(msg, 'sent');
+                if (!AppState.activeChat) return;
+                const msg = {
+                    id: Utils.generateKey(),
+                    from: AppState.myKey,
+                    senderNick: AppState.myNick,
+                    type: 'text',
+                    content: txt,
+                    timestamp: Date.now()
+                };
+                const sent = WebRTC.sendMsg(AppState.activeChat.key, msg);
+                if (!sent) {
+                    Toast.show('Aviso', 'Tentando reconectar ao par P2P...', 'warning');
+                    WebRTC.call(AppState.activeChat.key);
+                }
+                MessageHandler.saveAndRender(AppState.activeChat.key, msg, 'sent');
             },
-            receive: (msg) => {
-                if(msg.type === 'file_chunk') return FileUploader.receiveChunk(msg);
-                MessageHandler.saveAndRender(msg, 'received');
+            receive: (contactKey, msg) => {
+                if (msg.type === 'file_chunk') {
+                    return FileUploader.receiveChunk(contactKey, msg);
+                }
+                MessageHandler.saveAndRender(contactKey, msg, 'received');
             },
-            saveAndRender: (msg, dir) => {
-                const key = AppState.userData.chats.find(c => c.id === msg.to) ? msg.to : msg.from;
-                if(!AppState.userData.history[key]) AppState.userData.history[key] = [];
-                AppState.userData.history[key].push(msg); Storage.save();
-                if(AppState.activeChat && AppState.activeChat.id === key) MessageHandler.render(msg, dir);
+            saveAndRender: (contactKey, msg, dir) => {
+                const chat = AppState.chats.find(c => c.key === contactKey);
+                if (chat) {
+                    if (!chat.messages) chat.messages = [];
+                    chat.messages.push(msg);
+                }
+                if (AppState.activeChat && AppState.activeChat.key === contactKey) {
+                    MessageHandler.render(msg, dir);
+                }
             },
             render: (msg, dir) => {
-                const box = document.getElementById('messages'); if(box.innerHTML.includes('Nenhuma conversa')) box.innerHTML = '';
-                const div = document.createElement('div'); div.className = `message ${dir}`;
-                
+                const box = document.getElementById('messages');
+                if (box.querySelector('.empty-chat')) box.innerHTML = '';
+
+                const div = document.createElement('div');
+                div.className = `message ${dir}`;
+
                 let contentHTML = '';
                 if (msg.type === 'text') {
                     contentHTML = Utils.escapeHtml(msg.content);
                 } else if (msg.type === 'audio') {
                     const src = Utils.safeSrc(msg.content);
                     contentHTML = src
-                        ? `<audio controls src="${Utils.escapeAttr(src)}" style="max-width:200px; height:40px;"></audio>`
+                        ? `<audio controls src="${Utils.escapeAttr(src)}" style="max-width:220px; height:40px;"></audio>`
                         : `<em>Áudio indisponível</em>`;
                 } else {
                     const href = Utils.safeSrc(msg.content);
-                    const nomeArquivo = Utils.escapeHtml(msg.fileName || 'arquivo');
+                    const nome = Utils.escapeHtml(msg.fileName || 'arquivo');
                     contentHTML = href
-                        ? `<a href="${Utils.escapeAttr(href)}" download="${Utils.escapeAttr(msg.fileName || 'arquivo')}" style="color:white; text-decoration:underline;"><i class="fas fa-file"></i> Baixar ${nomeArquivo}</a>`
-                        : `<span><i class="fas fa-file"></i> ${nomeArquivo} (indisponível)</span>`;
+                        ? `<a href="${Utils.escapeAttr(href)}" download="${Utils.escapeAttr(msg.fileName || 'arquivo')}" style="color:white; text-decoration:underline;"><i class="fas fa-file"></i> Baixar ${nome}</a>`
+                        : `<span><i class="fas fa-file"></i> ${nome}</span>`;
                 }
-                
-                let senderLabel = (dir === 'received' && AppState.activeChat.isGroup) ? `<div class="message-sender">Membro</div>` : '';
-                div.innerHTML = `${senderLabel}<div>${contentHTML}</div><div style="font-size:10px; opacity:0.7; margin-top:5px; text-align:right;">${Utils.formatTime(msg.timestamp)}</div>`;
-                box.appendChild(div); box.scrollTop = box.scrollHeight;
+
+                const senderLabel = (dir === 'received')
+                    ? `<div class="message-sender">${Utils.escapeHtml(msg.senderNick || 'Contato')}</div>`
+                    : '';
+
+                div.innerHTML = `${senderLabel}<div>${contentHTML}</div><div class="message-time">${Utils.formatTime(msg.timestamp)}</div>`;
+                box.appendChild(div);
+                box.scrollTop = box.scrollHeight;
             }
         };
 
-        const sendMessage = () => { const i = document.getElementById('msg-input'); if(i.value.trim()) { MessageHandler.sendText(i.value.trim()); i.value = ''; } };
-        const handleKeyPress = (e) => { if(e.key === 'Enter') sendMessage(); };
-        const handleFileSelect = (e) => { 
-            if(e.target.files[0]) {
-                const file = e.target.files[0]; const reader = new FileReader();
+        const sendMessage = () => {
+            const i = document.getElementById('msg-input');
+            if (i.value.trim()) {
+                MessageHandler.sendText(i.value.trim());
+                i.value = '';
+            }
+        };
+
+        const handleKeyPress = (e) => {
+            if (e.key === 'Enter') sendMessage();
+        };
+
+        const handleFileSelect = (e) => {
+            if (e.target.files[0]) {
+                const file = e.target.files[0];
+                const reader = new FileReader();
                 reader.onload = ev => FileUploader.sendBase64(ev.target.result, 'file', file.name);
-                reader.readAsDataURL(file); e.target.value=''; 
+                reader.readAsDataURL(file);
+                e.target.value = '';
             }
         };
 
         const renderChats = () => {
-            const list = document.getElementById('contact-list'); list.innerHTML = '';
-            AppState.userData.chats.forEach(c => {
-                const div = document.createElement('div'); div.className = 'contact-item'; div.setAttribute('data-chat-id', c.id);
-                div.innerHTML = `<div class="contact-avatar ${c.isGroup?'group':''}">${c.isGroup?'<i class="fas fa-users"></i>':Utils.escapeHtml(Utils.getInitials(c.nick||c.name||'?'))}</div><div class="contact-info"><div class="contact-name">${Utils.escapeHtml(c.nick||c.name||'Sem nome')}</div></div><div class="status-dot offline"></div>`;
-                div.onclick = () => {
-                    AppState.activeChat = c; document.getElementById('chat-title-info').textContent = c.nick||c.name;
-                    document.getElementById('messages').innerHTML = '';
-                    (AppState.userData.history[c.id] || []).forEach(m => MessageHandler.render(m, m.from === AppState.userData.id ? 'sent' : 'received'));
-                    if(window.innerWidth <= 768) toggleSidebar();
-                    if(c.isGroup) { c.members.forEach(mId => { if(mId !== AppState.userData.id) WebRTC.call(mId); }); } else { WebRTC.call(c.id); }
-                };
+            const list = document.getElementById('contact-list');
+            list.innerHTML = '';
+            
+            if (AppState.chats.length === 0) {
+                list.innerHTML = `
+                    <div style="text-align:center; color:var(--text-muted); font-size:13px; padding:30px 15px;">
+                        Nenhuma conversa ainda.<br>Clique em <strong>+</strong> acima para adicionar alguém pela chave!
+                    </div>
+                `;
+                return;
+            }
+
+            AppState.chats.forEach(c => {
+                const div = document.createElement('div');
+                div.className = `contact-item ${AppState.activeChat?.key === c.key ? 'active' : ''}`;
+                div.setAttribute('data-chat-key', c.key);
+                
+                const isOnline = AppState.peerConnections[c.key]?.connectionState === 'connected';
+                
+                div.innerHTML = `
+                    <div class="contact-avatar">${Utils.escapeHtml(Utils.getInitials(c.nick))}</div>
+                    <div class="contact-info">
+                        <div class="contact-name">${Utils.escapeHtml(c.nick || 'Desconhecido')}</div>
+                        <div class="contact-sub">${Utils.escapeHtml(c.key)}</div>
+                    </div>
+                    <div class="status-dot ${isOnline ? 'online' : 'offline'}"></div>
+                `;
+                
+                div.onclick = () => selectChat(c);
                 list.appendChild(div);
             });
         };
 
-        const createChat = () => {
-            if(AppState.newChatType === 'individual') {
-                AppState.userData.chats.push({id: document.getElementById('contact-id').value, nick: document.getElementById('contact-nick').value, isGroup: false});
-            } else {
-                const grp = {id: 'grp_'+Utils.generateId(16), name: document.getElementById('group-name').value, isGroup: true, members: [AppState.userData.id, ...AppState.groupMembers.map(m=>m.id)]};
-                AppState.userData.chats.push(grp);
-                grp.members.forEach(mId => { if(mId !== AppState.userData.id) FirebaseSignaling.send(mId, {type: 'group_invite', group: grp}); });
+        const selectChat = (chat) => {
+            AppState.activeChat = chat;
+            document.getElementById('chat-title-info').textContent = chat.nick || 'Contato';
+            document.getElementById('chat-sub-info').textContent = `Chave: ${chat.key}`;
+            
+            // Habilita campos de mensagem
+            document.getElementById('msg-input').disabled = false;
+            document.getElementById('btn-attach').disabled = false;
+            document.getElementById('record-btn').disabled = false;
+            document.getElementById('btn-send').disabled = false;
+            document.getElementById('msg-input').focus();
+            
+            // Renderiza histórico da sessão
+            const box = document.getElementById('messages');
+            box.innerHTML = '';
+            (chat.messages || []).forEach(m => {
+                MessageHandler.render(m, m.from === AppState.myKey ? 'sent' : 'received');
+            });
+
+            WebRTC.updateStatus(chat.key, AppState.peerConnections[chat.key]?.connectionState);
+            WebRTC.call(chat.key);
+
+            if (window.innerWidth <= 768) {
+                const sb = document.getElementById('sidebar');
+                sb.classList.add('collapsed');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (overlay) overlay.classList.remove('active');
             }
-            Storage.save(); renderChats(); closeModal('new-chat-modal');
-            AppState.groupMembers = []; renderGroupMembersList();
+            renderChats();
+        };
+
+        // Adiciona contato inserindo apenas a Chave
+        const createChatByKey = () => {
+            const keyInput = document.getElementById('contact-key').value.trim();
+            if (!keyInput) {
+                return Toast.show('Erro', 'Insira a chave do contato', 'error');
+            }
+            if (keyInput === AppState.myKey) {
+                return Toast.show('Aviso', 'Essa é a sua própria chave!', 'warning');
+            }
+
+            let chat = AppState.chats.find(c => c.key === keyInput);
+            if (!chat) {
+                chat = {
+                    key: keyInput,
+                    nick: 'Carregando...',
+                    messages: []
+                };
+                AppState.chats.push(chat);
+            }
+
+            closeModal('new-chat-modal');
+            renderChats();
+            selectChat(chat);
+            Toast.show('Conectando...', 'Buscando contato na rede P2P...', 'info');
         };
 
         document.addEventListener('DOMContentLoaded', () => {
             try {
-                firebase.initializeApp(FIREBASE_CONFIG); 
+                firebase.initializeApp(FIREBASE_CONFIG);
                 db = firebase.database();
                 
-                // Rastreador de erros de conexão do Firebase
                 db.ref('.info/connected').on('value', snap => {
                     const p = document.getElementById('connection-panel');
                     if (snap.val() === true) {
-                        console.log("🔥 Conectado ao Firebase com sucesso!");
-                        firebaseInitialized = true; 
+                        firebaseInitialized = true;
                         document.getElementById('loading-overlay').classList.add('hidden');
-                        p.className = 'connection-panel success'; 
-                        p.innerHTML = '<div class="status-dot"></div><i class="fas fa-check"></i> Firebase Conectado';
-                        if(AppState.userData) FirebaseSignaling.registerUser(AppState.userData.id);
-                    } else {
-                        console.warn("⚠️ Desconectado do Firebase.");
+                        p.className = 'connection-panel success';
+                        p.innerHTML = '<div class="status-dot"></div><i class="fas fa-check"></i> Rede P2P Pronta';
+                        if (AppState.myKey) {
+                            FirebaseSignaling.registerUser(AppState.myKey);
+                        }
                     }
                 }, (error) => {
-                    console.error("❌ ERRO GRAVE NO FIREBASE (Verifique as Regras de Segurança no painel do Google):", error);
-                    Toast.show('Erro de Rede', 'Servidor recusou a conexão. Verifique o console (F12).', 'error');
+                    console.error("Firebase connection error:", error);
                     const p = document.getElementById('connection-panel');
                     p.className = 'connection-panel error';
-                    p.innerHTML = '<div class="status-dot"></div><i class="fas fa-times"></i> Erro de Permissão do Firebase';
+                    p.innerHTML = '<div class="status-dot"></div><i class="fas fa-times"></i> Erro de Rede';
                     document.getElementById('loading-overlay').classList.add('hidden');
                 });
-            } catch(e) { 
-                console.error("Erro na inicialização:", e); 
+            } catch(e) {
+                console.error("Erro na inicialização:", e);
             }
         });
     </script>
