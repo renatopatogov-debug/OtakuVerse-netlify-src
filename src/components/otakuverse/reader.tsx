@@ -191,6 +191,7 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
                 src={src}
                 alt={`Página ${i + 1}`}
                 loading={i < 2 ? "eager" : "lazy"}
+                referrerPolicy="no-referrer"
                 className="mx-auto block w-full select-none"
                 draggable={false}
               />

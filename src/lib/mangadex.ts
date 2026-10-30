@@ -106,9 +106,7 @@ function coverUrl(manga: RawManga, size: "256" | "512"): string | null {
     (r) => r.type === "cover_art" && r.attributes?.fileName,
   );
   if (!cover?.attributes?.fileName) return null;
-  return proxied(
-    `${UPLOADS}/covers/${manga.id}/${cover.attributes.fileName}.${size}.jpg`,
-  );
+  return `${UPLOADS}/covers/${manga.id}/${cover.attributes.fileName}.${size}.jpg`;
 }
 
 function toMangaItem(manga: RawManga, size: "256" | "512" = "256"): MangaItem {
@@ -247,7 +245,7 @@ function feedParams(lang: string): URLSearchParams {
   return p;
 }
 
-/** Capítulos de UM idioma (mais recentes primeiro, paginando até o fim). */
+/** Capítulos de UM idioma selecionado (rápido em 1 chamada única de até 500 caps). */
 export async function chaptersForLang(
   id: string,
   lang: string,
@@ -264,24 +262,15 @@ export async function chaptersForLang(
     };
     relationships: { id: string; type: string; attributes?: { name?: string } }[];
   };
-  const all: FeedItem[] = [];
-  let total = 0;
-  const PAGE = 500;
-  for (let offset = 0; offset === 0 || offset < total; offset += PAGE) {
-    const p = feedParams(lang);
-    p.set("offset", String(offset));
-    const feed = await mdFetch<{ total: number; data: FeedItem[] }>(
-      `/manga/${id}/feed`,
-      p,
-    );
-    total = feed.total;
-    all.push(...feed.data);
-    if (feed.data.length === 0) break;
-    // Segurança: no máximo 6 páginas (3000 caps) para não martelar a API.
-    if (offset + PAGE >= 3000) break;
-  }
+  const p = feedParams(lang);
+  p.set("limit", "500");
+  p.set("offset", "0");
+  const feed = await mdFetch<{ total: number; data: FeedItem[] }>(
+    `/manga/${id}/feed`,
+    p,
+  );
 
-  const chapters: ChapterItem[] = all.map((c) => ({
+  const chapters: ChapterItem[] = (feed.data ?? []).map((c) => ({
     id: c.id,
     chapter: c.attributes.chapter,
     title: c.attributes.title,
@@ -292,15 +281,12 @@ export async function chaptersForLang(
         ?.name ?? null,
     publishAt: c.attributes.publishAt,
   }));
-  return { chapters, total };
+  return { chapters, total: feed.total };
 }
 
 /**
- * Detalhe do mangá + capítulos. Os capítulos vêm de UM idioma só (o
- * preferido disponível — pt-br > en > es-la > es, ou o que o cliente pedir).
- * Motivo: séries como One Punch-Man têm 1900+ capítulos somando todos os
- * idiomas e o feed corta em 500 — buscando por idioma, cada lista cabe.
- * A UI pega os outros idiomas sob demanda via chaptersForLang.
+ * Detalhe do mangá + capítulos do idioma selecionado.
+ * Busca APENAS o idioma requisitado para responder instantaneamente e não sobrecarregar a API.
  */
 export async function mangaDetail(
   id: string,
@@ -316,29 +302,37 @@ export async function mangaDetail(
     authorRel?.attributes as { name?: string } | undefined
   )?.name;
 
-  // Totais por idioma (para as abas da UI) e o idioma a carregar agora.
-  const totals = await langTotals(id);
-  const order = preferredLang
-    ? [preferredLang, ...LANG_PRIORITY.filter((l) => l !== preferredLang)]
-    : LANG_PRIORITY;
-  const loadedLang =
-    order.find((l) => (totals[l] ?? 0) > 0) ?? preferredLang ?? LANG_PRIORITY[0];
-
+  const targetLang = preferredLang?.trim() || "pt-br";
   let chapters: ChapterItem[] = [];
-  if ((totals[loadedLang] ?? 0) > 0) {
+  let total = 0;
+  let loadedLang = targetLang;
+
+  try {
+    const res = await chaptersForLang(id, targetLang);
+    chapters = res.chapters;
+    total = res.total;
+  } catch {
+    chapters = [];
+    total = 0;
+  }
+
+  // Fallback se pt-br não tiver capítulos
+  if (chapters.length === 0 && targetLang === "pt-br") {
     try {
-      const res = await chaptersForLang(id, loadedLang);
-      chapters = res.chapters;
-    } catch {
-      chapters = [];
-    }
+      const enRes = await chaptersForLang(id, "en");
+      if (enRes.chapters.length > 0) {
+        chapters = enRes.chapters;
+        total = enRes.total;
+        loadedLang = "en";
+      }
+    } catch {}
   }
 
   return {
     manga,
     author: authorName ?? null,
     chapters,
-    langTotals: totals,
+    langTotals: { [loadedLang]: total },
     loadedLang,
   };
 }

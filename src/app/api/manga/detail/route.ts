@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const forceSource = req.nextUrl.searchParams.get("source");
     // v2: resposta agora traz langTotals + chapters de UM idioma só.
     const data = await cached(
-      `manga:detail:v2:${id}:${preferredLang ?? ""}`,
+      `manga:detail:v3:${id}:${preferredLang ?? ""}`,
       5 * 60 * 1000,
       () => mangaDetail(id, preferredLang),
     );

@@ -14,9 +14,9 @@
 // Os caches otv-downloads-v1 e otv-api-v1 sobrevivem a updates do SW
 // (só o cache de estáticos é limpo por versão).
 
-const CACHE = "otv-v2";
-const DL_CACHE = "otv-downloads-v1";
-const API_CACHE = "otv-api-v1";
+const CACHE = "otv-v3";
+const DL_CACHE = "otv-downloads-v2";
+const API_CACHE = "otv-api-v2";
 const API_CACHE_LIMIT = 80;
 
 const API_JSON = /^\/api\/(manga|anime|anilist)\//;
@@ -94,16 +94,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Páginas de mangá via proxy: cache-first no cache de downloads
+  // 3. Imagens via proxy: busca prioritariamente na rede (sem prender imagens erradas em cache)
   if (url.pathname === "/api/img") {
     event.respondWith(
       (async () => {
-        const cache = await caches.open(DL_CACHE);
-        const hit = await cache.match(req);
-        if (hit) return hit;
-        const res = await fetch(req);
-        if (res.ok) await cache.put(req, res.clone());
-        return res;
+        try {
+          return await fetch(req);
+        } catch {
+          const cache = await caches.open(DL_CACHE);
+          const hit = await cache.match(req);
+          if (hit) return hit;
+          return new Response(null, { status: 504 });
+        }
       })(),
     );
     return;

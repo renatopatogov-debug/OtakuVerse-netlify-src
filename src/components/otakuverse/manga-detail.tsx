@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, BookOpen, FileText, Loader2, Play } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Loader2,
+  Play,
+  Search,
+} from "lucide-react";
 import { fetchJson, useAsync } from "./use-async";
-import { RangeAccordion, groupOfIndex } from "./collapsible-groups";
 import { Poster, MangaCard } from "./cards";
 import { FavButton, ResumeChip } from "./library";
 import type { Nav } from "./types";
@@ -13,7 +22,6 @@ import type {
   MangaItem,
   ChapterItem,
 } from "@/lib/mangadex";
-import { LANG_PRIORITY } from "@/lib/mangadex";
 import { KAKA_PREFIX } from "@/lib/kakamanga";
 import { useWatchHistory } from "@/lib/local-store";
 import { cn } from "@/lib/utils";
@@ -24,6 +32,12 @@ const STATUS_PT: Record<string, string> = {
   hiatus: "Em hiato",
   cancelled: "Cancelado",
 };
+
+const LANG_OPTIONS = [
+  { key: "pt-br", label: "🇧🇷 Português" },
+  { key: "en", label: "🇺🇸 Inglês" },
+  { key: "es", label: "🇪🇸 Espanhol" },
+];
 
 function formatDate(iso: string) {
   try {
@@ -48,58 +62,56 @@ export function MangaDetail({
   // Último capítulo lido deste mangá (chip "Continuar leitura")
   const lastRead = historyEntries.find((e) => e.key === `mg:${id}`) ?? null;
 
-  // Idioma escolhido ANTES do carregamento: se já há progresso, retomamos
-  // no idioma do último capítulo lido; senão pt-br. O servidor carrega
-  // apenas esse idioma (séries longas como One Punch-Man têm 1900+ caps
-  // somando tudo — por idioma cada lista cabe no feed).
-  const initialLang = lastRead?.lang ?? "pt-br";
-  const [lang, setLang] = useState<string>(initialLang);
+  // Idioma selecionado (padrão: pt-br ou o último lido)
+  const initialLang = lastRead?.lang === "en" ? "en" : "pt-br";
+  const [selectedLang, setSelectedLang] = useState<string>(initialLang);
+
+  // Busca inicial dos detalhes + capítulos APENAS do idioma selecionado
   const { data, loading, error } = useAsync<MangaDetailResult>(
     () => fetchJson(`/api/manga/detail?id=${id}&lang=${initialLang}`),
     `manga-detail:${id}:${initialLang}`,
   );
 
-  // Capítulos por idioma, carregados sob demanda (null = carregando).
-  const [langChapters, setLangChapters] = useState<
-    Record<string, ChapterItem[] | null>
-  >({});
+  // Cache no cliente dos capítulos por idioma para não sobrecarregar a API
+  const [langChapters, setLangChapters] = useState<Record<string, ChapterItem[]>>({});
+  const [loadingLang, setLoadingLang] = useState(false);
 
-  // Registra o(s) idioma(s) que já vêm carregados do detail.
+  // Registra os capítulos iniciais recebidos
   useEffect(() => {
-    if (!data) return;
-    const k =
-      data.source === "kakamanga"
-        ? data.chapters[0]?.lang ?? "en"
-        : data.loadedLang ?? "pt-br";
-    setLangChapters((prev) =>
-      prev[k] ? prev : { ...prev, [k]: data.chapters },
-    );
-  }, [data]);
+    if (!data?.chapters) return;
+    const langKey = data.loadedLang || selectedLang;
+    setLangChapters((prev) => ({
+      ...prev,
+      [langKey]: data.chapters,
+    }));
+    if (data.loadedLang && data.loadedLang !== selectedLang) {
+      setSelectedLang(data.loadedLang);
+    }
+  }, [data, selectedLang]);
 
-  // Ao trocar de idioma, busca a lista se ainda não foi carregada.
-  useEffect(() => {
-    const totals = data?.langTotals;
-    if (!totals) return;
-    if ((totals[lang] ?? 0) <= 0) return;
-    if (langChapters[lang] !== undefined) return;
-    let alive = true;
-    setLangChapters((prev) => ({ ...prev, [lang]: null }));
-    fetchJson<{ chapters: ChapterItem[] }>(
-      `/api/manga/chapters?id=${id}&lang=${lang}`,
-    )
-      .then((r) => {
-        if (alive)
-          setLangChapters((prev) => ({ ...prev, [lang]: r.chapters }));
-      })
-      .catch(() => {
-        if (alive) setLangChapters((prev) => ({ ...prev, [lang]: [] }));
-      });
-    return () => {
-      alive = false;
-    };
-    // langChapters não entra nas deps de propósito (evita refetch em loop).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, lang, id]);
+  // Carrega sob demanda APENAS o idioma selecionado quando o usuário troca de aba
+  const handleSelectLang = async (lang: string) => {
+    setSelectedLang(lang);
+    if (langChapters[lang] !== undefined) return; // Já carregado
+
+    setLoadingLang(true);
+    try {
+      const res = await fetchJson<{ chapters: ChapterItem[] }>(
+        `/api/manga/chapters?id=${id}&lang=${lang}`,
+      );
+      setLangChapters((prev) => ({
+        ...prev,
+        [lang]: res.chapters ?? [],
+      }));
+    } catch {
+      setLangChapters((prev) => ({
+        ...prev,
+        [lang]: [],
+      }));
+    } finally {
+      setLoadingLang(false);
+    }
+  };
 
   /** Monta o item do leitor a partir de um capítulo */
   const readerItemFor = (
@@ -131,13 +143,13 @@ export function MangaDetail({
   // Retomada: deep-link do histórico abre direto o capítulo salvo
   useEffect(() => {
     if (resumedRef.current || !chapterId || !data) return;
-    const all = [...data.chapters];
+    const all = langChapters[selectedLang] ?? data.chapters ?? [];
     const item = readerItemFor(data, all, chapterId);
     if (item) {
       resumedRef.current = true;
       nav.push(item);
     }
-  }, [chapterId, data, nav]);
+  }, [chapterId, data, langChapters, selectedLang, nav]);
 
   if (loading) {
     return (
@@ -162,22 +174,7 @@ export function MangaDetail({
   }
 
   const { manga, author } = data;
-
-  // Idiomas disponíveis: vem do langTotals (contagem por idioma no
-  // servidor). Se a fonte for KakaManga (sem langTotals), deriva dos caps.
-  const totals = data.langTotals ?? {};
-  let availableLangs = LANG_PRIORITY.filter((l) => (totals[l] ?? 0) > 0);
-  if (availableLangs.length === 0 && data.chapters.length > 0) {
-    availableLangs = Array.from(new Set(data.chapters.map((c) => c.lang)));
-  }
-
-  // Idioma ativo: o escolhido se existe; senão o primeiro disponível.
-  const activeLang: string =
-    availableLangs.includes(lang) ? lang : availableLangs[0] ?? "pt-br";
-  const langLoading = langChapters[activeLang] === null;
-  const visibleChapters = langChapters[activeLang] ?? [];
-  const langCount = (l: string): number =>
-    langChapters[l]?.length ?? totals[l] ?? 0;
+  const currentChapters = langChapters[selectedLang] ?? data.chapters ?? [];
 
   return (
     <div className="space-y-6">
@@ -228,7 +225,7 @@ export function MangaDetail({
               <ResumeChip
                 entry={lastRead}
                 onResume={() => {
-                  const item = readerItemFor(data, data.chapters, lastRead.episodeId ?? "");
+                  const item = readerItemFor(data, currentChapters, lastRead.episodeId ?? "");
                   if (item) nav.push(item);
                 }}
               />
@@ -256,109 +253,61 @@ export function MangaDetail({
         </div>
       </section>
 
-      {/* Capítulos */}
-      <section>
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <h2 className="flex items-center gap-2 text-lg font-bold">
+      {/* Seção de Capítulos Retrátil */}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-emerald-400" />
-            Capítulos
-          </h2>
-          {availableLangs.length > 1 ? (
-            <div className="flex gap-1 rounded-lg bg-secondary p-1">
-              {availableLangs.map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLang(l)}
-                  className={cn(
-                    "rounded px-3 py-1 text-xs font-semibold transition-colors",
-                    activeLang === l
-                      ? "bg-emerald-600 text-white"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {l === "pt-br"
-                    ? "🇧🇷 Português"
-                    : l === "en"
-                      ? "🇺🇸 Inglês"
-                      : l === "es-la" || l === "es"
-                        ? "🇪🇸 Espanhol"
-                        : `🌐 ${l}`}
-                  <span className="ml-1.5 opacity-70">
-                    ({langCount(l)})
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
+            <h2 className="text-lg font-bold">Capítulos</h2>
+            {!loadingLang && currentChapters.length > 0 ? (
+              <span className="rounded-full bg-secondary/80 px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                {currentChapters.length} {currentChapters.length === 1 ? "capítulo" : "capítulos"}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Abas de Idioma — carrega APENAS o idioma selecionado */}
+          <div className="flex gap-1 rounded-xl border border-border/50 bg-secondary/60 p-1">
+            {LANG_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => handleSelectLang(opt.key)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+                  selectedLang === opt.key
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {langLoading ? (
-          <div className="flex justify-center rounded-xl border border-border/60 py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+        {loadingLang ? (
+          <div className="flex justify-center rounded-2xl border border-border/60 bg-card/30 py-12">
+            <div className="flex items-center gap-2 text-sm text-emerald-400">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Carregando capítulos do idioma...</span>
+            </div>
           </div>
-        ) : visibleChapters.length === 0 ? (
-          <p className="rounded-xl border border-border/60 py-10 text-center text-sm text-muted-foreground">
-            Nenhum capítulo disponível neste idioma.
-          </p>
+        ) : currentChapters.length === 0 ? (
+          <div className="rounded-2xl border border-border/60 bg-card/30 py-12 text-center text-sm text-muted-foreground">
+            <p>Nenhum capítulo disponível neste idioma para esta obra.</p>
+            <p className="mt-1 text-xs opacity-75">Tente selecionar outro idioma nas abas acima.</p>
+          </div>
         ) : (
-          <ChapterGroups
-            key={activeLang}
-            chapters={visibleChapters}
+          <CollapsibleChapterList
+            chapters={currentChapters}
             lastReadId={lastRead?.episodeId ?? null}
-            renderChapter={(c) => (
-              <div
-                key={c.id}
-                className="flex w-full items-center gap-2 rounded-xl border border-border/60 px-4 py-3 transition-colors hover:border-emerald-500/60 hover:bg-secondary/50"
-              >
-                <button
-                  onClick={() => {
-                    const item = readerItemFor(data, visibleChapters, c.id);
-                    if (item) nav.push(item);
-                  }}
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-emerald-400" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {c.chapter ? `Capítulo ${c.chapter}` : "Capítulo único"}
-                      {c.title ? ` — ${c.title}` : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {c.pages > 0 ? `${c.pages} págs · ` : ""}
-                      {formatDate(c.publishAt)}
-                      {c.group ? ` · ${c.group}` : ""}
-                    </p>
-                  </div>
-                  {lastRead?.episodeId === c.id ? (
-                    <span className="flex shrink-0 items-center gap-1 rounded bg-emerald-600/90 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                      <Play className="h-2.5 w-2.5" fill="currentColor" /> LENDO
-                    </span>
-                  ) : null}
-                  {c.id.startsWith(KAKA_PREFIX) ? (
-                    <span className="shrink-0 rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
-                      KakaManga
-                    </span>
-                  ) : null}
-                  <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
-                    {c.lang}
-                  </span>
-                </button>
-                <ChapterDlButton
-                  input={{
-                    chapterId: c.id,
-                    mangaId: id,
-                    mangaTitle: manga.title,
-                    mangaCoverUrl: manga.coverUrl,
-                    chapterNumber: c.chapter,
-                    label: c.chapter
-                      ? `Cap. ${c.chapter}`
-                      : "Capítulo único",
-                    lang: c.lang,
-                  }}
-                  className="mr-1"
-                />
-              </div>
-            )}
+            onSelectChapter={(targetId) => {
+              const item = readerItemFor(data, currentChapters, targetId);
+              if (item) nav.push(item);
+            }}
+            mangaId={id}
+            mangaTitle={manga.title}
+            mangaCoverUrl={manga.coverUrl}
           />
         )}
       </section>
@@ -368,53 +317,233 @@ export function MangaDetail({
   );
 }
 
-/* ---------- Lista retrátil de capítulos (grupos de 50) ---------- */
+/* ---------- Lista Retrátil Inteligente de Capítulos ---------- */
 
-const CHAPTER_GROUP_SIZE = 50;
+const GROUP_SIZE = 50;
 
-function chapterNum(c: ChapterItem): number | null {
-  if (!c.chapter) return null;
-  const n = parseFloat(c.chapter);
-  return Number.isFinite(n) ? n : null;
-}
-
-function ChapterGroups({
+function CollapsibleChapterList({
   chapters,
   lastReadId,
-  renderChapter,
+  onSelectChapter,
+  mangaId,
+  mangaTitle,
+  mangaCoverUrl,
 }: {
   chapters: ChapterItem[];
   lastReadId: string | null;
-  renderChapter: (c: ChapterItem) => React.ReactNode;
+  onSelectChapter: (id: string) => void;
+  mangaId: string;
+  mangaTitle: string;
+  mangaCoverUrl: string | null;
 }) {
-  // Abre por padrão o grupo do último capítulo lido (ou o mais recente).
-  const initial = groupOfIndex(
-    lastReadId ? chapters.findIndex((c) => c.id === lastReadId) : -1,
-    CHAPTER_GROUP_SIZE,
-    0,
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortAsc, setSortAsc] = useState(false); // false = mais recentes primeiro
+
+  // Filtro e Ordenação
+  const processedChapters = useMemo(() => {
+    let list = [...chapters];
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.chapter && c.chapter.toLowerCase().includes(q)) ||
+          (c.title && c.title.toLowerCase().includes(q))
+      );
+    }
+    if (sortAsc) {
+      list.reverse();
+    }
+    return list;
+  }, [chapters, searchTerm, sortAsc]);
+
+  // Se a lista filtrada tiver poucos itens (<= 15), exibe tudo sem agrupar
+  const isShortList = processedChapters.length <= 15;
+
+  // Divisão em grupos retráteis
+  const groups = useMemo(() => {
+    if (isShortList) return [];
+    const count = processedChapters.length;
+    const numGroups = Math.ceil(count / GROUP_SIZE);
+    return Array.from({ length: numGroups }, (_, i) => {
+      const start = i * GROUP_SIZE;
+      const end = Math.min(start + GROUP_SIZE, count);
+      const slice = processedChapters.slice(start, end);
+      const firstCap = slice[0]?.chapter;
+      const lastCap = slice[slice.length - 1]?.chapter;
+      const label =
+        firstCap && lastCap && firstCap !== lastCap
+          ? `Capítulos ${lastCap} – ${firstCap}`
+          : firstCap
+            ? `Capítulo ${firstCap}`
+            : `Capítulos ${start + 1} – ${end}`;
+      return { id: i, label, slice, count: slice.length };
+    });
+  }, [processedChapters, isShortList]);
+
+  // Controle de quais grupos estão abertos (o primeiro grupo ou o que tem o último lido vem aberto)
+  const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({ 0: true });
+
+  const toggleGroup = (groupId: number) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
+
+  const expandAll = () => {
+    const all: Record<number, boolean> = {};
+    groups.forEach((g) => {
+      all[g.id] = true;
+    });
+    setOpenGroups(all);
+  };
+
+  const collapseAll = () => {
+    setOpenGroups({});
+  };
+
+  const renderSingleChapter = (c: ChapterItem) => (
+    <div
+      key={c.id}
+      className="group flex w-full items-center gap-2 rounded-xl border border-border/50 bg-card/60 px-3.5 py-2.5 transition-all hover:border-emerald-500/60 hover:bg-secondary/60 hover:shadow-sm"
+    >
+      <button
+        onClick={() => onSelectChapter(c.id)}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+      >
+        <FileText className="h-4 w-4 shrink-0 text-emerald-400 group-hover:scale-110 transition-transform" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">
+            {c.chapter ? `Capítulo ${c.chapter}` : "Capítulo único"}
+            {c.title ? ` — ${c.title}` : ""}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {c.pages > 0 ? `${c.pages} págs · ` : ""}
+            {formatDate(c.publishAt)}
+            {c.group ? ` · ${c.group}` : ""}
+          </p>
+        </div>
+        {lastReadId === c.id ? (
+          <span className="flex shrink-0 items-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+            <Play className="h-2.5 w-2.5" fill="currentColor" /> LENDO
+          </span>
+        ) : null}
+        {c.id.startsWith(KAKA_PREFIX) ? (
+          <span className="shrink-0 rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
+            KakaManga
+          </span>
+        ) : null}
+        <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
+          {c.lang}
+        </span>
+      </button>
+      <ChapterDlButton
+        input={{
+          chapterId: c.id,
+          mangaId,
+          mangaTitle,
+          mangaCoverUrl,
+          chapterNumber: c.chapter,
+          label: c.chapter ? `Cap. ${c.chapter}` : "Capítulo único",
+          lang: c.lang,
+        }}
+        className="mr-1"
+      />
+    </div>
   );
-  const [openGroup, setOpenGroup] = useState<number | null>(initial);
 
   return (
-    <RangeAccordion
-      count={chapters.length}
-      size={CHAPTER_GROUP_SIZE}
-      openIndex={openGroup}
-      onOpenChange={setOpenGroup}
-      unit="caps"
-      labelFor={(s, e) => {
-        // Lista em ordem desc: primeiro item da fatia é o cap. mais alto.
-        const hi = chapterNum(chapters[s]);
-        const lo = chapterNum(chapters[e - 1]);
-        if (hi != null && lo != null) {
-          return hi === lo
-            ? `Capítulo ${hi}`
-            : `Capítulos ${Math.min(hi, lo)} – ${Math.max(hi, lo)}`;
-        }
-        return `Capítulos ${s + 1} – ${e}`;
-      }}
-      renderItem={(s, e) => <>{chapters.slice(s, e).map(renderChapter)}</>}
-    />
+    <div className="space-y-3">
+      {/* Barra de Ferramentas da Lista Retrátil */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 bg-card/40 p-2.5">
+        <div className="relative min-w-[200px] flex-1 max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por capítulo (ex: 12)..."
+            className="h-8 w-full rounded-lg border border-input/60 bg-background/80 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setSortAsc(!sortAsc)}
+            className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title="Alternar ordem de exibição"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            <span>{sortAsc ? "Mais antigos" : "Mais recentes"}</span>
+          </button>
+
+          {!isShortList ? (
+            <>
+              <button
+                onClick={expandAll}
+                className="rounded-lg border border-border/60 bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                Expandir Tudo
+              </button>
+              <button
+                onClick={collapseAll}
+                className="rounded-lg border border-border/60 bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                Recolher Tudo
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Renderização Direta (se curta) ou Grupos Retráteis (se longa) */}
+      {isShortList ? (
+        <div className="space-y-1.5">
+          {processedChapters.map(renderSingleChapter)}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {groups.map((group) => {
+            const isOpen = !!openGroups[group.id];
+            return (
+              <div
+                key={group.id}
+                className="overflow-hidden rounded-xl border border-border/60 bg-card/40 transition-all"
+              >
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary/40"
+                  aria-expanded={isOpen}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">
+                      {group.label}
+                    </span>
+                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
+                      {group.count} caps
+                    </span>
+                  </div>
+
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>{isOpen ? "Recolher" : "Expandir"}</span>
+                    {isOpen ? (
+                      <ChevronUp className="h-4 w-4 text-emerald-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </span>
+                </button>
+
+                {isOpen ? (
+                  <div className="space-y-1.5 border-t border-border/40 bg-background/30 p-3">
+                    {group.slice.map(renderSingleChapter)}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -427,7 +556,6 @@ function MangaRecs({ id, nav }: { id: string; nav: Nav }) {
   );
 
   const items = data?.items ?? [];
-  // Não ocupa espaço enquanto carrega nem quando não há relacionadas.
   if (loading || items.length === 0) return null;
 
   return (

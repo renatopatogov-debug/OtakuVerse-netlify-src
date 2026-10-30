@@ -39,9 +39,15 @@ export function Poster({
   icon: "anime" | "manga";
 }) {
   const [failed, setFailed] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState(src);
   const Icon = icon === "anime" ? Clapperboard : BookOpen;
 
-  if (!src || failed) {
+  useEffect(() => {
+    setCurrentSrc(src);
+    setFailed(false);
+  }, [src]);
+
+  if (!currentSrc || failed) {
     return (
       <div
         className={cn(
@@ -55,10 +61,18 @@ export function Poster({
   }
   return (
     <img
-      src={src}
+      src={currentSrc}
       alt={alt}
       loading="lazy"
-      onError={() => setFailed(true)}
+      referrerPolicy="no-referrer"
+      onError={() => {
+        if (currentSrc && !currentSrc.startsWith("/api/img") && currentSrc.includes("mangadex.org")) {
+          // Se a CDN direta falhar por bloqueio de DNS de operadora, tenta o proxy same-origin como fallback
+          setCurrentSrc(`/api/img?u=${encodeURIComponent(currentSrc)}`);
+        } else {
+          setFailed(true);
+        }
+      }}
       className={cn("object-cover", className)}
     />
   );
