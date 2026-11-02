@@ -36,11 +36,16 @@ yarn-error.log*
 # vercel
 .vercel
 
+# netlify
+.netlify/*
+!.netlify/results.md
+
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-/local-*`n!src/lib/local-store.ts
+/local-*
+!src/lib/local-store.ts
 .claude
 .z-ai-config
 *.log
