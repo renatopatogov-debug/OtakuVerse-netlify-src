@@ -11,6 +11,7 @@ import {
   Play,
   SkipForward,
   Star,
+  Sparkles,
   TvMinimalPlay,
   Youtube,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import type { AniListMedia } from "@/lib/anilist";
 import type { AniZipMapping, AniZipEpisode } from "@/lib/anizip";
 import type { SkipTimes } from "@/lib/aniskip";
 import type { SfhdSourcesResult } from "@/lib/animesfhd";
+import type { TomatoMatchItem, TomatoStreamResult } from "@/lib/tomato";
 import {
   isWatched,
   saveWatchProgress,
@@ -88,6 +90,13 @@ interface SfhdMatchItem {
   episodeCount: number;
   category: string | null;
 }
+
+/* Estado do stream alternativo Tomato (1080p FHD) */
+type TomatoPlayerState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; data: TomatoStreamResult }
+  | { status: "error"; message: string };
 
 /* Estado do fallback HLS (animesfhd) dentro do player primário */
 type FallbackState =
@@ -342,17 +351,61 @@ function AnimeDetailContent({
   const sfhdOther =
     sfhdMatch.data?.matches.find((m) => m.seriesId !== sfhdPick?.seriesId) ?? null;
 
+  /* ----- Ponte Tomato (fonte 1080p FHD alternativa) ----- */
+  const tomatoMatch = useAsync<{ matches: TomatoMatchItem[] }>(
+    () =>
+      matchTitle
+        ? fetchJson<{ matches: TomatoMatchItem[] }>(
+            `/api/anime/tomato-match?title=${encodeURIComponent(matchTitle)}&audio=${audioPref || ""}`,
+          )
+        : Promise.resolve({ matches: [] }),
+    matchTitle ? `tomato-match:${matchTitle}:${audioPref}` : "tomato-match:none",
+  );
+  const tomatoPick = tomatoMatch.data?.matches?.[0] ?? null;
+
+  const [tomato, setTomato] = useState<TomatoPlayerState>({ status: "idle" });
+  const [tomatoWanted, setTomatoWanted] = useState(false);
+
   /* ----- Fallback HLS dentro do player (quando o MP4 primário falha) ----- */
   const [fallback, setFallback] = useState<FallbackState>({ status: "idle" });
   const [fallbackWanted, setFallbackWanted] = useState(false);
   const [primaryFailed, setPrimaryFailed] = useState(false);
 
   useEffect(() => {
-    // Trocou de episódio/qualidade → reseta o fallback
+    // Trocou de episódio/qualidade → reseta o fallback e o Tomato
     setFallback({ status: "idle" });
     setFallbackWanted(false);
+    setTomato({ status: "idle" });
+    setTomatoWanted(false);
     setPrimaryFailed(false);
   }, [playing?.ep.id, quality]);
+
+  useEffect(() => {
+    if (!tomatoWanted || !tomatoPick || !playingEpNum) return;
+    let alive = true;
+    (async () => {
+      setTomato({ status: "loading" });
+      try {
+        const res = await fetchJson<TomatoStreamResult>(
+          `/api/anime/tomato-source?animeId=${tomatoPick.id}&epNumber=${playingEpNum}&seasonNumber=${seasonIdx + 1}&audio=${audioPref || ""}`,
+        );
+        if (!res?.sources?.length) throw new Error("Sem fontes no Tomato para este episódio");
+        if (alive) {
+          setTomato({ status: "ready", data: res });
+        }
+      } catch (e) {
+        if (alive) {
+          setTomato({
+            status: "error",
+            message: e instanceof Error ? e.message : "Falha ao resolver stream do Tomato",
+          });
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [tomatoWanted, tomatoPick, playingEpNum, seasonIdx, audioPref]);
 
   useEffect(() => {
     if (!fallbackWanted || !sfhdPick || !playingEpNum) return;
@@ -549,7 +602,64 @@ function AnimeDetailContent({
       <div ref={playerRef} id="player">
         {playing ? (
           <div className="overflow-hidden rounded-2xl border border-fuchsia-500/30 bg-black shadow-2xl shadow-fuchsia-950/30">
-            {fallback.status === "ready" ? (
+            {tomato.status === "ready" ? (
+              /* Fonte alternada Tomato (1080p FHD) */
+              <div className="space-y-2 px-2 pt-2 sm:px-3 sm:pt-3">
+                <HlsPlayer
+                  key={`tomato-stream-${tomato.data.episodeId}`}
+                  sources={tomato.data.sources}
+                  title={`${anime.name} ep ${tomato.data.episodeNumber || playingEpNum || ""}`}
+                  startAt={pendingSeekRef.current}
+                  poster={
+                    playing.ep.thumbnailLarge ||
+                    zipEpisode(anizip, playingEpNum)?.image ||
+                    null
+                  }
+                  onProgress={(p, d) => {
+                    saveProgress(
+                      {
+                        key: `tomato:${tomato.data.animeId}:${tomato.data.episodeId}`,
+                        source: "tomato",
+                        title: anime.name,
+                        posterUrl:
+                          media?.coverImage?.extraLarge || anime.posterUrl || null,
+                        cid: anime.upstreamCid,
+                        episodeNumber: playingEpNum,
+                        episodeTitle:
+                          zipTitlePtBr(anizip, playingEpNum) ?? playing.ep.title ?? null,
+                        audio: tomato.data.isDubbed
+                          ? ("dublado" as const)
+                          : ("legendado" as const),
+                      },
+                      p,
+                      d,
+                    );
+                  }}
+                  onEnded={() => {
+                    saveWatchProgress({
+                      key: `tomato:${tomato.data.animeId}:${tomato.data.episodeId}`,
+                      source: "tomato",
+                      title: anime.name,
+                      posterUrl:
+                        media?.coverImage?.extraLarge || anime.posterUrl || null,
+                      episodeNumber: playingEpNum,
+                      episodeTitle:
+                        zipTitlePtBr(anizip, playingEpNum) ?? playing.ep.title ?? null,
+                      audio: tomato.data.isDubbed
+                        ? ("dublado" as const)
+                        : ("legendado" as const),
+                      position: 1,
+                      duration: 1,
+                    });
+                  }}
+                />
+                <p className="flex items-center gap-1.5 px-1 pb-1 text-[11px] text-rose-400">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Tocando pela fonte Tomato (1080p FHD
+                  {tomato.data.isDubbed ? " · dublado" : " · legendado"}).
+                </p>
+              </div>
+            ) : fallback.status === "ready" ? (
               /* Fallback HLS (animesfhd) ativo — player HLS com failover */
               <div className="space-y-2 px-2 pt-2 sm:px-3 sm:pt-3">
                 <HlsPlayer
@@ -646,10 +756,13 @@ function AnimeDetailContent({
                     pendingSeekRef.current = 0;
                   }}
                   onError={() => {
-                    // Erro no MP4 primário → fallback HLS automático quando
-                    // existe casamento no animesfhd (ponte MAL)
+                    // Erro no MP4 primário → fallback automático Tomato ou HLS
                     setPrimaryFailed(true);
-                    if (sfhdPick) setFallbackWanted(true);
+                    if (tomatoPick) {
+                      setTomatoWanted(true);
+                    } else if (sfhdPick) {
+                      setFallbackWanted(true);
+                    }
                   }}
                   className="aspect-video w-full bg-black"
                 >
@@ -675,11 +788,15 @@ function AnimeDetailContent({
                     <p className="flex items-center gap-2 text-xs font-semibold text-amber-300">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       Fonte principal falhou
-                      {fallback.status === "loading"
-                        ? " — ativando HLS (animesfhd)..."
-                        : sfhdPick
-                          ? " — HLS ativado acima"
-                          : " — sem fonte HLS casada (use a ponte abaixo)"}
+                      {tomato.status === "loading"
+                        ? " — ativando Tomato (1080p)..."
+                        : fallback.status === "loading"
+                          ? " — ativando HLS (animesfhd)..."
+                          : tomatoPick
+                            ? " — Tomato ativado acima"
+                            : sfhdPick
+                              ? " — HLS ativado acima"
+                              : " — sem fontes alternativas casadas"}
                     </p>
                   </div>
                 ) : null}
@@ -691,7 +808,7 @@ function AnimeDetailContent({
                   playing.ep.title ??
                   `Episódio ${playing.ep.episodeNumber ?? ""}`}
               </p>
-              {fallback.status !== "ready" ? (
+              {fallback.status !== "ready" && tomato.status !== "ready" ? (
                 <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
                   {(["SD", "HD", "FHD"] as const).map((q) => {
                     const available =
@@ -718,9 +835,30 @@ function AnimeDetailContent({
                   })}
                 </div>
               ) : null}
+              {tomatoPick && tomato.status !== "ready" ? (
+                <button
+                  onClick={() => {
+                    setFallbackWanted(false);
+                    setTomatoWanted(true);
+                  }}
+                  disabled={tomato.status === "loading"}
+                  className="flex items-center gap-1.5 rounded-lg border border-rose-500/50 bg-rose-950/40 px-2.5 py-1.5 text-xs font-semibold text-rose-300 transition-colors hover:bg-rose-950/70 disabled:opacity-60"
+                  title="Trocar para a fonte Tomato (1080p FHD)"
+                >
+                  {tomato.status === "loading" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5 text-rose-400" />
+                  )}
+                  Tomato
+                </button>
+              ) : null}
               {sfhdPick && fallback.status !== "ready" ? (
                 <button
-                  onClick={() => setFallbackWanted(true)}
+                  onClick={() => {
+                    setTomatoWanted(false);
+                    setFallbackWanted(true);
+                  }}
                   disabled={fallback.status === "loading"}
                   className="flex items-center gap-1.5 rounded-lg border border-sky-500/50 bg-sky-950/40 px-2.5 py-1.5 text-xs font-semibold text-sky-300 transition-colors hover:bg-sky-950/70 disabled:opacity-60"
                   title="Trocar para a fonte HLS do animesfhd.net"
@@ -733,7 +871,7 @@ function AnimeDetailContent({
                   HLS
                 </button>
               ) : null}
-              {fallback.status !== "ready" && playing.ep.videoUrl ? (
+              {fallback.status !== "ready" && tomato.status !== "ready" && playing.ep.videoUrl ? (
                 <a
                   href={urlFor(playing.ep) ?? "#"}
                   target="_blank"
@@ -744,6 +882,11 @@ function AnimeDetailContent({
                 </a>
               ) : null}
             </div>
+            {tomato.status === "error" ? (
+              <p className="mx-4 mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                Tomato falhou: {tomato.message}
+              </p>
+            ) : null}
             {fallback.status === "error" ? (
               <p className="mx-4 mb-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 Fallback HLS falhou: {fallback.message}
@@ -946,6 +1089,61 @@ function AnimeDetailContent({
                 className="rounded-lg border border-sky-500/50 bg-sky-950/40 px-4 py-2 text-sm font-semibold text-sky-300 transition-colors hover:bg-sky-950/70"
               >
                 Abrir fonte HLS
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* Fonte Tomato (1080p FHD) alternativa */}
+      {tomatoPick ? (
+        <section className="rounded-2xl border border-rose-500/25 bg-rose-950/10 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="h-20 w-14 shrink-0 overflow-hidden rounded-lg border border-border/60">
+                <Poster
+                  src={tomatoPick.coverUrl || anime.posterUrl}
+                  alt={tomatoPick.name}
+                  icon="anime"
+                  className="h-full w-full"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+                  <Sparkles className="h-4 w-4 text-rose-400" />
+                  Também disponível no Tomato
+                  <span className="rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                    1080p FHD
+                  </span>
+                  {tomatoPick.seasons.length > 1 ? (
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground">
+                      {tomatoPick.seasons.length} temporadas/versões
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  {tomatoPick.episodeCount} episódios em qualidade 1080p FHD ·{" "}
+                  {tomatoPick.seasons.some((s) => s.dubbed)
+                    ? "Dublado e Legendado"
+                    : "Legendado"}
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setFallbackWanted(false);
+                  setTomatoWanted(true);
+                  requestAnimationFrame(() =>
+                    playerRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    }),
+                  );
+                }}
+                className="rounded-lg border border-rose-500/50 bg-rose-950/40 px-4 py-2 text-sm font-semibold text-rose-300 transition-colors hover:bg-rose-950/70"
+              >
+                Assistir no Tomato
               </button>
             </div>
           </div>

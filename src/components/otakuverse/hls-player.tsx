@@ -128,6 +128,14 @@ export function HlsPlayer({
 
     (async () => {
       try {
+        const isM3u8 = playUrl.includes(".m3u8") || playUrl.includes("m3u8");
+        if (!isM3u8) {
+          // Arquivo de vídeo direto (MP4/WebM) — reprodução nativa sem HLS parser
+          video.src = playUrl;
+          video.play().catch(() => {});
+          return;
+        }
+
         const mod = await import("hls.js");
         const HlsCtor = mod.default;
         if (destroyed) return;
