@@ -68,6 +68,7 @@ interface RawManga {
     contentRating: string | null;
     originalLanguage: string | null;
     lastChapter: string | null;
+    links?: Record<string, string>;
     tags: { attributes: { name: Record<string, string> } }[];
   };
   relationships: { id: string; type: string; attributes?: { fileName?: string } }[];
@@ -101,12 +102,18 @@ function proxied(url: string): string {
   return `/api/img?u=${encodeURIComponent(url)}&v=2`;
 }
 
-function coverUrl(manga: RawManga, size: "256" | "512"): string | null {
+function coverUrl(manga: RawManga, size: "256" | "512", title?: string): string | null {
   const cover = manga.relationships?.find(
     (r) => r.type === "cover_art" && r.attributes?.fileName,
   );
-  if (!cover?.attributes?.fileName) return null;
-  return `/api/manga/cover/${manga.id}/${cover.attributes.fileName}.${size}.jpg`;
+  const fileName = cover?.attributes?.fileName ? `${cover.attributes.fileName}.${size}.jpg` : "cover.jpg";
+  const params = new URLSearchParams();
+  if (title) params.set("title", title);
+  const al = manga.attributes.links?.al;
+  if (al) params.set("al", al);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return `/api/manga/cover/${manga.id}/${fileName}${qs}`;
+
 }
 
 function toMangaItem(manga: RawManga, size: "256" | "512" = "256"): MangaItem {
@@ -123,7 +130,7 @@ function toMangaItem(manga: RawManga, size: "256" | "512" = "256"): MangaItem {
       .map((t) => t.attributes.name.en ?? Object.values(t.attributes.name)[0])
       .filter(Boolean)
       .slice(0, 8),
-    coverUrl: coverUrl(manga, size),
+    coverUrl: coverUrl(manga, size, pickTitle(manga)),
     originalLanguage: manga.attributes.originalLanguage,
     lastChapter: manga.attributes.lastChapter,
   };
