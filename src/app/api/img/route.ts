@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /**
  * Proxy de imagens do MangaDex e fontes de mangá.
@@ -94,7 +96,10 @@ export async function GET(req: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        "Netlify-CDN-Cache-Control": "no-store",
+        "CDN-Cache-Control": "no-store",
+        "Netlify-Vary": "query=u",
       },
     });
   } catch (err) {

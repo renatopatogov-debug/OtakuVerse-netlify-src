@@ -3,6 +3,8 @@ import { searchMangas } from "@/lib/mangadex";
 import { cached } from "@/lib/cache";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;

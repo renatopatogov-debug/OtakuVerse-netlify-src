@@ -19,6 +19,21 @@
 [functions]
   node_bundler = "esbuild"
 
+# APIs: nunca prender no CDN do Netlify (evita colisão de Durable Cache)
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/img"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
 # Headers do PWA (service worker sempre atualizado, manifest correto)
 [[headers]]
   for = "/sw.js"

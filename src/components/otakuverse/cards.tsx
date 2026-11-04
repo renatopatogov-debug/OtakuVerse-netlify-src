@@ -66,9 +66,9 @@ export function Poster({
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => {
-        if (currentSrc && !currentSrc.startsWith("/api/img") && currentSrc.includes("mangadex.org")) {
-          // Se a CDN direta falhar por bloqueio de DNS de operadora, tenta o proxy same-origin como fallback
-          setCurrentSrc(`/api/img?u=${encodeURIComponent(currentSrc)}`);
+        const coverMatch = currentSrc?.match(/uploads\.mangadex\.org\/covers\/([^/]+)\/([^/?]+)/i);
+        if (coverMatch) {
+          setCurrentSrc(`/api/manga/cover/${coverMatch[1]}/${coverMatch[2]}`);
         } else {
           setFailed(true);
         }

@@ -106,9 +106,7 @@ function coverUrl(manga: RawManga, size: "256" | "512"): string | null {
     (r) => r.type === "cover_art" && r.attributes?.fileName,
   );
   if (!cover?.attributes?.fileName) return null;
-  return proxied(
-    `${UPLOADS}/covers/${manga.id}/${cover.attributes.fileName}.${size}.jpg`,
-  );
+  return `/api/manga/cover/${manga.id}/${cover.attributes.fileName}.${size}.jpg`;
 }
 
 function toMangaItem(manga: RawManga, size: "256" | "512" = "256"): MangaItem {
@@ -352,7 +350,7 @@ export async function chapterPages(chapterId: string): Promise<ChapterPages> {
   const { baseUrl, chapter } = json;
   const pages = (chapter.data ?? []).map(
     (img) =>
-      proxied(`${baseUrl}/data/${chapter.hash}/${img}`),
+      `/api/manga/page/${chapter.hash}/${img}?b=${encodeURIComponent(baseUrl)}`,
   );
   return { chapterId, pages, total: pages.length };
 }

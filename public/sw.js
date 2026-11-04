@@ -14,12 +14,12 @@
 // Os caches otv-downloads-v1 e otv-api-v1 sobrevivem a updates do SW
 // (só o cache de estáticos é limpo por versão).
 
-const CACHE = "otv-v4";
-const DL_CACHE = "otv-downloads-v4";
-const API_CACHE = "otv-api-v4";
+const CACHE = "otv-v5";
+const DL_CACHE = "otv-downloads-v5";
+const API_CACHE = "otv-api-v5";
 const API_CACHE_LIMIT = 80;
 
-const API_JSON = /^\/api\/(manga|anime|anilist)\//;
+const API_JSON = /^\/api\/(manga|anime|anilist)\/(?!cover\/|page\/)/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -95,7 +95,11 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 3. Imagens via proxy: busca prioritariamente na rede (sem prender imagens erradas em cache)
-  if (url.pathname === "/api/img") {
+  if (
+    url.pathname === "/api/img" ||
+    url.pathname.startsWith("/api/manga/page/") ||
+    url.pathname.startsWith("/api/manga/cover/")
+  ) {
     event.respondWith(
       (async () => {
         try {

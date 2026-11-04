@@ -3,6 +3,8 @@ import { chaptersForLang } from "@/lib/mangadex";
 import { cached } from "@/lib/cache";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /** Capítulos de um mangá em um idioma específico (busca sob demanda da UI). */
 export async function GET(req: NextRequest) {

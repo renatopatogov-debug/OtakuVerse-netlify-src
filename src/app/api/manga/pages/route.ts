@@ -8,6 +8,8 @@ import {
 import { cached } from "@/lib/cache";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const chapterId = (req.nextUrl.searchParams.get("chapterId") ?? "").trim();
@@ -34,7 +36,10 @@ export async function GET(req: NextRequest) {
         const result: ChapterPages = {
           chapterId,
           pages: raw.map(
-            (u) => `/api/img?u=${encodeURIComponent(u)}`,
+            (u) => {
+              const m = u.match(/2xstorage\.com\/([^/]+)\/([^/]+)\/([^/]+)$/i);
+              return m ? `/api/manga/page/kaka/${m[1]}/${m[2]}/${m[3]}` : `/api/img?u=${encodeURIComponent(u)}`;
+            },
           ),
           total: raw.length,
         };
