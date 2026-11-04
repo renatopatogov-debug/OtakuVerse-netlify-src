@@ -186,15 +186,7 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
             onTouchEnd={onTouchEnd}
           >
             {(pages ?? []).map((src, i) => (
-              <img
-                key={i}
-                src={src}
-                alt={`Página ${i + 1}`}
-                loading={i < 2 ? "eager" : "lazy"}
-                referrerPolicy="no-referrer"
-                className="mx-auto block w-full select-none"
-                draggable={false}
-              />
+              <ReaderPage key={src + i} src={src} pageNum={i + 1} />
             ))}
             {swipeHint ? (
               <div className="pointer-events-none sticky bottom-4 z-30 flex justify-center">
@@ -225,6 +217,46 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
             </div>
           ) : null}
         </>
+      )}
+    </div>
+  );
+}
+
+function ReaderPage({ src, pageNum }: { src: string; pageNum: number }) {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    setFailed(false);
+  }, [src]);
+
+  return (
+    <div className="relative min-h-[250px] w-full flex items-center justify-center bg-zinc-950/50">
+      {failed ? (
+        <div className="flex flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
+          <p>Não foi possível carregar a página {pageNum}.</p>
+          <button
+            onClick={() => {
+              setFailed(false);
+              const sep = currentSrc.includes("?") ? "&" : "?";
+              setCurrentSrc(`${currentSrc}${sep}retry=${Date.now()}`);
+            }}
+            className="mt-2.5 rounded-lg border border-border/70 bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : (
+        <img
+          src={currentSrc}
+          alt={`Página ${pageNum}`}
+          loading={pageNum <= 2 ? "eager" : "lazy"}
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          className="mx-auto block w-full select-none"
+          draggable={false}
+        />
       )}
     </div>
   );

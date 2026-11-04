@@ -3,19 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 /**
- * Proxy de imagens do MangaDex.
+ * Proxy de imagens do MangaDex e fontes de mangá.
  *
- * Por que existe: uploads.mangadex.org e os nós do at-home server podem estar
- * inacessíveis na rede do usuário final (ISP, DNS, hotlink, headers do gateway
- * de preview). Servindo as imagens pelo nosso backend (same-origin), o
- * navegador do usuário nunca fala direto com o MangaDex.
- *
- * Segurança: whitelist estrita — hosts oficiais do MangaDex + CDN do
- * KakaManga (2xstorage.com, fonte fallback de capítulos):
- *   - *.mangadex.org    (cobre uploads.mangadex.org, capas)
- *   - *.mangadex.network (nós do at-home server, páginas dos capítulos)
- *   - *.2xstorage.com   (CDN de imagens do KakaManga)
- * Qualquer outro host é rejeitado com 400, evita virar proxy aberto.
+ * Por que existe: uploads.mangadex.org e nós do MangaDex estão bloqueados
+ * por DNS/provedores no Brasil. Servindo pelo backend (same-origin), os
+ * usuários conseguem visualizar capas e páginas normalmente.
  */
 
 const ALLOWED_SUFFIXES = [".mangadex.org", ".mangadex.network", ".2xstorage.com"];
@@ -32,6 +24,9 @@ function isAllowed(raw: string): boolean {
   );
 }
 
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
 export async function GET(req: NextRequest) {
   const u = req.nextUrl.searchParams.get("u");
 
@@ -42,7 +37,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Só http(s) (nós do at-home podem devolver http://) e só hosts do MangaDex
   if (!/^https?:\/\//i.test(u) || !isAllowed(u)) {
     return NextResponse.json(
       { error: "Host não autorizado" },
@@ -51,49 +45,64 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Headers por host (cada CDN é chato de um jeito):
-    //  - 2xstorage (KakaManga): exige UA de navegador + Referer deles, senão 403.
-    //  - uploads.mangadex.org: se Referer é de outro site, troca a capa por um
-    //    placeholder genérico (mesma imagem pra qualquer URL!) → nunca mandar Referer.
-    //  - *.mangadex.network (at-home): 404 em UAs de navegador completas → usar UA simples.
     const host = new URL(u).hostname.toLowerCase();
     const isKaka = host.endsWith("2xstorage.com");
-    const upstream = await fetch(u, {
-      headers: {
-        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        "User-Agent": isKaka
-          ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-          : "OtakuVerseDemo/1.0",
-        ...(isKaka ? { Referer: "https://www.kakamanga.com/" } : {}),
-      },
+    const isNetwork = host.endsWith("mangadex.network");
+
+    const reqHeaders: Record<string, string> = {
+      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      "User-Agent": isNetwork ? "OtakuVerseDemo/1.0" : BROWSER_UA,
+    };
+    if (isKaka) {
+      reqHeaders.Referer = "https://www.kakamanga.com/";
+    }
+
+    let upstream = await fetch(u, {
+      headers: reqHeaders,
       cache: "no-store",
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(8_500),
     });
 
-    if (!upstream.ok || !upstream.body) {
+    // Fallback: se o nó voluntário do MangaDex At-Home falhou, tenta o CDN oficial da MangaDex
+    if (!upstream.ok && isNetwork && u.includes("/data/")) {
+      const fallbackUrl = u.replace(/^https?:\/\/[^/]+/, "https://uploads.mangadex.org");
+      const fallbackRes = await fetch(fallbackUrl, {
+        headers: {
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+          "User-Agent": BROWSER_UA,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(6_000),
+      }).catch(() => null);
+
+      if (fallbackRes && fallbackRes.ok) {
+        upstream = fallbackRes;
+      }
+    }
+
+    if (!upstream.ok) {
       return NextResponse.json(
         { error: `MangaDex HTTP ${upstream.status}` },
         { status: upstream.status === 404 ? 404 : 502 },
       );
     }
 
-    const headers = new Headers();
-    headers.set("Content-Type", upstream.headers.get("content-type") ?? "image/jpeg");
-    const len = upstream.headers.get("content-length");
-    if (len) headers.set("Content-Length", len);
-    // Imagens do MangaDex são imutáveis (nome inclui hash) → cache agressivo
-    headers.set("Cache-Control", "public, max-age=604800, immutable");
+    const buffer = await upstream.arrayBuffer();
+    const contentType = upstream.headers.get("content-type") || "image/jpeg";
 
-    return new NextResponse(upstream.body, {
+    return new NextResponse(buffer, {
       status: 200,
-      headers,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+      },
     });
   } catch (err) {
     return NextResponse.json(
       {
         error:
           err instanceof Error && err.name === "TimeoutError"
-            ? "Timeout ao buscar imagem no MangaDex"
+            ? "Timeout ao buscar imagem"
             : "Falha ao buscar imagem",
       },
       { status: 504 },

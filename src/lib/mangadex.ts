@@ -102,11 +102,13 @@ function proxied(url: string): string {
 }
 
 function coverUrl(manga: RawManga, size: "256" | "512"): string | null {
-  const cover = manga.relationships.find(
+  const cover = manga.relationships?.find(
     (r) => r.type === "cover_art" && r.attributes?.fileName,
   );
   if (!cover?.attributes?.fileName) return null;
-  return `${UPLOADS}/covers/${manga.id}/${cover.attributes.fileName}.${size}.jpg`;
+  return proxied(
+    `${UPLOADS}/covers/${manga.id}/${cover.attributes.fileName}.${size}.jpg`,
+  );
 }
 
 function toMangaItem(manga: RawManga, size: "256" | "512" = "256"): MangaItem {
@@ -297,7 +299,7 @@ export async function mangaDetail(
   const json = await mdFetch<{ data: RawManga }>("/manga/" + id, pManga);
   const manga = toMangaItem(json.data, "512");
 
-  const authorRel = json.data.relationships.find((r) => r.type === "author");
+  const authorRel = json.data.relationships?.find((r) => r.type === "author");
   const authorName = (
     authorRel?.attributes as { name?: string } | undefined
   )?.name;

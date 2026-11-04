@@ -99,7 +99,7 @@ export default function Home() {
             chapterId={current.chapterId}
           />
         ) : null}
-        {current.t === "reader" ? <Reader item={current} nav={nav} /> : null}
+        {current.t === "reader" ? <Reader key={current.chapterId} item={current} nav={nav} /> : null}
       </main>
 
       <footer className="mt-auto border-t border-border/60 bg-card/40">

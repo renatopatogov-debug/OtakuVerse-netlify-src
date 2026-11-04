@@ -76,18 +76,24 @@ export function MangaDetail({
   const [langChapters, setLangChapters] = useState<Record<string, ChapterItem[]>>({});
   const [loadingLang, setLoadingLang] = useState(false);
 
-  // Registra os capítulos iniciais recebidos
+  // Reset de estado quando o id do mangá muda (evita reter dados de mangá anterior)
+  useEffect(() => {
+    setLangChapters({});
+    setSelectedLang(initialLang);
+  }, [id, initialLang]);
+
+  // Registra os capítulos iniciais recebidos da primeira chamada
   useEffect(() => {
     if (!data?.chapters) return;
-    const langKey = data.loadedLang || selectedLang;
+    const langKey = data.loadedLang || initialLang;
     setLangChapters((prev) => ({
       ...prev,
       [langKey]: data.chapters,
     }));
-    if (data.loadedLang && data.loadedLang !== selectedLang) {
+    if (data.loadedLang) {
       setSelectedLang(data.loadedLang);
     }
-  }, [data, selectedLang]);
+  }, [data]);
 
   // Carrega sob demanda APENAS o idioma selecionado quando o usuário troca de aba
   const handleSelectLang = async (lang: string) => {
@@ -225,8 +231,29 @@ export function MangaDetail({
               <ResumeChip
                 entry={lastRead}
                 onResume={() => {
-                  const item = readerItemFor(data, currentChapters, lastRead.episodeId ?? "");
-                  if (item) nav.push(item);
+                  const targetChapterId = lastRead.episodeId ?? "";
+                  const item = readerItemFor(data, currentChapters, targetChapterId);
+                  if (item) {
+                    nav.push(item);
+                  } else {
+                    // Navega direto se o capítulo for de outro idioma ou ainda não listado
+                    nav.push({
+                      t: "reader",
+                      chapterId: targetChapterId,
+                      chapterLabel: lastRead.episodeTitle ?? "Capítulo",
+                      mangaTitle: manga.title,
+                      lang: lastRead.lang ?? "pt-br",
+                      chapters: currentChapters.map((x) => ({
+                        id: x.id,
+                        chapter: x.chapter,
+                        title: x.title,
+                      })),
+                      index: 0,
+                      mangaId: id,
+                      mangaCoverUrl: manga.coverUrl,
+                      chapterNumber: lastRead.episodeNumber ? String(lastRead.episodeNumber) : null,
+                    });
+                  }
                 }}
               />
             </div>
@@ -339,7 +366,7 @@ function CollapsibleChapterList({
   const [searchTerm, setSearchTerm] = useState("");
   const [sortAsc, setSortAsc] = useState(false); // false = mais recentes primeiro
 
-  // Filtro e Ordenação
+  // Filtro e Ordenação Numérica Inteligente
   const processedChapters = useMemo(() => {
     let list = [...chapters];
     if (searchTerm.trim()) {
@@ -350,9 +377,12 @@ function CollapsibleChapterList({
           (c.title && c.title.toLowerCase().includes(q))
       );
     }
-    if (sortAsc) {
-      list.reverse();
-    }
+    list.sort((a, b) => {
+      const numA = a.chapter ? parseFloat(a.chapter) : 0;
+      const numB = b.chapter ? parseFloat(b.chapter) : 0;
+      if (isNaN(numA) || isNaN(numB)) return 0;
+      return sortAsc ? numA - numB : numB - numA;
+    });
     return list;
   }, [chapters, searchTerm, sortAsc]);
 

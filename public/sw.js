@@ -14,9 +14,9 @@
 // Os caches otv-downloads-v1 e otv-api-v1 sobrevivem a updates do SW
 // (só o cache de estáticos é limpo por versão).
 
-const CACHE = "otv-v3";
-const DL_CACHE = "otv-downloads-v2";
-const API_CACHE = "otv-api-v2";
+const CACHE = "otv-v4";
+const DL_CACHE = "otv-downloads-v4";
+const API_CACHE = "otv-api-v4";
 const API_CACHE_LIMIT = 80;
 
 const API_JSON = /^\/api\/(manga|anime|anilist)\//;
