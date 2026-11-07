@@ -427,6 +427,24 @@
             background: var(--paper-alt);
         }
 
+        /* ── PRIMEIRO A PERGUNTAR (Sorteio) ── */
+        .first-player-banner {
+            background: #fff;
+            border: 2px dashed var(--accent);
+            padding: 10px 14px;
+            margin-bottom: 18px;
+            text-align: center;
+            animation: fadeIn 0.4s ease;
+        }
+        .first-player-name {
+            font-family: var(--font-stamp);
+            font-size: 1.25rem;
+            color: var(--accent);
+            letter-spacing: 2px;
+            display: block;
+            margin-top: 3px;
+        }
+
         /* ── TIMER ── */
         #hourglass-canvas {
             display: block;
@@ -664,6 +682,11 @@
             <div class="stamp-box">Interrogatório em Progresso</div>
         </div>
 
+        <div id="firstPlayerBanner" class="first-player-banner">
+            <span class="label-small" style="color: var(--accent); margin: 0;">Primeiro a Interrogar:</span>
+            <span class="first-player-name" id="firstPlayerName">—</span>
+        </div>
+
         <div id="timerElements" class="timer-wrapper">
             <span class="label-small" style="text-align:center; margin-bottom: 10px;">Tempo Restante</span>
             <canvas id="hourglass-canvas" width="60" height="90"></canvas>
@@ -797,10 +820,37 @@
         ]
     };
 
-    let players = ["Agente Alfa", "Agente Bravo", "Agente Charlie", "Agente Delta"];
+    const STORAGE_KEY = 'spyfall_players_v1';
+    const DEFAULT_PLAYERS = ["Agente Alfa", "Agente Bravo", "Agente Charlie", "Agente Delta"];
+
+    function carregarJogadoresSalvos() {
+        try {
+            const salvo = localStorage.getItem(STORAGE_KEY);
+            if (salvo) {
+                const parsed = JSON.parse(salvo);
+                if (Array.isArray(parsed) && parsed.length >= 3) {
+                    return parsed;
+                }
+            }
+        } catch (e) {
+            console.warn("Falha ao carregar jogadores salvos:", e);
+        }
+        return [...DEFAULT_PLAYERS];
+    }
+
+    function salvarJogadores() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
+        } catch (e) {
+            console.warn("Falha ao salvar jogadores:", e);
+        }
+    }
+
+    let players = carregarJogadoresSalvos();
     let mode = 'loc';
     let state = {
         secret: "", spies: [], index: 0,
+        firstPlayer: "",
         timeRemaining: 0, totalTime: 0,
         timerId: null, timerEnabled: true
     };
@@ -860,6 +910,11 @@
     function drawSandGrain(x, y) { ctx.fillRect(x, y, 2, 2); }
 
     // ── UI ──
+    function updatePlayerName(index, val) {
+        players[index] = val.trim() || `Agente ${index + 1}`;
+        salvarJogadores();
+    }
+
     function renderPlayers() {
         const container = document.getElementById('playerList');
         container.innerHTML = "";
@@ -868,7 +923,7 @@
             row.className = 'player-row';
             row.innerHTML = `
                 <span class="player-num">${String(i+1).padStart(2,'0')}.</span>
-                <input type="text" value="${name}" onchange="players[${i}] = this.value">
+                <input type="text" value="${name.replace(/"/g, '&quot;')}" onchange="updatePlayerName(${i}, this.value)" oninput="players[${i}] = this.value; salvarJogadores();">
                 <button class="btn-remove" onclick="removePlayer(${i})" title="Remover">×</button>`;
             container.appendChild(row);
         });
@@ -877,12 +932,18 @@
     function addPlayer() {
         const names = ["Echo","Foxtrot","Golf","Hotel","India","Juliet","Kilo","Lima","Mike","November"];
         players.push(`Agente ${names[players.length - 4] || players.length + 1}`);
+        salvarJogadores();
         renderPlayers();
     }
 
     function removePlayer(i) {
-        if (players.length > 3) { players.splice(i, 1); renderPlayers(); }
-        else alert("Missão requer no mínimo 3 agentes.");
+        if (players.length > 3) {
+            players.splice(i, 1);
+            salvarJogadores();
+            renderPlayers();
+        } else {
+            alert("Missão requer no mínimo 3 agentes.");
+        }
     }
 
     function setMode(m) {
@@ -913,6 +974,7 @@
         state.secret = pool[Math.floor(Math.random() * pool.length)];
         state.spies = [];
         state.index = 0;
+        state.firstPlayer = players[Math.floor(Math.random() * players.length)];
         state.totalTime = parseInt(document.getElementById('timerMin').value) * 60;
         state.timeRemaining = state.totalTime;
         clearInterval(state.timerId);
@@ -992,6 +1054,11 @@
             startTurn();
         } else {
             switchView('interrogationView');
+            const firstBanner = document.getElementById('firstPlayerBanner');
+            const firstNameEl = document.getElementById('firstPlayerName');
+            if (firstBanner && firstNameEl) {
+                firstNameEl.textContent = state.firstPlayer || players[0];
+            }
             if (state.timerEnabled) {
                 document.getElementById('timerElements').classList.remove('hidden');
                 document.getElementById('noTimerLabel').classList.add('hidden');

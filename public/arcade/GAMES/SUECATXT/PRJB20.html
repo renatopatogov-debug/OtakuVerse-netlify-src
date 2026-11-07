@@ -25,6 +25,7 @@
             --red-alert: #CC0000;
             --green-ok: #2E7D32;
             --accent: #FFD700;
+            --purple: #764ba2;
             --border-color: #1a1a1a;
             --shadow-color: rgba(0,0,0,0.15);
             --card-bg: #fff;
@@ -789,7 +790,7 @@
         </div>
 
         <button onclick="startGame()" class="btn-green" id="startBtn" disabled>INICIAR SISTEMA [ENTER]</button>
-        <button onclick="goTo('screen-editor')" class="btn-small" style="margin-top: 5px;background:var(--purple);color:#fff;border-color:var(--purple);">📝 EDITOR DE PACKS</button>
+        <button onclick="goTo('screen-editor')" class="btn-purple btn-small" style="margin-top: 5px;">📝 EDITOR DE PACKS</button>
         <button onclick="goTo('screen-terms')" class="btn-small" style="margin-top: 5px;">← VOLTAR</button>
     </div>
 
@@ -1039,7 +1040,7 @@
         { title: "LATÊNCIA ALTA", desc: "Tudo o que você fizer deve ser em câmera lenta (slow motion).", punish: "Acelerou = Bebe", type: "STATUS", hardcore: false },
         { title: "SYSTEM RESTORE", desc: "Todos devem trocar de lugar com a pessoa à sua frente.", punish: "Troca Física", type: "GERAL", hardcore: false },
         { title: "TELA TOUCH", desc: "Você não pode usar as mãos para beber (use antebraços/cotovelos).", punish: "Derrubou = Bebe Tudo", type: "DESAFIO", hardcore: false },
-        { title: "CTR+C / CTRL+V", desc: "Imite exatamente o gesto/fala da pessoa que jogou antes de você.", punish: "Errou = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "CTRL+C / CTRL+V", desc: "Imite exatamente o gesto/fala da pessoa que jogou antes de você.", punish: "Errou = Bebe", type: "REFLEXO", hardcore: false },
 
         // === PACK: SOCIAL ENGINEERING ===
         { title: "ENGENHARIA SOCIAL", desc: "Convença alguém a fazer um gesto ridículo sem explicar por quê. Quem recusar, bebe.", punish: "Teimoso = Bebe", type: "DESAFIO", hardcore: false },
@@ -1095,12 +1096,12 @@
         // ============================================
         { title: "TESTE DE ATRIBUTO", desc: "Escolha um atributo (Força, Destreza, Inteligência...). O grupo define seu valor (1-20). Se for menor que 10, beba.", punish: "Fraco = Bebe", type: "JOGO", hardcore: false },
         { title: "DADO DA SORTE", desc: "Role um dado invisível (1-6). Par = você distribui 1 dose. Ímpar = você bebe.", punish: "Azar do Dado", type: "SORTE", hardcore: false },
-        { title: "MISSÃO SECRETÁRIA", desc: "Receba uma missão secreta (escreva num papel). Complete até o fim do jogo ou beba 3 doses.", punish: "Falhou Missão", type: "DESAFIO", hardcore: false },
+        { title: "MISSÃO SECRETA", desc: "Receba uma missão secreta (escreva num papel). Complete até o fim do jogo ou beba 3 doses.", punish: "Falhou Missão", type: "DESAFIO", hardcore: false },
         { title: "INVENTÁRIO", desc: "Escolha 3 itens da mesa como seu inventário. Se alguém tocar sem permissão, bebe.", punish: "Invasão de Inventário", type: "STATUS", hardcore: false },
         { title: "CURSEIRO", desc: "Preveja quem será o próximo a ser punido. Se acertar, distribua 2 doses. Se errar, beba 2.", punish: "Profecia Falha", type: "SORTE", hardcore: false },
-        { title: "BUFF/DEBUFF", desc: "Dê um buff (+1 dose imune) pra alguém e um debuff (+1 dose obrigatória) pra outro.", spell: "Gerenciamento", type: "REGRA", hardcore: false },
+        { title: "BUFF/DEBUFF", desc: "Dê um buff (+1 dose imune) pra alguém e um debuff (+1 dose obrigatória) pra outro.", punish: "Gerenciamento", type: "REGRA", hardcore: false },
         { title: "BOSS FIGHT", desc: "Todos contra você! Cada pessoa tenta fazer você rir em 10s. Se ninguém conseguir, você distribui 3 doses.", punish: "Derrota do Boss", type: "DESAFIO", hardcore: false },
-        { title: "LOOT DROP", desc: "O jogador à sua direita te dá um 'item' (objeto real). Use-o criativamente ou beba.", prize: "Item Obtido", type: "CRIATIVO", hardcore: false },
+        { title: "LOOT DROP", desc: "O jogador à sua direita te dá um 'item' (objeto real). Use-o criativamente ou beba.", punish: "Item Obtido", type: "CRIATIVO", hardcore: false },
         { title: "NPC", desc: "Você é um NPC agora. Só fale quando perguntarem. Respostas monossilábicas.", punish: "Quebrou Personagem", type: "STATUS", hardcore: false },
         { title: "SAVE POINT", desc: "Marque seu score atual. Se passar de X doses, volta pro save point. (Uma vez por jogo)", punish: "Benefício Único", type: "REGRA", hardcore: false },
 
@@ -1121,7 +1122,7 @@
         // ============================================
         // === PACK: MEMÓRIA (NOVO!) ================
         // ============================================
-        { title: "MEMÓRIA RAM", desc: "Fui ao mercado e comprei... (Lista cumulativa). Quem esquecer a sequência, bebe.", punish: "Erro de Leitura", type: "JOGO", hardcore: false },
+        { title: "TRAVA-LÍNGUA", desc: "Fale um trava-língua 3x rápido sem gaguejar (ex: O rato roeu a roupa do rei de Roma).", punish: "Travou = Bebe", type: "DESAFIO", hardcore: false },
         { title: "SIMON DIZ", desc: "Você é o Simon. Crie uma sequência de gestos (máx 5). Repetir errado = bebe.", punish: "Sequência Quebrada", type: "JOGO", hardcore: false },
         { title: "FLASHBACK", desc: "Nomeie algo que aconteceu há exatamente X minutos atrás (defina tempo). Errou = bebe.", punish: "Amnésia Aguda", type: "DESAFIO", hardcore: false },
         { title: "PALAVRA-CHAVE", desc: "Diga uma palavra-chave. Todos devem lembrar qual foi a última carta com essa palavra no título. Não lembra = bebe.", punish: "Memória Falha", type: "JOGO", hardcore: false },
@@ -1144,7 +1145,17 @@
         { title: "TÚNEL HUMANO", desc: "Forme um túnel com as pernas (sentado). Alguém deve rastejar por baixo. Ambos bebem se falhar.", punish: "Obstrução", type: "DESAFIO", hardcore: false },
         { title: "GRAVIDADE ZERO", desc: "Levante-se da cadeira SEM usar as mãos. Impossível? Use criatividade. Não conseguiu = bebe.", punish: "Lei da Física", type: "DESAFIO", hardcore: false },
         { title: "REFLEXO DE GATO", desc: "Deixe cair um objeto (caneta). Tente pegar antes de tocar o chão. Deixou cair = bebe.", punish: "Reflexo Lento", type: "REFLEXO", hardcore: false },
-        { title: "TORCIDA OLÍMPICA", desc: "Faça a melhor celebração esportiva possível em 5s. Grupo vota o vencedor. Perdedor bebe.", punish: "Comemoração Fraca", type: "VOTAÇÃO", hardcore: false }
+        { title: "TORCIDA OLÍMPICA", desc: "Faça a melhor celebração esportiva possível em 5s. Grupo vota o vencedor. Perdedor bebe.", punish: "Comemoração Fraca", type: "VOTAÇÃO", hardcore: false },
+
+        // === PACK: BÔNUS V6 ===
+        { title: "MOMENTO SILENCIOSO", desc: "Silêncio absoluto na sala por 30s. Qualquer som, risada ou tosse = bebe.", punish: "Quebrou Silêncio", type: "STATUS", hardcore: false },
+        { title: "DUELO DE OLHARES", desc: "Escolha um adversário para encarar sem piscar. O primeiro a piscar bebe.", punish: "Piscou = Bebe", type: "DESAFIO", hardcore: false },
+        { title: "IMPOSTOR", desc: "Todos fecham os olhos. O host toca no ombro de alguém (impostor). Descubram em votação rápida.", punish: "Erro = Inocentes Bebem", type: "VOTAÇÃO", hardcore: false },
+        { title: "HISTÓRIA COLETIVA", desc: "Construam uma história palavra por palavra na roda. Quem travar bebe.", punish: "Travou = Bebe", type: "JOGO", hardcore: false },
+        { title: "REVERSÃO TEMPORAL", desc: "A ordem da roda é invertida imediatamente até a próxima rodada.", punish: "Sentido Invertido", type: "REGRA", hardcore: false },
+        { title: "POKER FACE", desc: "Conte uma mentira absurda parecendo verdade. Quem duvidar e errar, bebe.", punish: "Enganado Bebe", type: "JOGO", hardcore: false },
+        { title: "DESCARGA ELÉTRICA", desc: "Aperto de mão em cadeia. Quem demorar mais de 1s para repassar, bebe.", punish: "Lento = Bebe", type: "REFLEXO", hardcore: false },
+        { title: "BLIND TASTE", desc: "De olhos vendados ou fechados, adivinhe que bebida te deram em um gole.", punish: "Errou = Bebe Dobro", type: "HARDCORE", hardcore: true }
     ];
 
     // ==========================================
@@ -1152,6 +1163,7 @@
     // ==========================================
     let players = [];
     let deck = [];
+    let currentCard = null;
     let turnIndex = 0;
     let roundCount = 0;
     let currentLevel = 1;
@@ -1189,6 +1201,9 @@
     function getAudioContext() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
         }
         return audioCtx;
     }
@@ -1544,6 +1559,11 @@
     function startTimer() {
         if (timerDuration === 0) return;
         
+        if (timerRemaining <= 0) {
+            timerRemaining = timerDuration;
+            updateTimerDisplay();
+        }
+
         stopTimer();
         timerRunning = true;
         document.getElementById('timerToggleBtn').textContent = '⏸️';
@@ -1596,34 +1616,39 @@
         ).join('');
     }
 
-    function loadCard() {
-        if (deck.length === 0) {
+    function loadCard(specificCard = null) {
+        if (!specificCard && deck.length === 0) {
             buildDeck();
             showToast('BARALHO RESHUFFLED!', 'warning');
         }
 
-        const card = deck.pop();
+        const card = specificCard || deck.pop();
+        if (!card) return;
+        currentCard = card;
         const currentPlayer = players[turnIndex];
 
-        gameHistory.push({
-            round: roundCount,
-            player: currentPlayer.name,
-            card: card.title,
-            timestamp: new Date().toLocaleTimeString()
-        });
+        if (!specificCard) {
+            gameHistory.push({
+                round: roundCount,
+                player: currentPlayer.name,
+                card: card.title,
+                timestamp: new Date().toLocaleTimeString()
+            });
+        }
 
         const gameCardDiv = document.getElementById('mainCard');
         gameCardDiv.classList.remove('shake', 'card-hardcore', 'card-special', 'card-challenge');
         void gameCardDiv.offsetHeight;
         gameCardDiv.classList.add('shake');
 
-        document.getElementById('currentPlayerBar').innerHTML = `▶ VEZ DE: <strong>${currentPlayer.name}</strong>`;
+        document.getElementById('currentPlayerBar').innerHTML = `▶ VEZ DE: <strong>${escapeHtml(currentPlayer.name)}</strong>`;
         document.getElementById('currentPlayerBar').style.background = getPlayerGradient(turnIndex);
         
-        document.getElementById('cardType').innerText = card.type;
-        document.getElementById('cardTitle').innerText = card.title;
-        document.getElementById('cardDesc').innerText = `"${card.desc}"`;
-        document.getElementById('cardPunish').innerText = `> PENALIDADE: ${card.punish.toUpperCase()}`;
+        document.getElementById('cardType').innerText = card.type || 'GERAL';
+        document.getElementById('cardTitle').innerText = card.title || 'SEM TÍTULO';
+        document.getElementById('cardDesc').innerText = `"${card.desc || ''}"`;
+        const punishText = (card.punish || 'Ação Imediata').toUpperCase();
+        document.getElementById('cardPunish').innerText = `> PENALIDADE: ${punishText}`;
 
         applyCardStyle(card);
 
@@ -1681,6 +1706,7 @@
             turnIndex: turnIndex,
             roundCount: roundCount,
             level: currentLevel,
+            card: currentCard,
             playersSnapshot: JSON.parse(JSON.stringify(players))
         };
 
@@ -1697,6 +1723,11 @@
             updateStatusDisplay();
             updatePlayersIndicator();
             loadCard();
+        }
+
+        // Sync turn to multiplayer
+        if (multiplayerMode && conn && conn.open) {
+            conn.send({ type: 'nextTurn', turnIndex, roundCount, currentLevel });
         }
     }
 
@@ -1748,6 +1779,8 @@
     }
 
     window.punishPlayer = function(index) {
+        if (!players[index]) return;
+
         lastAction = {
             type: 'punish',
             playerIndex: index,
@@ -1756,24 +1789,32 @@
 
         players[index].score += 1;
         const btn = document.getElementById(`btn-punish-${index}`);
-        const originalHTML = btn.innerHTML;
+        let originalHTML = '';
         
-        btn.innerHTML = `<span style="color:var(--green-ok);">✓ REGISTRADO!</span>`;
-        btn.style.background = '#d4edda';
-        btn.disabled = true;
+        if (btn) {
+            originalHTML = btn.innerHTML;
+            btn.innerHTML = `<span style="color:var(--green-ok);">✓ REGISTRADO!</span>`;
+            btn.style.background = '#d4edda';
+            btn.disabled = true;
+        }
         
         updatePlayersIndicator();
         playSound('punish');
         showToast(`${players[index].name} RECEBEU +1 DOSE!`, 'error');
 
-        setTimeout(() => {
-            if (btn.parentNode) {
-                btn.innerHTML = originalHTML;
-                btn.style.background = 'var(--card-bg)';
-                btn.disabled = false;
-                btn.querySelector('small').textContent = `(${players[index].score} doses)`;
-            }
-        }, 800);
+        if (btn) {
+            setTimeout(() => {
+                if (btn && btn.parentNode) {
+                    btn.innerHTML = originalHTML;
+                    btn.style.background = 'var(--card-bg)';
+                    btn.disabled = false;
+                    const small = btn.querySelector('small');
+                    if (small) {
+                        small.textContent = `(${players[index].score} doses)`;
+                    }
+                }
+            }, 800);
+        }
 
         // Sync punishment
         if (multiplayerMode && conn && conn.open) {
@@ -1814,12 +1855,16 @@
             players.forEach((p, i) => p.score = lastAction.previousScores[i]);
             showToast('PUNIÇÃO EM MASSA DESFEITA!', 'info');
         } else if (lastAction.type === 'turn') {
+            if (currentCard) {
+                deck.push(currentCard);
+            }
+            const previousCard = lastAction.card;
             turnIndex = lastAction.turnIndex;
             roundCount = lastAction.roundCount;
             currentLevel = lastAction.level;
             players = lastAction.playersSnapshot;
-            showToast('TORNADA DESFEITA!', 'info');
-            loadCard();
+            showToast('RODADA DESFEITA!', 'info');
+            loadCard(previousCard);
         }
 
         lastAction = null;
@@ -1984,6 +2029,7 @@
     // COMPARTILHAR
     // ==========================================
     function shareResults() {
+        if (!players || players.length === 0) return;
         const winner = players[0];
         const loser = players[players.length - 1];
         
@@ -2161,7 +2207,7 @@
                 codeDiv.textContent = id;
                 codeDiv.onclick = () => {
                     navigator.clipboard.writeText(id);
-                    showToast('CÓPIO COPIADO!', 'success');
+                    showToast('CÓDIGO COPIADO!', 'success');
                 };
                 document.getElementById('multiplayerUI').appendChild(codeDiv);
                 
@@ -2250,15 +2296,18 @@
                 turnIndex = data.turnIndex;
                 roundCount = data.roundCount;
                 currentLevel = data.currentLevel;
-                // Host manages deck
+                goTo('screen-game');
+                updateStatusDisplay();
+                updatePlayersIndicator();
                 break;
             case 'cardLoaded':
                 // Show same card
-                document.getElementById('cardType').innerText = data.card.type;
-                document.getElementById('cardTitle').innerText = data.card.title;
-                document.getElementById('cardDesc').innerText = `"${data.card.desc}"`;
-                document.getElementById('cardPunish').innerText = `> PENALIDADE: ${data.card.punish.toUpperCase()}`;
-                document.getElementById('currentPlayerBar').innerHTML = `▶ VEZ DE: <strong>${data.player}</strong>`;
+                document.getElementById('cardType').innerText = data.card.type || 'GERAL';
+                document.getElementById('cardTitle').innerText = data.card.title || 'SEM TÍTULO';
+                document.getElementById('cardDesc').innerText = `"${data.card.desc || ''}"`;
+                const remotePunish = (data.card.punish || 'Ação Imediata').toUpperCase();
+                document.getElementById('cardPunish').innerText = `> PENALIDADE: ${remotePunish}`;
+                document.getElementById('currentPlayerBar').innerHTML = `▶ VEZ DE: <strong>${escapeHtml(data.player)}</strong>`;
                 applyCardStyle(data.card);
                 break;
             case 'punishment':
@@ -2270,7 +2319,11 @@
                 updatePlayersIndicator();
                 break;
             case 'nextTurn':
-                nextTurn();
+                turnIndex = data.turnIndex;
+                roundCount = data.roundCount;
+                currentLevel = data.currentLevel;
+                updateStatusDisplay();
+                updatePlayersIndicator();
                 break;
         }
     }
@@ -2299,18 +2352,29 @@
         const gameScreen = document.getElementById('screen-game');
         if (!gameScreen.classList.contains('active')) return;
 
+        // Fecha o alerta de level up se estiver aberto
+        const levelOverlay = document.getElementById('levelAlert');
+        if (levelOverlay && levelOverlay.style.display === 'flex') {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+                e.preventDefault();
+                dismissLevelAlert();
+                return;
+            }
+        }
+
         switch(e.key) {
             case 'ArrowRight':
             case 'Enter':
             case ' ':
+                e.preventDefault();
                 if (e.shiftKey) {
                     skipCard();
                 } else {
-                    e.preventDefault();
                     nextTurn();
                 }
                 break;
             case 'ArrowLeft':
+                e.preventDefault();
                 undoLastAction();
                 break;
             case 'p':
@@ -2323,10 +2387,8 @@
                 break;
             case 's':
             case 'S':
-                if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    saveGame();
-                }
+                e.preventDefault();
+                saveGame();
                 break;
             case 't':
             case 'T':
@@ -2336,7 +2398,7 @@
                 finishGame();
                 break;
             case '?':
-                showToast('⌨️ Atalhos: →=Próximo | ←=Desfazer | P=Punir | R=Regras | S=Salvar | T=Tema | Esc=Sair', 'info');
+                showToast('⌨️ Atalhos: →/Espaço=Próximo | Shift+Espaço=Pular | ←=Desfazer | P=Punir | R=Regras | S=Salvar | T=Tema | Esc=Sair', 'info');
                 break;
         }
     });
