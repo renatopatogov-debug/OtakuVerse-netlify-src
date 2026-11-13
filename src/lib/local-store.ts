@@ -8,7 +8,7 @@
 // Os stores são reativos: hooks usam useSyncExternalStore, então componentes
 // (header, library, home) re-renderizam sozinhos quando qualquer tela salva
 // progresso ou favorita algo. O formato das keys dos itens carrega a fonte no
-// prefixo (ol: / sfhd: / fb: / av: / mg:) — a UI usa isso para saber pra onde
+// prefixo (ol: / sfhd: / tomato: / fb: / av: / mg:) — a UI usa isso para saber pra onde
 // navegar ao retomar.
 
 import { useCallback, useSyncExternalStore } from "react";
@@ -18,6 +18,7 @@ import { useCallback, useSyncExternalStore } from "react";
 export type WatchSource =
   | "otakulogia"
   | "sfhd"
+  | "tomato"
   | "fallback"
   | "av"
   | "manga";

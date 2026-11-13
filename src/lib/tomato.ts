@@ -14,7 +14,8 @@ const BASES = [
 const DEFAULT_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTYwNjA4NjUsInV1aWQiOiJkYTljZTViZi1jODU1LTQ2NTAtYTc0MC05NGNiZTAwM2YzZTEiLCJpYXQiOjE3ODgzMDI3NzJ9.MmkgEfO3S3HNvmYfHIS1PsTqb5uJmpBAPfTuyesLYO0";
 
-export const TOMATO_TOKEN = process.env.TOMATO_TOKEN || DEFAULT_TOKEN;
+export const TOMATO_TOKEN =
+  (process.env.TOMATO_TOKEN ?? "").trim() || DEFAULT_TOKEN;
 
 /* ---------- Tipos ---------- */
 
@@ -112,6 +113,9 @@ async function tomatoRequest<T>(
     preferredBase?: string;
   } = {},
 ): Promise<T> {
+  if (!TOMATO_TOKEN) {
+    throw new Error("Variável de ambiente TOMATO_TOKEN não configurada");
+  }
   const bases = options.preferredBase
     ? [options.preferredBase, ...BASES.filter((b) => b !== options.preferredBase)]
     : BASES;
@@ -188,10 +192,10 @@ interface RawSearchResponse {
 
 export async function searchTomato(query: string): Promise<TomatoSearchItem[]> {
   const q = query.trim();
-  if (!q) return [];
+  if (!q || !TOMATO_TOKEN) return [];
 
-  return await cached(`tomato:search:${cleanTitle(q)}`, 30 * 60_000, async () => {
-    try {
+  try {
+    return await cached(`tomato:search:${cleanTitle(q)}`, 30 * 60_000, async () => {
       const resp = await tomatoRequest<RawSearchResponse>("/v2/content/search", {
         method: "POST",
         body: {
@@ -203,10 +207,10 @@ export async function searchTomato(query: string): Promise<TomatoSearchItem[]> {
       });
 
       return resp.result || resp.data || [];
-    } catch {
-      return [];
-    }
-  });
+    });
+  } catch {
+    return [];
+  }
 }
 
 interface RawAnimeDetailResponse {
@@ -220,10 +224,10 @@ interface RawAnimeDetailResponse {
 }
 
 export async function getTomatoAnime(animeId: number): Promise<TomatoAnimeFull | null> {
-  if (!Number.isFinite(animeId) || animeId <= 0) return null;
+  if (!TOMATO_TOKEN || !Number.isFinite(animeId) || animeId <= 0) return null;
 
-  return await cached(`tomato:anime:${animeId}`, 60 * 60_000, async () => {
-    try {
+  try {
+    return await cached(`tomato:anime:${animeId}`, 60 * 60_000, async () => {
       const resp = await tomatoRequest<RawAnimeDetailResponse>(`/v2/anime/${animeId}`);
       const details = resp.anime_details || resp.data?.anime_details;
       const seasons = resp.anime_seasons || resp.data?.anime_seasons || [];
@@ -233,10 +237,10 @@ export async function getTomatoAnime(animeId: number): Promise<TomatoAnimeFull |
         anime_details: details,
         anime_seasons: seasons,
       };
-    } catch {
-      return null;
-    }
-  });
+    });
+  } catch {
+    return null;
+  }
 }
 
 interface RawEpisodesResponse {
@@ -249,10 +253,10 @@ export async function getTomatoSeasonEpisodes(
   seasonId: number,
   page = 0,
 ): Promise<TomatoEpisodeItem[]> {
-  if (!Number.isFinite(seasonId) || seasonId <= 0) return [];
+  if (!TOMATO_TOKEN || !Number.isFinite(seasonId) || seasonId <= 0) return [];
 
-  return await cached(`tomato:season:${seasonId}:p${page}`, 60 * 60_000, async () => {
-    try {
+  try {
+    return await cached(`tomato:season:${seasonId}:p${page}`, 60 * 60_000, async () => {
       const resp = await tomatoRequest<RawEpisodesResponse>(`/season/${seasonId}/episodes`, {
         method: "POST",
         body: {
@@ -263,10 +267,10 @@ export async function getTomatoSeasonEpisodes(
       });
 
       return resp.data || [];
-    } catch {
-      return [];
-    }
-  });
+    });
+  } catch {
+    return [];
+  }
 }
 
 interface RawStreamResponse {
@@ -286,11 +290,11 @@ interface RawStreamResponse {
 export async function getTomatoEpisodeStream(
   episodeId: number,
 ): Promise<{ sources: TomatoPlayerSource[]; episodeNumber?: number; episodeTitle?: string } | null> {
-  if (!Number.isFinite(episodeId) || episodeId <= 0) return null;
+  if (!TOMATO_TOKEN || !Number.isFinite(episodeId) || episodeId <= 0) return null;
 
   // Cache curto (15 min) para renovar URLs assinadas antes que expirem (~100 min)
-  return await cached(`tomato:stream:${episodeId}`, 15 * 60_000, async () => {
-    try {
+  try {
+    return await cached(`tomato:stream:${episodeId}`, 15 * 60_000, async () => {
       const resp = await tomatoRequest<RawStreamResponse>(
         `/v2/anime/episode/${episodeId}/stream`,
       );
@@ -327,10 +331,10 @@ export async function getTomatoEpisodeStream(
         episodeNumber: resp.episodeNumber,
         episodeTitle: resp.episodeName,
       };
-    } catch {
-      return null;
-    }
-  });
+    });
+  } catch {
+    return null;
+  }
 }
 
 /* ---------- Matching com AniList/OtakuVerse ---------- */
@@ -340,7 +344,7 @@ export async function matchTomatoAnime(
   audioPref?: "dub" | "leg" | null,
 ): Promise<TomatoMatchItem[]> {
   const query = title.trim();
-  if (!query) return [];
+  if (!query || !TOMATO_TOKEN) return [];
 
   return await cached(
     `tomato:matchall:${cleanTitle(query)}:${audioPref || "any"}`,
@@ -369,44 +373,41 @@ export async function matchTomatoAnime(
         .sort((a, b) => b.score - a.score)
         .slice(0, 3); // Top 3 candidatos mais próximos
 
-      // 3. Carrega os detalhes e temporadas para enriquecer
-      const matches: TomatoMatchItem[] = [];
+      // 3. Carrega os detalhes e temporadas em paralelo para enriquecer
+      return Promise.all(
+        scored.map(async ({ item, score }): Promise<TomatoMatchItem> => {
+          const detail = await getTomatoAnime(item.id);
+          const seasons = detail?.anime_seasons || [];
 
-      for (const { item, score } of scored) {
-        const detail = await getTomatoAnime(item.id);
-        const seasons = detail?.anime_seasons || [];
+          const mappedSeasons = seasons.map((s) => ({
+            id: s.season_id,
+            name: s.season_name,
+            number: s.season_number,
+            dubbed: s.season_dubbed === 1,
+            episodesCount: s.season_episodes,
+          }));
 
-        // Mapeia temporadas
-        const mappedSeasons = seasons.map((s) => ({
-          id: s.season_id,
-          name: s.season_name,
-          number: s.season_number,
-          dubbed: s.season_dubbed === 1,
-          episodesCount: s.season_episodes,
-        }));
+          // Se o usuário tem preferência de áudio, reordena as temporadas compatíveis primeiro
+          if (audioPref) {
+            const wantDub = audioPref === "dub";
+            mappedSeasons.sort((a, b) => {
+              if (a.dubbed === wantDub && b.dubbed !== wantDub) return -1;
+              if (b.dubbed === wantDub && a.dubbed !== wantDub) return 1;
+              return a.number - b.number;
+            });
+          }
 
-        // Se o usuário tem preferência de áudio, reordena as temporadas compatíveis primeiro
-        if (audioPref) {
-          const wantDub = audioPref === "dub";
-          mappedSeasons.sort((a, b) => {
-            if (a.dubbed === wantDub && b.dubbed !== wantDub) return -1;
-            if (b.dubbed === wantDub && a.dubbed !== wantDub) return 1;
-            return a.number - b.number;
-          });
-        }
-
-        matches.push({
-          id: item.id,
-          name: item.name,
-          year: item.date ? Number.parseInt(item.date, 10) || null : null,
-          coverUrl: item.image || null,
-          episodeCount: item.episodes || 0,
-          score,
-          seasons: mappedSeasons,
-        });
-      }
-
-      return matches;
+          return {
+            id: item.id,
+            name: item.name,
+            year: item.date ? Number.parseInt(item.date, 10) || null : null,
+            coverUrl: item.image || null,
+            episodeCount: item.episodes || 0,
+            score,
+            seasons: mappedSeasons,
+          };
+        }),
+      );
     },
   );
 }

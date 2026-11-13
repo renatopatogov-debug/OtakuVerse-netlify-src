@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,7 +17,7 @@ export const metadata: Metadata = {
   description:
     "Explore animes e mangás em um só lugar: busca, catálogo, episódios, leitor de mangás com downloads offline. Integrado com as APIs públicas do MangaDex e Otakulogia.",
   keywords: ["anime", "mangá", "otaku", "MangaDex", "streaming", "leitor", "offline"],
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icons/icon-192.png",
     apple: "/icons/icon-192.png",
@@ -48,7 +47,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         {children}
-        <Toaster />
         <script
           dangerouslySetInnerHTML={{
             __html: `if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));`,

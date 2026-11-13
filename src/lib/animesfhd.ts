@@ -226,37 +226,54 @@ interface RawSeriesDetail {
   pages?: number;
 }
 
+function appendEpisodes(
+  episodes: Map<string, SfhdEpisode>,
+  list: RawSeriesDetail["episodes"],
+) {
+  for (const e of list ?? []) {
+    const id = String(e.id);
+    if (!episodes.has(id)) {
+      episodes.set(id, {
+        id,
+        number: typeof e.episode_number === "number" ? e.episode_number : 0,
+        title: e.title?.trim() || null,
+        description: e.description?.trim() || null,
+        thumbnailUrl: e.thumbnail_url || null,
+      });
+    }
+  }
+}
+
 async function sfhdSeriesRaw(seriesId: string): Promise<SfhdSeriesDetail> {
   if (!/^\d+$/.test(seriesId)) throw new Error("seriesId inválido");
 
-  // Coleta todas as páginas de episódios (per_page=100). Guarda anti-loop:
-  // se a API ignorar o page e repetir a página 1, dedupe por id e pare.
+  // Coleta página 1 e busca eventuais páginas restantes (até 6) em paralelo.
   const episodes = new Map<string, SfhdEpisode>();
-  let meta: RawSeriesDetail | null = null;
-  for (let page = 1; page <= 6; page++) {
-    const data = await sfhdJson<RawSeriesDetail>(
-      `/api/series/${seriesId}?page=${page}`,
-    );
-    meta = data;
-    const list = data.episodes ?? [];
-    if (list.length === 0) break;
-    const before = episodes.size;
-    for (const e of list) {
-      const id = String(e.id);
-      if (!episodes.has(id)) {
-        episodes.set(id, {
-          id,
-          number: typeof e.episode_number === "number" ? e.episode_number : 0,
-          title: e.title?.trim() || null,
-          description: e.description?.trim() || null,
-          thumbnailUrl: e.thumbnail_url || null,
-        });
+  const meta = await sfhdJson<RawSeriesDetail>(`/api/series/${seriesId}?page=1`);
+  if (!meta) throw new Error("série sem dados");
+  appendEpisodes(episodes, meta.episodes);
+
+  if (meta.has_more && (meta.episodes?.length ?? 0) > 0) {
+    const maxPage =
+      typeof meta.pages === "number" && meta.pages > 1
+        ? Math.min(meta.pages, 6)
+        : 6;
+    if (maxPage >= 2) {
+      const pages = Array.from({ length: maxPage - 1 }, (_, i) => i + 2);
+      const settled = await Promise.allSettled(
+        pages.map((p) => sfhdJson<RawSeriesDetail>(`/api/series/${seriesId}?page=${p}`)),
+      );
+      for (const res of settled) {
+        if (res.status !== "fulfilled") continue;
+        const list = res.value.episodes ?? [];
+        if (list.length === 0) break;
+        const before = episodes.size;
+        appendEpisodes(episodes, list);
+        if (episodes.size === before) break;
       }
     }
-    if (!data.has_more || episodes.size === before) break;
   }
 
-  if (!meta) throw new Error("série sem dados");
   const s = meta.series ?? ({} as RawSeriesItem);
 
   return {
@@ -494,11 +511,21 @@ export async function sfhdMatchesByMal(
       async () => {
         const candidates = (await sfhdSearch(term)).slice(0, 8);
         const validated: SfhdSearchItem[] = [];
-        for (const cand of candidates) {
-          const detail = await sfhdSeries(cand.seriesId);
-          if (detail?.malId === malId) {
-            validated.push(cand);
-            if (validated.length >= max) break;
+        const BATCH_SIZE = 4;
+        for (
+          let i = 0;
+          i < candidates.length && validated.length < max;
+          i += BATCH_SIZE
+        ) {
+          const batch = candidates.slice(i, i + BATCH_SIZE);
+          const settled = await Promise.allSettled(
+            batch.map((cand) => sfhdSeries(cand.seriesId)),
+          );
+          for (let j = 0; j < batch.length && validated.length < max; j++) {
+            const res = settled[j];
+            if (res.status === "fulfilled" && res.value?.malId === malId) {
+              validated.push(batch[j]);
+            }
           }
         }
         return validated;

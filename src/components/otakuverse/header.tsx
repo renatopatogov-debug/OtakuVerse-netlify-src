@@ -42,7 +42,7 @@ export function Header({
             current.t === "manga-detail" ||
             current.t === "reader"
           ? "mangas"
-          : current.t === "arcade" || current.t === "arcade-player"
+          : current.t === "arcade"
             ? "arcade"
             : current.t === "favorites"
               ? "favorites"
@@ -126,6 +126,7 @@ export function Header({
 
           {/* Downloads offline */}
           <button
+            type="button"
             onClick={() => onNavigate({ t: "downloads" })}
             className={cn(
               "relative shrink-0 rounded-lg p-2 transition-colors",
@@ -146,6 +147,7 @@ export function Header({
 
           {/* Favoritos (biblioteca local do navegador) */}
           <button
+            type="button"
             onClick={() => onNavigate({ t: "favorites" })}
             className={cn(
               "relative shrink-0 rounded-lg p-2 transition-colors",
@@ -177,20 +179,25 @@ export function Header({
         {tabs.map((tab) => (
           <button
             key={tab.key}
+            type="button"
             onClick={() => onNavigate(tab.item)}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors",
+              "flex flex-1 items-center justify-center gap-1 py-2 text-xs font-medium transition-colors sm:gap-1.5 sm:text-sm",
               active === tab.key
                 ? "border-b-2 border-fuchsia-500 text-foreground"
                 : "text-muted-foreground",
             )}
           >
-            {tab.key === "animes" ? (
-              <Clapperboard className="h-4 w-4" />
+            {tab.key === "home" ? (
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            ) : tab.key === "animes" ? (
+              <Clapperboard className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             ) : tab.key === "mangas" ? (
-              <BookOpen className="h-4 w-4" />
+              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            ) : tab.key === "arcade" ? (
+              <Gamepad2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             ) : tab.key === "downloads" ? (
-              <DownloadIcon className="h-4 w-4" />
+              <DownloadIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             ) : null}
             {tab.label}
           </button>

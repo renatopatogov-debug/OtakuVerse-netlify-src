@@ -42,8 +42,9 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
     });
   }, [item.mangaId, item.chapterId, item.chapterLabel, item.chapterNumber, item.mangaTitle, item.mangaCoverUrl, item.lang]);
 
-  const canPrev = item.index > 0;
-  const canNext = item.index < item.chapters.length - 1;
+  // A lista `chapters` segue ordem decrescente (índice 0 = mais novo, fim = mais antigo).
+  const canPrev = item.index < item.chapters.length - 1;
+  const canNext = item.index > 0;
 
   // --- Gestos: swipe horizontal troca de capítulo ---
   // Esquerda = próximo capítulo (mais novo) · Direita = anterior (mais antigo).

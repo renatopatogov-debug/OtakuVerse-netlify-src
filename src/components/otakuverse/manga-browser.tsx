@@ -26,11 +26,17 @@ export function MangaBrowser({ nav }: { nav: Nav }) {
     error: string | null;
   } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
 
   const items = result?.key === listKey ? result.items : [];
   const total = result?.key === listKey ? result.total : 0;
   const loading = result?.key !== listKey;
   const error = result?.key === listKey ? result.error : null;
+  const activeLoadMoreError =
+    loadMoreError?.key === listKey ? loadMoreError.message : null;
 
   const buildUrl = (offset: number) =>
     debounced
@@ -40,43 +46,59 @@ export function MangaBrowser({ nav }: { nav: Nav }) {
         new URLSearchParams({ offset: String(offset), limit: String(PAGE) });
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
-    fetchJson<{ total: number; items: MangaItemUI[] }>(buildUrl(0))
+    fetchJson<{ total: number; items: MangaItemUI[] }>(buildUrl(0), {
+      signal: controller.signal,
+    })
       .then((d) => {
-        if (alive)
+        if (alive && !controller.signal.aborted)
           setResult({ key: listKey, items: d.items, total: d.total, error: null });
       })
       .catch((e) => {
-        if (alive)
-          setResult({
-            key: listKey,
-            items: [],
-            total: 0,
-            error: e instanceof Error ? e.message : "Erro",
-          });
+        if (
+          !alive ||
+          controller.signal.aborted ||
+          (e instanceof Error && e.name === "AbortError")
+        ) {
+          return;
+        }
+        setResult({
+          key: listKey,
+          items: [],
+          total: 0,
+          error: e instanceof Error ? e.message : "Erro",
+        });
       });
     return () => {
       alive = false;
+      controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listKey]);
 
   const loadMore = async () => {
     if (loadingMore) return;
     setLoadingMore(true);
+    setLoadMoreError(null);
+    const reqKey = listKey;
     try {
       const d = await fetchJson<{ total: number; items: MangaItemUI[] }>(
         buildUrl(items.length),
       );
       setResult((prev) => {
-        if (!prev || prev.key !== listKey) return prev;
+        if (!prev || prev.key !== reqKey) return prev;
         const seen = new Set(prev.items.map((x) => x.id));
         return {
           ...prev,
           items: [...prev.items, ...d.items.filter((x) => !seen.has(x.id))],
         };
       });
-    } catch {
-      /* silencioso */
+    } catch (e) {
+      setLoadMoreError({
+        key: reqKey,
+        message: e instanceof Error ? e.message : "Erro ao carregar mais",
+      });
     }
     setLoadingMore(false);
   };
@@ -129,7 +151,12 @@ export function MangaBrowser({ nav }: { nav: Nav }) {
             ))}
           </div>
           {items.length < total ? (
-            <div className="flex justify-center pt-2">
+            <div className="flex flex-col items-center gap-2 pt-2">
+              {activeLoadMoreError ? (
+                <p className="text-xs text-destructive">
+                  Falha ao carregar mais: {activeLoadMoreError}
+                </p>
+              ) : null}
               <button
                 onClick={loadMore}
                 disabled={loadingMore}
@@ -138,7 +165,11 @@ export function MangaBrowser({ nav }: { nav: Nav }) {
                 {loadingMore ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                {loadingMore ? "Carregando..." : "Carregar mais"}
+                {loadingMore
+                  ? "Carregando..."
+                  : activeLoadMoreError
+                    ? "Tentar novamente"
+                    : "Carregar mais"}
               </button>
             </div>
           ) : null}

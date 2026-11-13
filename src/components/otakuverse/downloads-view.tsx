@@ -103,18 +103,19 @@ export function DownloadsView({ nav }: { nav: Nav }) {
                       </div>
                       <button
                         onClick={() => {
+                          const descChapters = [...sorted].reverse();
                           const item: StackItem = {
                             t: "reader",
                             chapterId: c.chapterId,
                             chapterLabel: c.label,
                             mangaTitle: c.mangaTitle,
                             lang: c.lang,
-                            chapters: sorted.map((x) => ({
+                            chapters: descChapters.map((x) => ({
                               id: x.chapterId,
                               chapter: x.chapterNumber,
                               title: null,
                             })),
-                            index: sorted.findIndex(
+                            index: descChapters.findIndex(
                               (x) => x.chapterId === c.chapterId,
                             ),
                             mangaId: c.mangaId,

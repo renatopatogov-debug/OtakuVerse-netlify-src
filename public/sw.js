@@ -14,7 +14,7 @@
 // Os caches otv-downloads-v1 e otv-api-v1 sobrevivem a updates do SW
 // (só o cache de estáticos é limpo por versão).
 
-const CACHE = "otv-v5";
+const CACHE = "otv-v6";
 const DL_CACHE = "otv-downloads-v5";
 const API_CACHE = "otv-api-v5";
 const API_CACHE_LIMIT = 80;
@@ -26,7 +26,7 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE)
       .then((cache) =>
-        cache.addAll(["/", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"]),
+        cache.addAll(["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"]),
       )
       .then(() => self.skipWaiting()),
   );
@@ -95,6 +95,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 3. Imagens via proxy: busca prioritariamente na rede (sem prender imagens erradas em cache)
+  // e usa o cache de downloads em caso de modo offline ou falha do servidor.
   if (
     url.pathname === "/api/img" ||
     url.pathname.startsWith("/api/manga/page/") ||
@@ -103,7 +104,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         try {
-          return await fetch(req);
+          const res = await fetch(req);
+          if (res.ok) return res;
+          const cache = await caches.open(DL_CACHE);
+          const hit = await cache.match(req);
+          return hit ?? res;
         } catch {
           const cache = await caches.open(DL_CACHE);
           const hit = await cache.match(req);
@@ -134,7 +139,7 @@ self.addEventListener("fetch", (event) => {
   // 6. Estáticos com hash/ícones/manifest: cache-first
   if (
     url.pathname.startsWith("/icons/") ||
-    url.pathname === "/manifest.json" ||
+    url.pathname === "/manifest.webmanifest" ||
     url.pathname.startsWith("/_next/static/")
   ) {
     event.respondWith(

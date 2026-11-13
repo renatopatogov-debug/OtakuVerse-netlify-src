@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isHttpUrl,
+  isSafeImageContentType,
+  streamImageProxyResponse,
+} from "@/lib/image-proxy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,15 +20,15 @@ export const revalidate = 0;
 const ALLOWED_SUFFIXES = [".mangadex.org", ".mangadex.network", ".2xstorage.com"];
 
 function isAllowed(raw: string): boolean {
-  let host: string;
+  if (!isHttpUrl(raw)) return false;
   try {
-    host = new URL(raw).hostname.toLowerCase();
+    const host = new URL(raw).hostname.toLowerCase();
+    return ALLOWED_SUFFIXES.some(
+      (s) => host === s.slice(1) || host.endsWith(s),
+    );
   } catch {
     return false;
   }
-  return ALLOWED_SUFFIXES.some(
-    (s) => host === s.slice(1) || host.endsWith(s),
-  );
 }
 
 const BROWSER_UA =
@@ -39,7 +44,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (!/^https?:\/\//i.test(u) || !isAllowed(u)) {
+  if (!isAllowed(u)) {
     return NextResponse.json(
       { error: "Host não autorizado" },
       { status: 400 },
@@ -65,8 +70,12 @@ export async function GET(req: NextRequest) {
       signal: AbortSignal.timeout(8_500),
     });
 
+    const usable =
+      upstream.ok &&
+      isSafeImageContentType(upstream.headers.get("content-type"));
+
     // Fallback: se o nó voluntário do MangaDex At-Home falhou, tenta o CDN oficial da MangaDex
-    if (!upstream.ok && isNetwork && u.includes("/data/")) {
+    if (!usable && isNetwork && u.includes("/data/")) {
       const fallbackUrl = u.replace(/^https?:\/\/[^/]+/, "https://uploads.mangadex.org");
       const fallbackRes = await fetch(fallbackUrl, {
         headers: {
@@ -78,29 +87,24 @@ export async function GET(req: NextRequest) {
       }).catch(() => null);
 
       if (fallbackRes && fallbackRes.ok) {
+        await upstream.body?.cancel().catch(() => {});
         upstream = fallbackRes;
       }
     }
 
     if (!upstream.ok) {
+      await upstream.body?.cancel().catch(() => {});
       return NextResponse.json(
         { error: `MangaDex HTTP ${upstream.status}` },
         { status: upstream.status === 404 ? 404 : 502 },
       );
     }
 
-    const buffer = await upstream.arrayBuffer();
-    const contentType = upstream.headers.get("content-type") || "image/jpeg";
-
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "private, no-cache, no-store, must-revalidate",
-        "Netlify-CDN-Cache-Control": "no-store",
-        "CDN-Cache-Control": "no-store",
-        "Netlify-Vary": "query=u",
-      },
+    return await streamImageProxyResponse(upstream, {
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      "Netlify-CDN-Cache-Control": "no-store",
+      "CDN-Cache-Control": "no-store",
+      "Netlify-Vary": "query=u",
     });
   } catch (err) {
     return NextResponse.json(

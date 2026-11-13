@@ -1,5 +1,5 @@
 # OtakuVerse no Netlify — site de teste
-# O plugin oficial @netlify/plugin-nextjs converte as 27 API routes
+# O plugin oficial @netlify/plugin-nextjs converte as 29 API routes
 # em Netlify Functions automaticamente; o resto vira estático (PWA).
 
 [build]
@@ -19,7 +19,7 @@
 [functions]
   node_bundler = "esbuild"
 
-# APIs: nunca prender no CDN do Netlify (evita colisão de Durable Cache)
+# APIs dinâmicas: nunca prender no CDN do Netlify (evita colisão de Durable Cache)
 [[headers]]
   for = "/api/*"
   [headers.values]
@@ -27,12 +27,22 @@
     Netlify-CDN-Cache-Control = "no-store"
     CDN-Cache-Control = "no-store"
 
+# Assets imutáveis / legendas com chave isolada por path + query
 [[headers]]
-  for = "/api/img"
+  for = "/api/manga/page/*"
   [headers.values]
-    Cache-Control = "private, no-cache, no-store, must-revalidate"
-    Netlify-CDN-Cache-Control = "no-store"
-    CDN-Cache-Control = "no-store"
+    Cache-Control = "public, max-age=604800, immutable"
+    Netlify-CDN-Cache-Control = "public, max-age=604800"
+    CDN-Cache-Control = "public, max-age=604800"
+    Netlify-Vary = "query=b"
+
+[[headers]]
+  for = "/api/anime/sfhd-sub"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Netlify-CDN-Cache-Control = "public, max-age=3600"
+    CDN-Cache-Control = "public, max-age=3600"
+    Netlify-Vary = "query=episodeId"
 
 # Headers do PWA (service worker sempre atualizado, manifest correto)
 [[headers]]

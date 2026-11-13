@@ -22,11 +22,19 @@ export async function GET(req: NextRequest) {
   try {
     const forceSource = req.nextUrl.searchParams.get("source");
     // v2: resposta agora traz langTotals + chapters de UM idioma só.
-    const data = await cached(
+    const raw = await cached(
       `manga:detail:v3:${id}:${preferredLang ?? ""}`,
       5 * 60 * 1000,
       () => mangaDetail(id, preferredLang),
     );
+    // Clona antes de enriquecer para nunca mutar o objeto compartilhado no cache.
+    const data: typeof raw & {
+      source?: string;
+      manga: typeof raw.manga & { anilistScore?: number | null };
+    } = {
+      ...raw,
+      manga: { ...raw.manga },
+    };
 
     // Fallback de capítulos: se o MangaDex não tem NENHUM capítulo em
     // NENHUM idioma (ex.: Frieren — fonte oficial saiu do ar), tenta o
@@ -49,7 +57,7 @@ export async function GET(req: NextRequest) {
         );
         if (kaka.length > 0) {
           data.chapters = kaka;
-          (data as { source?: string }).source = "kakamanga";
+          data.source = "kakamanga";
         }
       }
     }
@@ -65,8 +73,7 @@ export async function GET(req: NextRequest) {
       if (al?.description) {
         data.manga.description = al.description;
         if (al.averageScore != null) {
-          (data.manga as { anilistScore?: number | null }).anilistScore =
-            al.averageScore;
+          data.manga.anilistScore = al.averageScore;
         }
       }
     }

@@ -89,19 +89,6 @@ function pickDescription(manga: RawManga): string | null {
   return d["pt-br"] ?? d.en ?? null;
 }
 
-/**
- * Reescreve uma URL de imagem do MangaDex para passar pelo nosso proxy
- * (/api/img). Motivo: uploads.mangadex.org e os nós do at-home server podem
- * estar bloqueados/indisponíveis na rede do usuário final; via same-origin o
- * navegador nunca acessa o MangaDex diretamente.
- */
-function proxied(url: string): string {
-  // v=2: cache-busting. O proxy já serviu essas URLs com Cache-Control
-  // immutable e o SW guarda em cache — se o conteúdo upstream já foi
-  // corrompido/placeholder em algum momento, o parâmetro força refetch.
-  return `/api/img?u=${encodeURIComponent(url)}&v=2`;
-}
-
 function coverUrl(manga: RawManga, size: "256" | "512", title?: string): string | null {
   const cover = manga.relationships?.find(
     (r) => r.type === "cover_art" && r.attributes?.fileName,
@@ -140,6 +127,7 @@ async function mdFetch<T>(path: string, params: URLSearchParams): Promise<T> {
   const res = await fetch(`${API}${path}?${params.toString()}`, {
     headers: { Accept: "application/json", "User-Agent": "OtakuVerseDemo/1.0" },
     cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`MangaDex HTTP ${res.status}`);
   return (await res.json()) as T;
@@ -348,6 +336,7 @@ export async function chapterPages(chapterId: string): Promise<ChapterPages> {
   const res = await fetch(`${API}/at-home/server/${chapterId}`, {
     headers: { Accept: "application/json", "User-Agent": "OtakuVerseDemo/1.0" },
     cache: "no-store",
+    signal: AbortSignal.timeout(12_000),
   });
   if (!res.ok) throw new Error(`MangaDex HTTP ${res.status}`);
   const json = (await res.json()) as {
@@ -402,15 +391,20 @@ export async function mangaRecommendations(
   }
   if (related.length === 0) return [];
 
-  // 3. Resolve cada título no MangaDex (busca de relevância, 1º resultado).
+  // 3. Resolve cada título no MangaDex em lotes paralelos de 4 (preservando ordem).
   const seenIds = new Set<string>([id]);
   const seenTitles = new Set<string>([selfTitle.toLowerCase()]);
   const out: MangaItem[] = [];
-  for (const rel of related) {
-    if (out.length >= 10) break;
-    try {
-      const r = await searchMangas(rel.title, 0, 1);
-      const hit = r.items[0];
+  const BATCH_SIZE = 4;
+  for (let i = 0; i < related.length && out.length < 10; i += BATCH_SIZE) {
+    const batch = related.slice(i, i + BATCH_SIZE);
+    const settled = await Promise.allSettled(
+      batch.map((rel) => searchMangas(rel.title, 0, 1)),
+    );
+    for (const res of settled) {
+      if (out.length >= 10) break;
+      if (res.status !== "fulfilled") continue;
+      const hit = res.value.items[0];
       if (
         hit &&
         !seenIds.has(hit.id) &&
@@ -420,8 +414,6 @@ export async function mangaRecommendations(
         seenTitles.add(hit.title.toLowerCase());
         out.push(hit);
       }
-    } catch {
-      // Título sem match no MangaDex — segue pro próximo.
     }
   }
   return out;

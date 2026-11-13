@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
  *   (o cleanup invalida pedidos antigos).
  */
 export function useAsync<T>(
-  fn: () => Promise<T>,
+  fn: (signal: AbortSignal) => Promise<T>,
   key: string,
 ): { data: T | null; loading: boolean; error: string | null } {
   const [state, setState] = useState<{ key: string; data: T | null; error: string | null }>({
@@ -19,23 +19,34 @@ export function useAsync<T>(
   });
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
-    fn()
+    fn(controller.signal)
       .then((d) => {
-        if (alive) setState({ key, data: d, error: null });
+        if (alive && !controller.signal.aborted) {
+          setState({ key, data: d, error: null });
+        }
       })
       .catch((e) => {
-        if (alive)
-          setState({
-            key,
-            data: null,
-            error:
-              e instanceof Error ? e.message : "Erro inesperado ao carregar",
-          });
+        if (
+          !alive ||
+          controller.signal.aborted ||
+          (e instanceof Error && e.name === "AbortError")
+        ) {
+          return;
+        }
+        setState({
+          key,
+          data: null,
+          error:
+            e instanceof Error ? e.message : "Erro inesperado ao carregar",
+        });
       });
     return () => {
       alive = false;
+      controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   return {
@@ -45,11 +56,23 @@ export function useAsync<T>(
   };
 }
 
-export async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  const json = await res.json();
+export async function fetchJson<T>(
+  url: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(url, init);
+  let json: { error?: unknown } | null = null;
+  try {
+    json = (await res.json()) as { error?: unknown };
+  } catch {
+    // Resposta não JSON (ex.: gateway timeout HTML)
+  }
   if (!res.ok || json?.error) {
-    throw new Error(json?.error ?? `HTTP ${res.status}`);
+    throw new Error(
+      typeof json?.error === "string" && json.error
+        ? json.error
+        : `HTTP ${res.status}`,
+    );
   }
   return json as T;
 }
@@ -74,6 +97,7 @@ export function useAniListScores(
   useEffect(() => {
     const list = items;
     if (!list || list.length === 0) return;
+    const controller = new AbortController();
     let alive = true;
     const titles = list
       .slice(0, 24)
@@ -84,10 +108,11 @@ export function useAniListScores(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ titles }),
+      signal: controller.signal,
     })
       .then((r) => r.json())
       .then((j) => {
-        if (!alive || !j?.results) return;
+        if (!alive || controller.signal.aborted || !j?.results) return;
         const map: Record<string, number | null> = {};
         j.results.forEach(
           (s: number | null, idx: number) => {
@@ -102,7 +127,9 @@ export function useAniListScores(
       });
     return () => {
       alive = false;
+      controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   // Padrão derivado: enquanto a key não bate, sem dados (estado de loading).

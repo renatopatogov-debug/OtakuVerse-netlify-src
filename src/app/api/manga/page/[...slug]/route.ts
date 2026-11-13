@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isHttpUrl,
+  isSafeImageContentType,
+  isSafePathSegment,
+  streamImageProxyResponse,
+} from "@/lib/image-proxy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,13 +13,24 @@ export const revalidate = 0;
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
+const PAGE_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=604800, immutable",
+  "Netlify-CDN-Cache-Control": "public, max-age=604800",
+};
+
+function isUsableUpstream(res: Response | null): res is Response {
+  return Boolean(
+    res && res.ok && isSafeImageContentType(res.headers.get("content-type")),
+  );
+}
+
 export async function GET(
   req: NextRequest,
   props: { params: Promise<{ slug: string[] }> },
 ) {
   const { slug } = await props.params;
 
-  if (!slug || slug.length < 2) {
+  if (!slug || slug.length < 2 || !slug.every(isSafePathSegment)) {
     return NextResponse.json({ error: "Rota inválida" }, { status: 400 });
   }
 
@@ -35,7 +52,7 @@ export async function GET(
         signal: AbortSignal.timeout(9_000),
       });
 
-      if (!upstream.ok) {
+      if (!isUsableUpstream(upstream)) {
         const fbRes = await fetch(fallbackUrl, {
           headers: {
             "User-Agent": BROWSER_UA,
@@ -46,29 +63,21 @@ export async function GET(
           signal: AbortSignal.timeout(7_000),
         }).catch(() => null);
 
-        if (fbRes && fbRes.ok) {
+        if (isUsableUpstream(fbRes)) {
+          await upstream.body?.cancel().catch(() => {});
           upstream = fbRes;
         }
       }
 
       if (!upstream.ok) {
+        await upstream.body?.cancel().catch(() => {});
         return NextResponse.json(
           { error: `KakaManga image HTTP ${upstream.status}` },
           { status: upstream.status === 404 ? 404 : 502 },
         );
       }
 
-      const buffer = await upstream.arrayBuffer();
-      const contentType = upstream.headers.get("content-type") || "image/webp";
-
-      return new NextResponse(buffer, {
-        status: 200,
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=604800, immutable",
-          "Netlify-CDN-Cache-Control": "public, max-age=604800",
-        },
-      });
+      return await streamImageProxyResponse(upstream, PAGE_CACHE_HEADERS, "image/webp");
     } catch {
       return NextResponse.json(
         { error: "Falha ao carregar página do KakaManga" },
@@ -87,7 +96,7 @@ export async function GET(
 
   const baseParam = req.nextUrl.searchParams.get("b");
   let validBaseUrl: string | null = null;
-  if (baseParam) {
+  if (baseParam && isHttpUrl(baseParam)) {
     try {
       const u = new URL(baseParam);
       const h = u.hostname.toLowerCase();
@@ -119,7 +128,7 @@ export async function GET(
     });
 
     // Se o nó At-Home falhou, tenta o CDN oficial da MangaDex
-    if (!upstream.ok && primaryUrl !== cdnFallbackUrl) {
+    if (!isUsableUpstream(upstream) && primaryUrl !== cdnFallbackUrl) {
       const fb = await fetch(cdnFallbackUrl, {
         headers: {
           "User-Agent": BROWSER_UA,
@@ -129,13 +138,14 @@ export async function GET(
         signal: AbortSignal.timeout(7_000),
       }).catch(() => null);
 
-      if (fb && fb.ok) {
+      if (isUsableUpstream(fb)) {
+        await upstream.body?.cancel().catch(() => {});
         upstream = fb;
       }
     }
 
     // Se ainda falhar, tenta a versão compactada (data-saver)
-    if (!upstream.ok) {
+    if (!isUsableUpstream(upstream)) {
       const ds = await fetch(dataSaverUrl, {
         headers: {
           "User-Agent": "OtakuVerseDemo/1.0",
@@ -145,29 +155,21 @@ export async function GET(
         signal: AbortSignal.timeout(6_000),
       }).catch(() => null);
 
-      if (ds && ds.ok) {
+      if (isUsableUpstream(ds)) {
+        await upstream.body?.cancel().catch(() => {});
         upstream = ds;
       }
     }
 
     if (!upstream.ok) {
+      await upstream.body?.cancel().catch(() => {});
       return NextResponse.json(
         { error: `MangaDex page HTTP ${upstream.status}` },
         { status: upstream.status === 404 ? 404 : 502 },
       );
     }
 
-    const buffer = await upstream.arrayBuffer();
-    const contentType = upstream.headers.get("content-type") || "image/jpeg";
-
-    return new NextResponse(buffer, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=604800, immutable",
-        "Netlify-CDN-Cache-Control": "public, max-age=604800",
-      },
-    });
+    return await streamImageProxyResponse(upstream, PAGE_CACHE_HEADERS, "image/jpeg");
   } catch {
     return NextResponse.json(
       { error: "Timeout ou falha ao carregar página de mangá" },

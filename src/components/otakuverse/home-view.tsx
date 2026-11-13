@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard, Flame, Play } from "lucide-react";
+import { BookOpen, Clapperboard, Flame } from "lucide-react";
 import { fetchJson, useAniListScores, useAsync } from "./use-async";
 import { TrendingSection } from "./hero";
 import { ContinueWatching } from "./continue-watching";
@@ -31,11 +31,11 @@ function ShelfTitle({
 
 export function HomeView({ nav }: { nav: Nav }) {
   const animes = useAsync<{ total: number; items: AnimeItemUI[] }>(
-    () => fetchJson("/api/anime/latest?limit=14"),
+    (signal) => fetchJson("/api/anime/latest?limit=14", { signal }),
     "home:latest",
   );
   const mangas = useAsync<{ total: number; items: MangaItemUI[] }>(
-    () => fetchJson("/api/manga/popular?limit=14"),
+    (signal) => fetchJson("/api/manga/popular?limit=14", { signal }),
     "home:popular",
   );
   const scores = useAniListScores(animes.data?.items);
@@ -52,11 +52,12 @@ export function HomeView({ nav }: { nav: Nav }) {
 
       {/* Destaque do dia (primeiro anime dos lançamentos) */}
       {featured ? (
-        <section
-          className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border/60 bg-card"
-          onClick={() => nav.push({ t: "anime-detail", cid: featured.upstreamCid })}
-        >
-          <div className="relative h-44 md:h-60">
+        <section className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+          <button
+            type="button"
+            onClick={() => nav.push({ t: "anime-detail", cid: featured.upstreamCid })}
+            className="group relative block h-44 w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500 md:h-60"
+          >
             <Poster
               src={featured.posterUrl}
               alt=""
@@ -88,7 +89,7 @@ export function HomeView({ nav }: { nav: Nav }) {
                 </span>
               </div>
             </div>
-          </div>
+          </button>
         </section>
       ) : null}
 
@@ -120,7 +121,7 @@ export function HomeView({ nav }: { nav: Nav }) {
         <ShelfTitle
           icon={
             <span className="text-emerald-400">
-              <Clapperboard className="h-5 w-5 rotate-180" />
+              <BookOpen className="h-5 w-5" />
             </span>
           }
         >

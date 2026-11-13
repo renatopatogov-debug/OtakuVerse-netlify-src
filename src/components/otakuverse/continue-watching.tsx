@@ -14,8 +14,13 @@ import type { Nav } from "./types";
 function resumeTarget(e: WatchEntry) {
   switch (e.source) {
     case "otakulogia":
+    case "tomato":
       return e.cid != null
-        ? ({ t: "anime-detail", cid: e.cid, epId: e.episodeId } as const)
+        ? ({
+            t: "anime-detail",
+            cid: e.cid,
+            epId: e.episodeId || undefined,
+          } as const)
         : null;
     case "sfhd":
       return e.seriesId
@@ -29,6 +34,8 @@ function resumeTarget(e: WatchEntry) {
       return e.mangaId
         ? ({ t: "manga-detail", id: e.mangaId, chapterId: e.episodeId } as const)
         : null;
+    case "av":
+      return null;
   }
 }
 

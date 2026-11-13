@@ -16,6 +16,7 @@ async function gql<T>(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, variables }),
         cache: "no-store",
+        signal: AbortSignal.timeout(12_000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();

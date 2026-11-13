@@ -6,7 +6,7 @@
 // + Biblioteca local: favoritos, progresso (Continuar Assistindo),
 //   retomada de episódio, checks de assistido e atalho LEG↔DUB.
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRightLeft,

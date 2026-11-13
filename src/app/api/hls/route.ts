@@ -16,11 +16,17 @@ export const runtime = "nodejs";
 
 function hostAllowed(url: string): boolean {
   try {
-    const host = new URL(url).hostname.toLowerCase();
+    const u = new URL(url);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    const host = u.hostname.toLowerCase();
     return SFHD_MEDIA_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`));
   } catch {
     return false;
   }
+}
+
+function isHttpTarget(u: URL): boolean {
+  return u.protocol === "https:" || u.protocol === "http:";
 }
 
 function proxied(absolute: string, origin: string): string {
@@ -31,7 +37,9 @@ function proxied(absolute: string, origin: string): string {
 function rewriteAttrUris(line: string, base: URL, origin: string): string {
   return line.replace(/URI="([^"]+)"/g, (_m, uri: string) => {
     try {
-      return `URI="${proxied(new URL(uri, base).toString(), origin)}"`;
+      const target = new URL(uri, base);
+      if (!isHttpTarget(target)) return `URI="${uri}"`;
+      return `URI="${proxied(target.toString(), origin)}"`;
     } catch {
       return `URI="${uri}"`;
     }
@@ -49,7 +57,9 @@ function rewritePlaylist(text: string, baseUrl: string, origin: string): string 
         return rewriteAttrUris(trimmed, base, origin);
       }
       try {
-        return proxied(new URL(trimmed, base).toString(), origin);
+        const target = new URL(trimmed, base);
+        if (!isHttpTarget(target)) return line;
+        return proxied(target.toString(), origin);
       } catch {
         return line;
       }
@@ -91,7 +101,7 @@ export async function GET(req: NextRequest) {
   const contentType = (upstream.headers.get("content-type") ?? "").toLowerCase();
   const looksPlaylist =
     contentType.includes("mpegurl") ||
-    u.split("?")[0].endsWith(".m3u8") ||
+    u.split("?")[0].toLowerCase().endsWith(".m3u8") ||
     (!contentType.includes("video") &&
       !contentType.includes("mp2t") &&
       !contentType.includes("octet-stream") &&
@@ -103,9 +113,12 @@ export async function GET(req: NextRequest) {
     try {
       const text = await upstream.text();
       if (!text.includes("#EXTM3U")) {
+        const safeFallbackType = contentType.includes("html")
+          ? "text/plain; charset=utf-8"
+          : contentType || "text/plain";
         return new NextResponse(text, {
           status: upstream.status,
-          headers: { "content-type": contentType || "text/plain" },
+          headers: { "content-type": safeFallbackType },
         });
       }
       return new NextResponse(rewritePlaylist(text, u, origin), {

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cached } from "@/lib/cache";
+import {
+  isHttpUrl,
+  isSafeImageContentType,
+  isSafePathSegment,
+  validateImageUpstream,
+} from "@/lib/image-proxy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,35 +86,44 @@ export async function GET(
   }
 
   const safeFile = fileName.replace(/[^a-zA-Z0-9_.-]/g, "");
+  if (!isSafePathSegment(safeFile)) {
+    return NextResponse.json({ error: "Nome de capa inválido" }, { status: 400 });
+  }
   const title = (req.nextUrl.searchParams.get("title") ?? "").trim();
   const alId = (req.nextUrl.searchParams.get("al") ?? "").trim();
 
   // Resolve a URL da capa com fallback em cadeia (AniList -> Kitsu -> MangaDex)
-  // Guarda a URL resolvida no cache para chamadas subsequentes
-  const resolvedCoverUrl = await cached(`manga:resolved-cover:${mangaId}`, 24 * 60 * 60 * 1000, async () => {
-    // 1. Fonte primária: AniList (alta definição, CDN Cloudflare ultrarrápida, sem rate-limit de imagem)
-    if (alId || title) {
-      const anilistUrl = await fetchAniListCover(title, alId);
-      if (anilistUrl) return anilistUrl;
-    }
+  // Só grava no cache quando encontra uma URL válida (não envenena com null).
+  let resolvedCoverUrl: string | null = null;
+  try {
+    resolvedCoverUrl = await cached(`manga:resolved-cover:${mangaId}`, 24 * 60 * 60 * 1000, async () => {
+      // 1. Fonte primária: AniList (alta definição, CDN Cloudflare ultrarrápida, sem rate-limit de imagem)
+      if (alId || title) {
+        const anilistUrl = await fetchAniListCover(title, alId);
+        if (anilistUrl) return anilistUrl;
+      }
 
-    // 2. Fonte secundária: Kitsu (segunda base ampla sem restrições)
-    if (title) {
-      const kitsuUrl = await fetchKitsuCover(title);
-      if (kitsuUrl) return kitsuUrl;
-    }
+      // 2. Fonte secundária: Kitsu (segunda base ampla sem restrições)
+      if (title) {
+        const kitsuUrl = await fetchKitsuCover(title);
+        if (kitsuUrl) return kitsuUrl;
+      }
 
-    // 3. Fallback: MangaDex (com headers adequados de Referer e User-Agent)
-    if (safeFile && safeFile !== "cover.jpg" && safeFile !== "default.jpg") {
-      return `https://uploads.mangadex.org/covers/${mangaId}/${safeFile}`;
-    }
+      // 3. Fallback: MangaDex (com headers adequados de Referer e User-Agent)
+      if (safeFile && safeFile !== "cover.jpg" && safeFile !== "default.jpg") {
+        return `https://uploads.mangadex.org/covers/${mangaId}/${safeFile}`;
+      }
 
-    return null;
-  });
+      throw new Error("Nenhuma capa encontrada");
+    });
+  } catch {
+    resolvedCoverUrl = null;
+  }
 
-  if (resolvedCoverUrl) {
+  if (resolvedCoverUrl && isHttpUrl(resolvedCoverUrl)) {
     try {
-      const isMangaDex = resolvedCoverUrl.includes("mangadex.org");
+      const host = new URL(resolvedCoverUrl).hostname.toLowerCase();
+      const isMangaDex = host === "mangadex.org" || host.endsWith(".mangadex.org");
       const headers: Record<string, string> = {
         Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
         "User-Agent": "OtakuVerseDemo/1.0",
@@ -124,7 +139,11 @@ export async function GET(
       });
 
       // Se o MangaDex falhar com arquivo redimensionado (.256.jpg / .512.jpg), tenta o original
-      if (!res.ok && isMangaDex && (safeFile.includes(".256.jpg") || safeFile.includes(".512.jpg"))) {
+      if (
+        (!res.ok || !isSafeImageContentType(res.headers.get("content-type"))) &&
+        isMangaDex &&
+        (safeFile.includes(".256.jpg") || safeFile.includes(".512.jpg"))
+      ) {
         const origFile = safeFile.replace(/\.(256|512)\.jpg$/, "");
         const origUrl = `https://uploads.mangadex.org/covers/${mangaId}/${origFile}`;
         const origRes = await fetch(origUrl, {
@@ -133,35 +152,40 @@ export async function GET(
           signal: AbortSignal.timeout(6000),
         }).catch(() => null);
 
-        if (origRes && origRes.ok) {
+        if (origRes && origRes.ok && isSafeImageContentType(origRes.headers.get("content-type"))) {
+          await res.body?.cancel().catch(() => {});
           res = origRes;
         }
       }
 
       if (res.ok) {
-        const buffer = await res.arrayBuffer();
-        const contentType = res.headers.get("content-type") || "image/jpeg";
-
-        return new NextResponse(buffer, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType,
-            "Cache-Control": "public, max-age=604800, immutable",
-            "Netlify-CDN-Cache-Control": "public, max-age=604800",
-          },
-        });
+        const check = await validateImageUpstream(res);
+        if (check.ok) {
+          const contentType = res.headers.get("content-type") || "image/jpeg";
+          return new NextResponse(res.body, {
+            status: 200,
+            headers: {
+              "Content-Type": contentType,
+              "Cache-Control": "public, max-age=604800, immutable",
+              "Netlify-CDN-Cache-Control": "public, max-age=604800",
+            },
+          });
+        }
+      } else {
+        await res.body?.cancel().catch(() => {});
       }
     } catch {
       // Falha de rede: cai no placeholder SVG abaixo
     }
   }
 
-  // Placeholder SVG estilizado caso nenhuma fonte tenha respondido a tempo
+  // Placeholder SVG sem cache longo caso nenhuma fonte tenha respondido a tempo
   return new NextResponse(PLACEHOLDER_SVG, {
     status: 200,
     headers: {
       "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=86400",
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      "Netlify-CDN-Cache-Control": "no-store",
     },
   });
 }

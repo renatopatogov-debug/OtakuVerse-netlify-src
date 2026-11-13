@@ -3,16 +3,16 @@
 // Downloads offline de capítulos de mangá.
 //
 // Estratégia: as páginas já chegam via proxy same-origin (/api/img), então
-// dá pra guardar tudo na Cache API do navegador (cache "otv-downloads-v1")
+// dá pra guardar tudo na Cache API do navegador (cache "otv-downloads-v5")
 // sem CORS e sem penalidade de quota de blob. Um manifesto sintético em
 // /__otv/chapters/<chapterId>.json marca o capítulo como completo.
 //
 // O download é resumível: se cair no meio, o próximo toque só baixa as
 // páginas que ainda faltam. Concorrência de 3 páginas por vez.
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
-export const DL_CACHE = "otv-downloads-v1";
+export const DL_CACHE = "otv-downloads-v5";
 export const STORE_KEY = "otv:downloads:v1";
 const PAGE_CONCURRENCY = 3;
 
@@ -172,29 +172,31 @@ export async function downloadChapter(
     const pages = json.pages ?? [];
     if (pages.length === 0) throw new Error("Capítulo sem páginas");
 
-    // 2. Baixa as que faltam (resumível), com relatórios de progresso
+    // 2. Baixa as que faltam (resumível e paralelo), com relatórios de progresso
     let done = 0;
     let size = 0;
-    const missing: { url: string; resp: Response }[] = [];
+    const missingUrls: string[] = [];
     for (const url of pages) {
       const hit = await cache.match(url);
       if (hit) {
         done++;
         size += Number(hit.headers.get("content-length") ?? 0);
       } else {
-        missing.push({ url, resp: await fetch(url) });
+        missingUrls.push(url);
       }
     }
-    if (missing.some((m) => !m.resp.ok)) {
-      throw new Error("Algumas páginas não responderam — tente de novo");
-    }
 
-    const toStore = missing;
     let stored = done;
     onProgress?.({ chapterId: input.chapterId, done: stored, total: pages.length });
     setProgress({ chapterId: input.chapterId, done: stored, total: pages.length });
 
-    await pool(toStore, PAGE_CONCURRENCY, async ({ url, resp }) => {
+    let failedCount = 0;
+    await pool(missingUrls, PAGE_CONCURRENCY, async (url) => {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        failedCount++;
+        return;
+      }
       const buf = await resp.clone().arrayBuffer();
       size += buf.byteLength;
       await cache.put(url, resp);
@@ -203,6 +205,9 @@ export async function downloadChapter(
       onProgress?.(p);
       setProgress(p);
     });
+    if (failedCount > 0) {
+      throw new Error("Algumas páginas não responderam — tente de novo");
+    }
 
     // 3. Manifesto marca o capítulo como completo (cache-only no SW).
     // Guarda também as URLs para o removeChapter poder apagar cada página.

@@ -7,7 +7,6 @@ export type StackItem =
   | { t: "favorites" }
   | { t: "downloads" }
   | { t: "arcade" }
-  | { t: "arcade-player"; url: string; title: string }
   | { t: "search"; q: string }
   | { t: "anime-detail"; cid: number; epId?: string }
   | { t: "fallback-detail"; slug: string; epId?: string }
