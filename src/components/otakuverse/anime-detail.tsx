@@ -36,6 +36,7 @@ import type { Nav } from "./types";
 import type { AnimeCatalogDetail, EpisodeInfo } from "@/lib/otakulogia";
 import type { TomatoMatchItem } from "@/lib/tomato";
 import {
+  type AudioPref,
   isWatched,
   usePreferredAudio,
   useWatchHistory,
@@ -72,7 +73,7 @@ function AnimeDetailContent({
 
   const [audioPref] = usePreferredAudio();
   const [manualSeason, setManualSeason] = useState<{
-    pref: string;
+    pref: AudioPref;
     idx: number;
   } | null>(null);
   const preferredSeasonIdx = useMemo(() => {

@@ -23,7 +23,11 @@ import type { SkipTimes } from "@/lib/aniskip";
 import type { SfhdSourcesResult } from "@/lib/animesfhd";
 import type { AnimeCatalogDetail, EpisodeInfo } from "@/lib/otakulogia";
 import type { TomatoMatchItem, TomatoStreamResult } from "@/lib/tomato";
-import { saveWatchProgress, useProgressSaver } from "@/lib/local-store";
+import {
+  type AudioPref,
+  saveWatchProgress,
+  useProgressSaver,
+} from "@/lib/local-store";
 import { cn } from "@/lib/utils";
 
 export type PlayerMode = "primary" | "tomato" | "sfhd";
@@ -60,7 +64,7 @@ export function AnimePlayerPanel({
   mode: PlayerMode;
   media: AniListMedia | null;
   anizip: AniZipMapping | null;
-  audioPref: "" | "leg" | "dub";
+  audioPref: AudioPref;
   sfhdPick: SfhdMatchItem | null;
   tomatoPick: TomatoMatchItem | null;
   onQualityChange: (q: VideoQuality) => void;
