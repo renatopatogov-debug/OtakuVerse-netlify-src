@@ -18,10 +18,8 @@ const PAGE_CACHE_HEADERS = {
   "Netlify-CDN-Cache-Control": "public, max-age=604800",
 };
 
-function isUsableUpstream(res: Response | null): res is Response {
-  return Boolean(
-    res && res.ok && isSafeImageContentType(res.headers.get("content-type")),
-  );
+function isUsableUpstream(res: Response): boolean {
+  return res.ok && isSafeImageContentType(res.headers.get("content-type"));
 }
 
 export async function GET(
@@ -63,7 +61,7 @@ export async function GET(
           signal: AbortSignal.timeout(7_000),
         }).catch(() => null);
 
-        if (isUsableUpstream(fbRes)) {
+        if (fbRes && isUsableUpstream(fbRes)) {
           await upstream.body?.cancel().catch(() => {});
           upstream = fbRes;
         }
@@ -138,7 +136,7 @@ export async function GET(
         signal: AbortSignal.timeout(7_000),
       }).catch(() => null);
 
-      if (isUsableUpstream(fb)) {
+      if (fb && isUsableUpstream(fb)) {
         await upstream.body?.cancel().catch(() => {});
         upstream = fb;
       }
@@ -155,7 +153,7 @@ export async function GET(
         signal: AbortSignal.timeout(6_000),
       }).catch(() => null);
 
-      if (isUsableUpstream(ds)) {
+      if (ds && isUsableUpstream(ds)) {
         await upstream.body?.cancel().catch(() => {});
         upstream = ds;
       }
