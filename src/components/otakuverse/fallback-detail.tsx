@@ -142,9 +142,10 @@ function FallbackCard({
  */
 export function FallbackSection({ q, nav }: { q: string; nav: Nav }) {
   const { data, loading, error } = useAsync<{ items: FallbackSearchItem[] }>(
-    () =>
+    (signal) =>
       fetchJson(
         `/api/anime/fallback-search?q=${encodeURIComponent(q)}`,
+        { signal },
       ),
     `fallback-search:${q}`,
   );
@@ -215,9 +216,10 @@ export function FallbackDetail({
   epId?: string;
 }) {
   const { data, loading, error } = useAsync<FallbackDetailData>(
-    () =>
+    (signal) =>
       fetchJson(
         `/api/anime/fallback-detail?slug=${encodeURIComponent(slug)}`,
+        { signal },
       ),
     `fallback-detail:${slug}`,
   );

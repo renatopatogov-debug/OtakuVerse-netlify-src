@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cached } from "@/lib/cache";
 import { fetchScores } from "@/lib/anilist";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
@@ -11,27 +12,38 @@ export const dynamic = "force-dynamic";
  * para nunca quebrar a UI das listas.
  */
 export async function POST(req: Request) {
-  let titles: string[] = [];
+  let rawTitles: string[] = [];
   try {
     const body = await req.json();
-    titles = Array.isArray(body?.titles)
+    rawTitles = Array.isArray(body?.titles)
       ? body.titles
-          .filter((t: unknown): t is string => typeof t === "string")
-          .map((t: string) => t.trim())
-          .filter(Boolean)
           .slice(0, 24)
+          .map((t: unknown) => (typeof t === "string" ? t.trim() : ""))
       : [];
   } catch {
     return NextResponse.json({ results: null });
   }
 
-  if (titles.length === 0) return NextResponse.json({ results: [] });
+  if (rawTitles.length === 0) return NextResponse.json({ results: [] });
+
+  const valid = rawTitles
+    .map((title, idx) => ({ title, idx }))
+    .filter((v) => v.title.length > 0);
+  if (valid.length === 0) {
+    return NextResponse.json({ results: rawTitles.map(() => null) });
+  }
 
   try {
-    const key = `anilist:batch:${titles.map((t) => t.toLowerCase()).join("¦")}`;
-    const results = await cached(key, 12 * 3600_000, () => fetchScores(titles));
+    const key = `anilist:batch:${valid.map((v) => v.title.toLowerCase()).join("¦")}`;
+    const scores = await cached(key, 12 * 3600_000, () =>
+      fetchScores(valid.map((v) => v.title)),
+    );
+    const results: (number | null)[] = rawTitles.map(() => null);
+    valid.forEach((v, i) => {
+      results[v.idx] = scores[i] ?? null;
+    });
     return NextResponse.json({ results });
   } catch {
-    return NextResponse.json({ results: titles.map(() => null) });
+    return NextResponse.json({ results: rawTitles.map(() => null) });
   }
 }

@@ -86,9 +86,10 @@ function SfhdEpisodePlayer({
   startAt?: number;
 }) {
   const { data, loading, error } = useAsync<SfhdSourcesResult>(
-    () =>
+    (signal) =>
       fetchJson(
         `/api/anime/sfhd-source?episodeId=${encodeURIComponent(episodeId)}`,
+        { signal },
       ),
     `sfhd-source:${episodeId}`,
   );
@@ -139,9 +140,10 @@ export function SfhdDetail({
   epId?: string;
 }) {
   const { data, loading, error } = useAsync<SfhdSeriesDetail>(
-    () =>
+    (signal) =>
       fetchJson(
         `/api/anime/sfhd-detail?seriesId=${encodeURIComponent(seriesId)}`,
+        { signal },
       ),
     `sfhd-detail:${seriesId}`,
   );

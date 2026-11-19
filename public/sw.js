@@ -94,28 +94,31 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Imagens via proxy: busca prioritariamente na rede (sem prender imagens erradas em cache)
-  // e usa o cache de downloads em caso de modo offline ou falha do servidor.
+  // 3a. Páginas de mangá baixadas: cache-first APENAS no DL_CACHE
+  // (navegação normal nunca grava no DL_CACHE — só downloads explícitos).
   if (
     url.pathname === "/api/img" ||
-    url.pathname.startsWith("/api/manga/page/") ||
-    url.pathname.startsWith("/api/manga/cover/")
+    url.pathname.startsWith("/api/manga/page/")
   ) {
     event.respondWith(
       (async () => {
+        const cache = await caches.open(DL_CACHE);
+        const hit = await cache.match(req);
+        if (hit) return hit;
         try {
-          const res = await fetch(req);
-          if (res.ok) return res;
-          const cache = await caches.open(DL_CACHE);
-          const hit = await cache.match(req);
-          return hit ?? res;
+          return await fetch(req);
         } catch {
-          const cache = await caches.open(DL_CACHE);
-          const hit = await cache.match(req);
-          if (hit) return hit;
           return new Response(null, { status: 504 });
         }
       })(),
+    );
+    return;
+  }
+
+  // 3b. Capas de mangá via proxy: network-first sem prender erros no cache local.
+  if (url.pathname.startsWith("/api/manga/cover/")) {
+    event.respondWith(
+      fetch(req).catch(() => new Response(null, { status: 504 })),
     );
     return;
   }

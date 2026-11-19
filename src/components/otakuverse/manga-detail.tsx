@@ -63,59 +63,111 @@ export function MangaDetail({
   const lastRead = historyEntries.find((e) => e.key === `mg:${id}`) ?? null;
 
   // Idioma selecionado (padrão: pt-br ou o último lido)
-  const initialLang = lastRead?.lang === "en" ? "en" : "pt-br";
-  const [selectedLang, setSelectedLang] = useState<string>(initialLang);
+  const initialLang =
+    lastRead?.lang === "en"
+      ? "en"
+      : lastRead?.lang === "es" || lastRead?.lang === "es-la"
+        ? "es"
+        : "pt-br";
+  const detailKey = `${id}:${initialLang}`;
 
   // Busca inicial dos detalhes + capítulos APENAS do idioma selecionado
   const { data, loading, error } = useAsync<MangaDetailResult>(
-    () => fetchJson(`/api/manga/detail?id=${id}&lang=${initialLang}`),
-    `manga-detail:${id}:${initialLang}`,
+    (signal) =>
+      fetchJson(
+        `/api/manga/detail?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(initialLang)}`,
+        { signal },
+      ),
+    `manga-detail:${detailKey}`,
   );
 
-  // Cache no cliente dos capítulos por idioma para não sobrecarregar a API
-  const [langChapters, setLangChapters] = useState<Record<string, ChapterItem[]>>({});
-  const [loadingLang, setLoadingLang] = useState(false);
+  // Estado derivado por detailKey (sem setState síncrono no useEffect)
+  const [manualLang, setManualLang] = useState<{
+    key: string;
+    lang: string;
+  } | null>(null);
+  const [extraChapters, setExtraChapters] = useState<{
+    key: string;
+    map: Record<string, ChapterItem[]>;
+  }>({ key: detailKey, map: {} });
+  const [loadingState, setLoadingState] = useState<{
+    key: string;
+    lang: string | null;
+  }>({ key: detailKey, lang: null });
+  const [langError, setLangError] = useState<{
+    key: string;
+    lang: string;
+    message: string;
+  } | null>(null);
+  const langAbortRef = useRef<AbortController | null>(null);
 
-  // Reset de estado quando o id do mangá muda (evita reter dados de mangá anterior)
   useEffect(() => {
-    setLangChapters({});
-    setSelectedLang(initialLang);
-  }, [id, initialLang]);
+    return () => {
+      langAbortRef.current?.abort();
+      langAbortRef.current = null;
+    };
+  }, [detailKey]);
 
-  // Registra os capítulos iniciais recebidos da primeira chamada
-  useEffect(() => {
-    if (!data?.chapters) return;
-    const langKey = data.loadedLang || initialLang;
-    setLangChapters((prev) => ({
-      ...prev,
-      [langKey]: data.chapters,
-    }));
-    if (data.loadedLang) {
-      setSelectedLang(data.loadedLang);
-    }
-  }, [data]);
+  const baseLang = data?.loadedLang || initialLang;
+  const selectedLang =
+    manualLang && manualLang.key === detailKey ? manualLang.lang : baseLang;
+  const langChapters = useMemo<Record<string, ChapterItem[]>>(() => {
+    const extraMap = extraChapters.key === detailKey ? extraChapters.map : {};
+    return data?.chapters
+      ? { [baseLang]: data.chapters, ...extraMap }
+      : extraMap;
+  }, [data?.chapters, baseLang, extraChapters, detailKey]);
+  const loadingLang =
+    loadingState.key === detailKey && loadingState.lang === selectedLang;
+  const activeLangError =
+    langError && langError.key === detailKey && langError.lang === selectedLang
+      ? langError.message
+      : null;
 
   // Carrega sob demanda APENAS o idioma selecionado quando o usuário troca de aba
   const handleSelectLang = async (lang: string) => {
-    setSelectedLang(lang);
-    if (langChapters[lang] !== undefined) return; // Já carregado
+    setManualLang({ key: detailKey, lang });
+    setLangError((prev) => (prev?.key === detailKey ? null : prev));
+    langAbortRef.current?.abort();
+    langAbortRef.current = null;
+    if (langChapters[lang] !== undefined) {
+      setLoadingState({ key: detailKey, lang: null });
+      return; // Já carregado
+    }
 
-    setLoadingLang(true);
+    const controller = new AbortController();
+    langAbortRef.current = controller;
+    setLoadingState({ key: detailKey, lang });
     try {
       const res = await fetchJson<{ chapters: ChapterItem[] }>(
-        `/api/manga/chapters?id=${id}&lang=${lang}`,
+        `/api/manga/chapters?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(lang)}`,
+        { signal: controller.signal },
       );
-      setLangChapters((prev) => ({
-        ...prev,
-        [lang]: res.chapters ?? [],
+      if (controller.signal.aborted) return;
+      setExtraChapters((prev) => ({
+        key: detailKey,
+        map: {
+          ...(prev.key === detailKey ? prev.map : {}),
+          [lang]: res.chapters ?? [],
+        },
       }));
-    } catch {
-      setLangChapters((prev) => ({
-        ...prev,
-        [lang]: [],
-      }));
+    } catch (e) {
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      ) {
+        return;
+      }
+      setLangError({
+        key: detailKey,
+        lang,
+        message:
+          e instanceof Error ? e.message : "Erro ao carregar capítulos",
+      });
     } finally {
-      setLoadingLang(false);
+      if (langAbortRef.current === controller) {
+        setLoadingState({ key: detailKey, lang: null });
+      }
     }
   };
 
@@ -180,7 +232,7 @@ export function MangaDetail({
   }
 
   const { manga, author } = data;
-  const currentChapters = langChapters[selectedLang] ?? data.chapters ?? [];
+  const currentChapters = langChapters[selectedLang] ?? [];
 
   return (
     <div className="space-y-6">
@@ -318,6 +370,16 @@ export function MangaDetail({
               <Loader2 className="h-5 w-5 animate-spin" />
               <span>Carregando capítulos do idioma...</span>
             </div>
+          </div>
+        ) : activeLangError ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-10 text-center text-sm text-destructive">
+            <p>Falha ao carregar capítulos: {activeLangError}</p>
+            <button
+              onClick={() => handleSelectLang(selectedLang)}
+              className="rounded-lg border border-border/70 bg-card/80 px-4 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-secondary"
+            >
+              Tentar novamente
+            </button>
           </div>
         ) : currentChapters.length === 0 ? (
           <div className="rounded-2xl border border-border/60 bg-card/30 py-12 text-center text-sm text-muted-foreground">
@@ -581,7 +643,10 @@ function CollapsibleChapterList({
 
 function MangaRecs({ id, nav }: { id: string; nav: Nav }) {
   const { data, loading } = useAsync<{ items: MangaItem[] }>(
-    () => fetchJson(`/api/manga/recommendations?id=${id}`),
+    (signal) =>
+      fetchJson(`/api/manga/recommendations?id=${encodeURIComponent(id)}`, {
+        signal,
+      }),
     `manga-recs:${id}`,
   );
 

@@ -305,7 +305,7 @@ export default function Home() {
         {current.t === "mangas" ? <MangaBrowser nav={nav} /> : null}
         {current.t === "favorites" ? <FavoritesView nav={nav} /> : null}
         {current.t === "downloads" ? <DownloadsView nav={nav} /> : null}
-        {current.t === "arcade" ? <ArcadeView nav={nav} /> : null}
+        {current.t === "arcade" ? <ArcadeView /> : null}
         {current.t === "search" ? <SearchView q={current.q} nav={nav} /> : null}
         {current.t === "anime-detail" ? (
           <AnimeDetail

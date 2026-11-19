@@ -7,6 +7,7 @@ import {
   type AniZipMapping,
 } from "@/lib/anizip";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

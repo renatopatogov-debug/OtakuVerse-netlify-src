@@ -322,7 +322,7 @@ function StaticHero({ nav }: { nav: Nav }) {
 
 export function TrendingSection({ nav }: { nav: Nav }) {
   const trending = useAsync<{ items: AniListMedia[] }>(
-    () => fetchJson("/api/anilist/trending?limit=8"),
+    (signal) => fetchJson("/api/anilist/trending?limit=8", { signal }),
     "trending",
   );
 

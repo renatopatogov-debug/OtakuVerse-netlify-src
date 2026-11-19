@@ -11,7 +11,12 @@
 // prefixo (ol: / sfhd: / tomato: / fb: / av: / mg:) — a UI usa isso para saber pra onde
 // navegar ao retomar.
 
-import { useCallback, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 
 /* ---------- Tipos ---------- */
 
@@ -38,7 +43,7 @@ export interface WatchEntry {
   episodeNumber: number | null;
   episodeTitle: string | null;
   audio?: "dublado" | "legendado" | null;
-  lang?: "pt-br" | "en" | null;
+  lang?: "pt-br" | "en" | "es" | "es-la" | null;
   /** Segundos assistidos / lidos até agora. */
   position: number;
   /** Duração total em segundos (0 para mangá). */
@@ -262,37 +267,57 @@ export function usePreferredAudio(): readonly [
  */
 export function useProgressSaver(intervalSeconds = 5) {
   type Pending = { entry: WatchProgressBase; position: number; duration: number };
-  let lastWrite = 0;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let pending: Pending | null = null;
+  const lastWriteRef = useRef<number>(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<Pending | null>(null);
 
-  const flush = () => {
-    timer = null;
-    if (!pending) return;
-    const { entry, position, duration } = pending;
-    pending = null;
-    lastWrite = Date.now();
-    saveWatchProgress({ ...entry, position, duration });
-  };
+  const flush = useCallback(() => {
+    timerRef.current = null;
+    const item = pendingRef.current;
+    if (!item) return;
+    pendingRef.current = null;
+    lastWriteRef.current = Date.now();
+    saveWatchProgress({
+      ...item.entry,
+      position: item.position,
+      duration: item.duration,
+    });
+  }, []);
 
-  return (
-    entry: WatchProgressBase,
-    position: number,
-    duration: number,
-    force = false,
-  ): void => {
-    pending = { entry, position, duration };
-    const now = Date.now();
-    if (force || now - lastWrite >= intervalSeconds * 1000) {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
       flush();
-      return;
-    }
-    if (!timer) {
-      timer = setTimeout(flush, Math.max(0, lastWrite + intervalSeconds * 1000 - now));
-    }
-  };
+    };
+  }, [flush]);
+
+  return useCallback(
+    (
+      entry: WatchProgressBase,
+      position: number,
+      duration: number,
+      force = false,
+    ): void => {
+      pendingRef.current = { entry, position, duration };
+      const now = Date.now();
+      if (force || now - lastWriteRef.current >= intervalSeconds * 1000) {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        flush();
+        return;
+      }
+      if (!timerRef.current) {
+        timerRef.current = setTimeout(
+          flush,
+          Math.max(0, lastWriteRef.current + intervalSeconds * 1000 - now),
+        );
+      }
+    },
+    [flush, intervalSeconds],
+  );
 }

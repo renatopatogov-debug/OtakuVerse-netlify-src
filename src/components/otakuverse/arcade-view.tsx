@@ -6,7 +6,6 @@ import {
   Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Nav } from "./types";
 
 interface GameItem {
   id: string;
@@ -35,7 +34,7 @@ const ARCADE_ITEMS: GameItem[] = [
     badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     icon: "🕯️",
     description: "Experiência imersiva de sobrevivência e terror em arte ASCII pura.",
-    url: "/arcade/GAMES/ROGUELIKERPG/RPGROGUELIKE 1/RPGROGUELIKE.html",
+    url: "/arcade/GAMES/ROGUELIKERPG/RPGROGUELIKE%201/RPGROGUELIKE.html",
   },
   {
     id: "spyfall",
@@ -93,7 +92,7 @@ const ARCADE_ITEMS: GameItem[] = [
   },
 ];
 
-export function ArcadeView({ nav }: { nav?: Nav }) {
+export function ArcadeView() {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8">
       {/* Header da Seção */}

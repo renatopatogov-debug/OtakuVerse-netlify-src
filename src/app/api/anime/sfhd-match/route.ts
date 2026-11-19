@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sfhdMatchesByMal } from "@/lib/animesfhd";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/anime/sfhd-match?title={nome}&mal={malId}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard, SearchX } from "lucide-react";
+import { BookOpen, Clapperboard, SearchX } from "lucide-react";
 import { fetchJson, useAniListScores, useAsync } from "./use-async";
 import {
   AnimeCard,
@@ -14,11 +14,17 @@ import { FallbackSection } from "./fallback-detail";
 
 export function SearchView({ q, nav }: { q: string; nav: Nav }) {
   const animes = useAsync<{ total: number; items: AnimeItemUI[] }>(
-    () => fetchJson(`/api/anime/search?q=${encodeURIComponent(q)}&limit=12`),
+    (signal) =>
+      fetchJson(`/api/anime/search?q=${encodeURIComponent(q)}&limit=12`, {
+        signal,
+      }),
     `search-anime:${q}`,
   );
   const mangas = useAsync<{ total: number; items: MangaItemUI[] }>(
-    () => fetchJson(`/api/manga/search?q=${encodeURIComponent(q)}&limit=12`),
+    (signal) =>
+      fetchJson(`/api/manga/search?q=${encodeURIComponent(q)}&limit=12`, {
+        signal,
+      }),
     `search-manga:${q}`,
   );
 
@@ -75,10 +81,11 @@ export function SearchView({ q, nav }: { q: string; nav: Nav }) {
 
       {/* Mangás */}
       <section>
-        <h2 className="mb-3 text-lg font-bold">
-          <span className="text-emerald-400">📖</span> Mangás
+        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
+          <BookOpen className="h-5 w-5 text-emerald-400" />
+          Mangás
           {mangas.data ? (
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
+            <span className="text-sm font-normal text-muted-foreground">
               ({mangas.data.total})
             </span>
           ) : null}

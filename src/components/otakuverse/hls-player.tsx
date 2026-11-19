@@ -58,6 +58,28 @@ export function HlsPlayer({
   const failedRef = useRef<Set<string>>(new Set());
   const lastSaveRef = useRef(0);
   const seekedRef = useRef(false);
+  const usingHlsJsRef = useRef(false);
+
+  const isTomatoOnly =
+    sources.length > 0 && sources.every((s) => s.provider === "Tomato");
+
+  const failAndAdvance = (curFailKey: string, curActiveKey: string) => {
+    failedRef.current.add(curFailKey);
+    const next = sources.findIndex(
+      (_, i) => !failedRef.current.has(`${i}|${sources[i].playUrl}`),
+    );
+    if (next >= 0) {
+      setIdx(next);
+    } else {
+      setStatus({
+        key: curActiveKey,
+        value: "error",
+        message: isTomatoOnly
+          ? "Todas as qualidades/fontes do Tomato falharam para este episódio."
+          : "Todas as fontes deste episódio falharam (os proxies do animesfhd podem estar fora do ar agora).",
+      });
+    }
+  };
 
   const handleLoadedMetadata = () => {
     const v = videoRef.current;
@@ -103,6 +125,7 @@ export function HlsPlayer({
     if (!video || !playUrl) return;
     let destroyed = false;
     let hlsInstance: { destroy: () => void } | null = null;
+    usingHlsJsRef.current = false;
 
     // Watchdog: se o vídeo não começou em 12s, trata como falha e pula
     // para a próxima fonte — independente do hls.js sinalizar erro ou não.
@@ -110,20 +133,7 @@ export function HlsPlayer({
       if (destroyed) return;
       const started = video.readyState >= 2 || video.currentTime > 0;
       if (started) return;
-      failedRef.current.add(failKey);
-      const next = sources.findIndex(
-        (_, i) => !failedRef.current.has(`${i}|${sources[i].playUrl}`),
-      );
-      if (next >= 0) {
-        setIdx(next);
-      } else {
-        setStatus({
-          key: activeKey,
-          value: "error",
-          message:
-            "Todas as fontes deste episódio falharam (os proxies do animesfhd podem estar fora do ar agora).",
-        });
-      }
+      failAndAdvance(failKey, activeKey);
     }, 12_000);
 
     (async () => {
@@ -141,6 +151,7 @@ export function HlsPlayer({
         if (destroyed) return;
 
         if (HlsCtor.isSupported()) {
+          usingHlsJsRef.current = true;
           // Timeouts curtos: fontes proxy do animesfhd costumam falhar com
           // 502 — queremos detectar rápido e pular para a próxima fonte.
           const hls = new HlsCtor({
@@ -166,20 +177,7 @@ export function HlsPlayer({
               details === "manifestParsingError" ||
               details === "manifestIncompatibleCodecsError";
             if (!manifestFail && !data.fatal) return;
-            failedRef.current.add(failKey);
-            const next = sources.findIndex(
-              (_, i) => !failedRef.current.has(`${i}|${sources[i].playUrl}`),
-            );
-            if (next >= 0) {
-              setIdx(next);
-            } else {
-              setStatus({
-                key: activeKey,
-                value: "error",
-                message:
-                  "Todas as fontes deste episódio falharam (os proxies do animesfhd podem estar fora do ar agora).",
-              });
-            }
+            failAndAdvance(failKey, activeKey);
           });
           hls.loadSource(playUrl);
           hls.attachMedia(video);
@@ -205,6 +203,7 @@ export function HlsPlayer({
 
     return () => {
       destroyed = true;
+      usingHlsJsRef.current = false;
       clearTimeout(watchdog);
       hlsInstance?.destroy();
       video.removeAttribute("src");
@@ -240,14 +239,11 @@ export function HlsPlayer({
             setStatus({ key: activeKey, value: "ready" })
           }
           onError={() => {
-            // erro do HLS nativo (Safari) — os erros do hls.js vêm no evento
+            // MP4 direto (Tomato) e HLS nativo (Safari); erros do hls.js vêm no Events.ERROR
+            if (usingHlsJsRef.current) return;
             if (status.key === activeKey && status.value === "error") return;
-            if (videoRef.current?.src) {
-              setStatus({
-                key: activeKey,
-                value: "error",
-                message: "Falha ao carregar o vídeo desta fonte.",
-              });
+            if (videoRef.current?.getAttribute("src")) {
+              failAndAdvance(failKey, activeKey);
             }
           }}
         >
@@ -319,9 +315,10 @@ export function HlsPlayer({
 
       {currentStatus === "error" && status.key === activeKey ? (
         <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {status.message ?? "Falha ao carregar o vídeo."} Os players proxy do
-          animesfhd (AniStream/AniTube) ficam instáveis às vezes — tente outro
-          episódio ou volte mais tarde.
+          {status.message ?? "Falha ao carregar o vídeo."}{" "}
+          {isTomatoOnly
+            ? "Tente outra qualidade acima, volte ao player principal ou teste a fonte HLS."
+            : "Os players proxy do animesfhd (AniStream/AniTube) ficam instáveis às vezes — tente outro episódio ou volte mais tarde."}
         </p>
       ) : null}
     </div>

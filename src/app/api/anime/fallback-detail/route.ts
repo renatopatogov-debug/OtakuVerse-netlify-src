@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { anipDetail } from "@/lib/fallback-anime";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/anime/fallback-detail?slug={slug}

@@ -139,7 +139,7 @@ export async function kakaPages(
   const html = await res.text();
 
   const re =
-    /https:\/\/imgs?-\d*\.2xstorage\.com\/([a-z0-9-]+)\/(\d+(?:\.\d+)?)\/(\d+)\.(webp|jpg|jpeg|png)/gi;
+    /https:\/\/img[a-z0-9-]*\.2xstorage\.com\/([a-z0-9-]+)\/(\d+(?:\.\d+)?)\/(\d+)\.(webp|jpg|jpeg|png)/gi;
   const seen = new Set<string>();
   const pages: string[] = [];
   let m: RegExpExecArray | null;
@@ -152,8 +152,8 @@ export async function kakaPages(
   }
   // Ordena por número da página (o HTML pode intercalar espelhos)
   pages.sort((a, b) => {
-    const na = Number(a.match(/\/(\d+)\.webp$/)?.[1] ?? 0);
-    const nb = Number(b.match(/\/(\d+)\.webp$/)?.[1] ?? 0);
+    const na = Number(a.match(/\/(\d+)\.(?:webp|jpg|jpeg|png)$/i)?.[1] ?? 0);
+    const nb = Number(b.match(/\/(\d+)\.(?:webp|jpg|jpeg|png)$/i)?.[1] ?? 0);
     return na - nb;
   });
   return pages;

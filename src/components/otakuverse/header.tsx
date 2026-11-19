@@ -36,7 +36,10 @@ export function Header({
   const active =
     current.t === "home"
       ? "home"
-      : current.t === "animes" || current.t === "anime-detail"
+      : current.t === "animes" ||
+          current.t === "anime-detail" ||
+          current.t === "sfhd-detail" ||
+          current.t === "fallback-detail"
         ? "animes"
         : current.t === "mangas" ||
             current.t === "manga-detail" ||

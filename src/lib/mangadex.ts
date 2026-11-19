@@ -4,7 +4,6 @@
 import { fetchMangaRelationTitles } from "@/lib/anilist";
 
 const API = "https://api.mangadex.org";
-const UPLOADS = "https://uploads.mangadex.org";
 
 /** Ordem de preferência de idiomas para exibição dos capítulos. */
 export const LANG_PRIORITY = ["pt-br", "en", "es-la", "es"];
@@ -15,6 +14,7 @@ export interface MangaItem {
   id: string;
   title: string;
   altTitlePtBr?: string | null;
+  altTitleEn?: string | null;
   description?: string | null;
   year?: number | null;
   status?: string | null;
@@ -84,6 +84,18 @@ function pickTitle(manga: RawManga): string {
   return pt ?? en ?? any ?? "Sem título";
 }
 
+function pickCanonicalTitle(manga: RawManga): string {
+  const attrs = manga.attributes;
+  return (
+    attrs.title.en ??
+    attrs.altTitles.find((t) => t.en)?.en ??
+    attrs.title["ja-ro"] ??
+    attrs.title.ja ??
+    attrs.title.ko ??
+    pickTitle(manga)
+  );
+}
+
 function pickDescription(manga: RawManga): string | null {
   const d = manga.attributes.description;
   return d["pt-br"] ?? d.en ?? null;
@@ -104,22 +116,30 @@ function coverUrl(manga: RawManga, size: "256" | "512", title?: string): string 
 }
 
 function toMangaItem(manga: RawManga, size: "256" | "512" = "256"): MangaItem {
+  const title = pickTitle(manga);
+  const canonical = pickCanonicalTitle(manga);
+  const attrs = manga.attributes;
+  const altEn =
+    attrs.title.en ??
+    attrs.altTitles.find((t) => t.en)?.en ??
+    attrs.title["ja-ro"] ??
+    null;
   return {
     id: manga.id,
-    title: pickTitle(manga),
-    altTitlePtBr:
-      manga.attributes.altTitles.find((t) => t["pt-br"])?.["pt-br"] ?? null,
+    title,
+    altTitlePtBr: attrs.altTitles.find((t) => t["pt-br"])?.["pt-br"] ?? null,
+    altTitleEn: altEn,
     description: pickDescription(manga),
-    year: manga.attributes.year,
-    status: manga.attributes.status,
-    contentRating: manga.attributes.contentRating,
-    tags: manga.attributes.tags
+    year: attrs.year,
+    status: attrs.status,
+    contentRating: attrs.contentRating,
+    tags: attrs.tags
       .map((t) => t.attributes.name.en ?? Object.values(t.attributes.name)[0])
       .filter(Boolean)
       .slice(0, 8),
-    coverUrl: coverUrl(manga, size, pickTitle(manga)),
-    originalLanguage: manga.attributes.originalLanguage,
-    lastChapter: manga.attributes.lastChapter,
+    coverUrl: coverUrl(manga, size, canonical),
+    originalLanguage: attrs.originalLanguage,
+    lastChapter: attrs.lastChapter,
   };
 }
 

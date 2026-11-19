@@ -60,12 +60,32 @@ async function gql<T>(
         await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
         continue;
       }
+      const json = (await res.json().catch(() => null)) as {
+        data?: Record<string, unknown> | null;
+        errors?: Array<{ status?: number; message?: string }>;
+      } | null;
+      const dataObj =
+        json?.data && typeof json.data === "object" ? json.data : null;
+      const hasPartialData =
+        dataObj !== null && Object.values(dataObj).some((v) => v != null);
+      const allNotFound =
+        Array.isArray(json?.errors) &&
+        json.errors.length > 0 &&
+        json.errors.every(
+          (e) => e?.status === 404 || /not found/i.test(e?.message ?? ""),
+        );
+      if (
+        dataObj &&
+        (res.ok || res.status === 404) &&
+        (!json?.errors?.length || hasPartialData || allNotFound)
+      ) {
+        return dataObj as unknown as T;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (json.errors?.length) {
+      if (json?.errors?.length) {
         throw new Error(json.errors[0]?.message ?? "Erro GraphQL AniList");
       }
-      return json.data as T;
+      throw new Error("Resposta vazia do AniList");
     } catch (err) {
       lastErr = err;
       await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
@@ -85,7 +105,7 @@ export function normalizeTitle(s: string): string {
     .trim();
 }
 
-function similarity(a: string, b: string): number {
+export function similarity(a: string, b: string): number {
   const A = normalizeTitle(a);
   const B = normalizeTitle(b);
   if (!A || !B) return 0;
@@ -97,6 +117,7 @@ function similarity(a: string, b: string): number {
   };
   const ga = bg(A);
   const gb = bg(B);
+  if (ga.size + gb.size === 0) return 0;
   let inter = 0;
   for (const g of ga) if (gb.has(g)) inter++;
   return (2 * inter) / (ga.size + gb.size);

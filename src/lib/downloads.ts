@@ -83,22 +83,34 @@ function write(next: DownloadState) {
   for (const l of listeners) l();
 }
 
-function setProgress(p: DownloadProgress | null) {
+function updateProgress(p: DownloadProgress) {
   const cur = read();
+  cache = {
+    ...cur,
+    progress: { ...cur.progress, [p.chapterId]: p },
+  };
+  for (const l of listeners) l();
+}
+
+function clearProgress(chapterId: string) {
+  const cur = read();
+  if (!(chapterId in cur.progress)) return;
   const progress = { ...cur.progress };
-  if (p) {
-    progress[p.chapterId] = p;
-  } else {
-    for (const k of Object.keys(progress)) delete progress[k];
-  }
-  write({ ...cur, progress });
+  delete progress[chapterId];
+  cache = { ...cur, progress };
+  for (const l of listeners) l();
 }
 
 function subscribe(l: Listener): () => void {
   listeners.add(l);
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORE_KEY) {
+      const activeProgress = cache?.progress ?? {};
       cache = null;
+      const reloaded = read();
+      if (Object.keys(activeProgress).length > 0) {
+        cache = { ...reloaded, progress: activeProgress };
+      }
       for (const fn of listeners) fn();
     }
   };
@@ -161,12 +173,14 @@ export async function downloadChapter(
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<DownloadedChapter> {
   const cache = await caches.open(DL_CACHE);
-  setProgress({ chapterId: input.chapterId, done: 0, total: 0, indeterminate: true });
+  updateProgress({ chapterId: input.chapterId, done: 0, total: 0, indeterminate: true });
   onProgress?.({ chapterId: input.chapterId, done: 0, total: 0, indeterminate: true });
 
   try {
     // 1. Lista de páginas
-    const res = await fetch(`/api/manga/pages?chapterId=${input.chapterId}`);
+    const res = await fetch(
+      `/api/manga/pages?chapterId=${encodeURIComponent(input.chapterId)}`,
+    );
     if (!res.ok) throw new Error(`Falha ao listar páginas (HTTP ${res.status})`);
     const json = (await res.json()) as { pages: string[] };
     const pages = json.pages ?? [];
@@ -188,7 +202,7 @@ export async function downloadChapter(
 
     let stored = done;
     onProgress?.({ chapterId: input.chapterId, done: stored, total: pages.length });
-    setProgress({ chapterId: input.chapterId, done: stored, total: pages.length });
+    updateProgress({ chapterId: input.chapterId, done: stored, total: pages.length });
 
     let failedCount = 0;
     await pool(missingUrls, PAGE_CONCURRENCY, async (url) => {
@@ -203,7 +217,7 @@ export async function downloadChapter(
       stored++;
       const p = { chapterId: input.chapterId, done: stored, total: pages.length };
       onProgress?.(p);
-      setProgress(p);
+      updateProgress(p);
     });
     if (failedCount > 0) {
       throw new Error("Algumas páginas não responderam — tente de novo");
@@ -224,19 +238,22 @@ export async function downloadChapter(
       }),
     );
 
-    // 4. Registra no store
-    const cur = read().entries.filter((e) => e.chapterId !== input.chapterId);
+    // 4. Registra no store (preservando progresso de outros capítulos simultâneos)
+    const curState = read();
+    const nextProgress = { ...curState.progress };
+    delete nextProgress[input.chapterId];
+    const cur = curState.entries.filter((e) => e.chapterId !== input.chapterId);
     write({
       entries: [entry, ...cur].sort(
         (a, b) =>
           a.mangaTitle.localeCompare(b.mangaTitle, "pt-BR") ||
           langWeight(a.lang) - langWeight(b.lang),
       ),
-      progress: {},
+      progress: nextProgress,
     });
     return entry;
   } finally {
-    setProgress(null);
+    clearProgress(input.chapterId);
     onProgress?.({ chapterId: input.chapterId, done: 0, total: 0, indeterminate: false });
   }
 }
@@ -258,10 +275,14 @@ export async function removeChapter(chapterId: string): Promise<void> {
     }
   }
   await cache.delete(manifestKey(chapterId));
+  const curState = read();
+  const nextProgress = { ...curState.progress };
+  delete nextProgress[chapterId];
   write({
-    entries: read().entries.filter((e) => e.chapterId !== chapterId),
-    progress: {},
-  });}
+    entries: curState.entries.filter((e) => e.chapterId !== chapterId),
+    progress: nextProgress,
+  });
+}
 
 /**
  * Retorna as páginas em cache (URLs reais) de um capítulo baixado.

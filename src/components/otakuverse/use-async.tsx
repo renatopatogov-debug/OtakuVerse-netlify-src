@@ -99,27 +99,28 @@ export function useAniListScores(
     if (!list || list.length === 0) return;
     const controller = new AbortController();
     let alive = true;
-    const titles = list
+    const entries = list
       .slice(0, 24)
-      .map((i) => (i.nameEn || i.name || "").trim())
-      .filter(Boolean);
-    if (titles.length === 0) return;
+      .map((i) => ({
+        id: i.id,
+        title: (i.nameEn || i.name || "").trim(),
+      }))
+      .filter((e) => e.title.length > 0);
+    if (entries.length === 0) return;
     fetch("/api/anilist/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ titles }),
+      body: JSON.stringify({ titles: entries.map((e) => e.title) }),
       signal: controller.signal,
     })
       .then((r) => r.json())
       .then((j) => {
-        if (!alive || controller.signal.aborted || !j?.results) return;
+        if (!alive || controller.signal.aborted || !Array.isArray(j?.results)) return;
         const map: Record<string, number | null> = {};
-        j.results.forEach(
-          (s: number | null, idx: number) => {
-            const it = list[idx];
-            if (it) map[it.id] = s;
-          },
-        );
+        (j.results as (number | null)[]).forEach((s, idx) => {
+          const entry = entries[idx];
+          if (entry) map[entry.id] = s;
+        });
         setState({ key, scores: map });
       })
       .catch(() => {

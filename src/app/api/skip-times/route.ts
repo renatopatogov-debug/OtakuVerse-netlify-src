@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cached } from "@/lib/cache";
 import { fetchSkipTimes, SKIP_TTL_MS } from "@/lib/aniskip";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**

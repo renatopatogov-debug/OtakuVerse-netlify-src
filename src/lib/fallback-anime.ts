@@ -127,8 +127,11 @@ async function cloudNonce(force = false): Promise<string> {
   return nonceBox.value;
 }
 
-async function cloudSearchRaw(q: string): Promise<FallbackSearchItem[]> {
-  const nonce = await cloudNonce();
+async function cloudSearchRaw(
+  q: string,
+  forceNonce = false,
+): Promise<FallbackSearchItem[]> {
+  const nonce = await cloudNonce(forceNonce);
   const url = `${CLOUD}/wp-json/dooplay/search?keyword=${encodeURIComponent(q)}&nonce=${nonce}`;
   const raw = await getText(url);
   const json = JSON.parse(raw) as Record<
@@ -157,7 +160,7 @@ export async function cloudSearch(q: string): Promise<FallbackSearchItem[]> {
     // 403 de nonce expirado → força renovação e tenta 1x de novo
     if (e instanceof Error && /403|nonce/i.test(e.message)) {
       try {
-        return await cloudSearchRaw(q);
+        return await cloudSearchRaw(q, true);
       } catch {
         return [];
       }
@@ -386,13 +389,10 @@ export async function searchFallback(q: string): Promise<FallbackSearchItem[]> {
   if (!term) return [];
   const norm = normalize(term);
 
-  // sfhd: busca real na API (barata, cache 30min) — fonte com vídeo HLS
-  let sfhd: FallbackSearchItem[] = [];
-  try {
-    const raw = await cached(`fallback:sfhd:${norm}`, 30 * 60_000, () =>
-      sfhdSearch(term),
-    );
-    sfhd = raw
+  const sfhdTask = cached(`fallback:sfhd:${norm}`, 30 * 60_000, () =>
+    sfhdSearch(term),
+  ).then((raw) =>
+    raw
       .filter((it) => it.title && it.title !== "Sem título")
       .slice(0, 12)
       .map((it) => ({
@@ -404,25 +404,27 @@ export async function searchFallback(q: string): Promise<FallbackSearchItem[]> {
         score: null,
         tmdbId: null,
         externalUrl: null,
-      }));
-  } catch {
-    /* sfhd indisponível */
-  }
+      })),
+  );
 
-  // cloud: cache por query, mas só quando traz algo (evita envenenar cache
-  // com vazio se o nonce falhar num instante ruim)
-  let cloud: FallbackSearchItem[] = [];
-  try {
-    const raw = await cached(`fallback:cloud:${norm}`, 30 * 60 * 1000, () =>
-      cloudSearch(term),
-    );
-    if (raw.length > 0) cloud = raw;
-  } catch {
-    /* cloud indisponível */
-  }
+  // Só grava no cache quando traz resultados (evita envenenar com vazio em falha de nonce)
+  const cloudTask = cached(`fallback:cloud:${norm}`, 30 * 60 * 1000, async () => {
+    const raw = await cloudSearch(term);
+    if (raw.length === 0) throw new Error("cloud vazio");
+    return raw;
+  });
 
-  // anip: usa o catálogo cacheado (12h) e filtra localmente — barato
-  const anip = await anipSearch(term);
+  const anipTask = anipSearch(term);
+
+  const [sfhdRes, cloudRes, anipRes] = await Promise.allSettled([
+    sfhdTask,
+    cloudTask,
+    anipTask,
+  ]);
+
+  const sfhd = sfhdRes.status === "fulfilled" ? sfhdRes.value : [];
+  const cloud = cloudRes.status === "fulfilled" ? cloudRes.value : [];
+  const anip = anipRes.status === "fulfilled" ? anipRes.value : [];
 
   return [...sfhd, ...anip, ...cloud].slice(0, 30);
 }

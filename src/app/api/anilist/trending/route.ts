@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cached } from "@/lib/cache";
 import { fetchTrending } from "@/lib/anilist";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {

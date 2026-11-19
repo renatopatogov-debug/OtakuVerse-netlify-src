@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sfhdSubtitleVtt } from "@/lib/animesfhd";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/anime/sfhd-sub?episodeId={id}

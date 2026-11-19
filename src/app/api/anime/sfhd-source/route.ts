@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sfhdSources } from "@/lib/animesfhd";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/anime/sfhd-source?episodeId={id}

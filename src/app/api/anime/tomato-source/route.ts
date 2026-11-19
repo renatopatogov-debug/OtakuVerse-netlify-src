@@ -5,6 +5,7 @@ import {
 } from "@/lib/tomato";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/anime/tomato-source?episodeId={id}

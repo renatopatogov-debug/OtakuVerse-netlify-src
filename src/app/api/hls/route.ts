@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SFHD_MEDIA_SUFFIXES } from "@/lib/animesfhd";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/hls?u={url}

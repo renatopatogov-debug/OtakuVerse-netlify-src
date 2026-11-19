@@ -3,6 +3,7 @@ import { fetchAnimesByCategory } from "@/lib/otakulogia";
 import { cached } from "@/lib/cache";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;

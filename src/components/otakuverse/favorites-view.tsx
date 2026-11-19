@@ -67,7 +67,7 @@ function FavCard({ fav, nav }: { fav: FavEntry; nav: Nav }) {
             e.stopPropagation();
             toggle(fav);
           }}
-          className="absolute right-1.5 bottom-1.5 rounded-full bg-black/70 p-1.5 text-white/70 opacity-0 backdrop-blur transition-all hover:bg-rose-950/90 hover:text-rose-300 group-hover:opacity-100"
+          className="absolute right-1.5 bottom-1.5 rounded-full bg-black/70 p-1.5 text-white/80 opacity-90 backdrop-blur transition-all hover:bg-rose-950/90 hover:text-rose-300 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
           aria-label={`Remover ${fav.title} dos favoritos`}
           title="Remover dos favoritos"
         >

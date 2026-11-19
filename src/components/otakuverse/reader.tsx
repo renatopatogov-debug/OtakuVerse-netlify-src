@@ -13,7 +13,11 @@ type ReaderItem = Extract<StackItem, { t: "reader" }>;
 
 export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
   const { data, loading, error } = useAsync<ChapterPages>(
-    () => fetchJson(`/api/manga/pages?chapterId=${item.chapterId}`),
+    (signal) =>
+      fetchJson(
+        `/api/manga/pages?chapterId=${encodeURIComponent(item.chapterId)}`,
+        { signal },
+      ),
     `pages:${item.chapterId}`,
   );
 
@@ -25,6 +29,13 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
   // Registra o capítulo no histórico local (Continuar leitura)
   useEffect(() => {
     if (!item.mangaId) return;
+    const historyLang =
+      item.lang === "pt-br" ||
+      item.lang === "en" ||
+      item.lang === "es" ||
+      item.lang === "es-la"
+        ? item.lang
+        : "en";
     saveWatchProgress({
       key: `mg:${item.mangaId}`,
       source: "manga",
@@ -36,7 +47,7 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
         ? Math.floor(Number(item.chapterNumber)) || null
         : null,
       episodeTitle: item.chapterLabel,
-      lang: item.lang === "pt-br" ? "pt-br" : "en",
+      lang: historyLang,
       position: 0,
       duration: 0,
     });
@@ -224,25 +235,29 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
 }
 
 function ReaderPage({ src, pageNum }: { src: string; pageNum: number }) {
-  const [currentSrc, setCurrentSrc] = useState(src);
-  const [failed, setFailed] = useState(false);
+  const [retryState, setRetryState] = useState<{
+    src: string;
+    nonce: number;
+    failed: boolean;
+  }>({ src, nonce: 0, failed: false });
 
-  useEffect(() => {
-    setCurrentSrc(src);
-    setFailed(false);
-  }, [src]);
+  const isStale = retryState.src !== src;
+  const failed = isStale ? false : retryState.failed;
+  const nonce = isStale ? 0 : retryState.nonce;
+  const currentSrc =
+    nonce > 0
+      ? `${src}${src.includes("?") ? "&" : "?"}retry=${nonce}`
+      : src;
 
   return (
-    <div className="relative min-h-[250px] w-full flex items-center justify-center bg-zinc-950/50">
+    <div className="relative flex min-h-[250px] w-full items-center justify-center bg-zinc-950/50">
       {failed ? (
         <div className="flex flex-col items-center justify-center p-8 text-center text-xs text-muted-foreground">
           <p>Não foi possível carregar a página {pageNum}.</p>
           <button
-            onClick={() => {
-              setFailed(false);
-              const sep = currentSrc.includes("?") ? "&" : "?";
-              setCurrentSrc(`${currentSrc}${sep}retry=${Date.now()}`);
-            }}
+            onClick={() =>
+              setRetryState({ src, nonce: Date.now(), failed: false })
+            }
             className="mt-2.5 rounded-lg border border-border/70 bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
           >
             Tentar novamente
@@ -254,7 +269,7 @@ function ReaderPage({ src, pageNum }: { src: string; pageNum: number }) {
           alt={`Página ${pageNum}`}
           loading={pageNum <= 2 ? "eager" : "lazy"}
           referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
+          onError={() => setRetryState({ src, nonce, failed: true })}
           className="mx-auto block w-full select-none"
           draggable={false}
         />

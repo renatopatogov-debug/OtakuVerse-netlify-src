@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { matchTomatoAnime } from "@/lib/tomato";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/anime/tomato-match?title={nome}&audio={dub|leg}

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BookOpen, Clapperboard, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,14 +38,16 @@ export function Poster({
   className?: string;
   icon: "anime" | "manga";
 }) {
-  const [failed, setFailed] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  const [imgState, setImgState] = useState<{
+    source: string | null | undefined;
+    override: string | null;
+    failed: boolean;
+  }>({ source: src, override: null, failed: false });
   const Icon = icon === "anime" ? Clapperboard : BookOpen;
 
-  useEffect(() => {
-    setCurrentSrc(src);
-    setFailed(false);
-  }, [src]);
+  const isStale = imgState.source !== src;
+  const failed = isStale ? false : imgState.failed;
+  const currentSrc = isStale ? src : (imgState.override ?? src);
 
   if (!currentSrc || failed) {
     return (
@@ -66,11 +68,17 @@ export function Poster({
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => {
-        const coverMatch = currentSrc?.match(/uploads\.mangadex\.org\/covers\/([^/]+)\/([^/?]+)/i);
+        const coverMatch = currentSrc?.match(
+          /uploads\.mangadex\.org\/covers\/([^/]+)\/([^/?]+)/i,
+        );
         if (coverMatch) {
-          setCurrentSrc(`/api/manga/cover/${coverMatch[1]}/${coverMatch[2]}`);
+          setImgState({
+            source: src,
+            override: `/api/manga/cover/${coverMatch[1]}/${coverMatch[2]}`,
+            failed: false,
+          });
         } else {
-          setFailed(true);
+          setImgState({ source: src, override: null, failed: true });
         }
       }}
       className={cn("object-cover", className)}

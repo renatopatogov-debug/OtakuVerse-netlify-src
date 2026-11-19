@@ -38,17 +38,23 @@ export async function GET(req: NextRequest) {
 
     // Fallback de capítulos: se o MangaDex não tem NENHUM capítulo em
     // NENHUM idioma (ex.: Frieren — fonte oficial saiu do ar), tenta o
-    // KakaManga usando o título como slug. Os ids vêm prefixados "kaka__".
+    // KakaManga usando o título canônico em inglês primeiro, depois o título principal.
     const allLangsEmpty =
       !data.langTotals ||
       Object.values(data.langTotals).every((n) => n <= 0);
     const needsKaka = allLangsEmpty || forceSource === "kaka";
+    const lookupTitle = (data.manga.altTitleEn ?? "").trim() || data.manga.title;
     if (needsKaka) {
-      const kakaSlug = await cached(
-        `manga:kaka-slug:${data.manga.title}`,
-        24 * 60 * 60 * 1000,
-        () => findKakaSlug(data.manga.title),
-      );
+      const findSlug = async (title: string) =>
+        cached(
+          `manga:kaka-slug:${title}`,
+          24 * 60 * 60 * 1000,
+          () => findKakaSlug(title),
+        );
+      let kakaSlug = await findSlug(lookupTitle);
+      if (!kakaSlug && lookupTitle !== data.manga.title) {
+        kakaSlug = await findSlug(data.manga.title);
+      }
       if (kakaSlug) {
         const kaka = await cached(
           `manga:kaka-chapters:${kakaSlug}`,
@@ -58,6 +64,8 @@ export async function GET(req: NextRequest) {
         if (kaka.length > 0) {
           data.chapters = kaka;
           data.source = "kakamanga";
+          data.loadedLang = "en";
+          data.langTotals = { ...data.langTotals, en: kaka.length };
         }
       }
     }
@@ -66,9 +74,9 @@ export async function GET(req: NextRequest) {
     // curta), tenta pegar no AniList — oficial, estável, sem Cloudflare.
     if (!data.manga.description || data.manga.description.length < 40) {
       const al = await cached(
-        `manga:al-desc:${data.manga.title}`,
+        `manga:al-desc:${lookupTitle}`,
         24 * 60 * 60 * 1000,
-        () => enrichManga(data.manga.title),
+        () => enrichManga(lookupTitle),
       );
       if (al?.description) {
         data.manga.description = al.description;
