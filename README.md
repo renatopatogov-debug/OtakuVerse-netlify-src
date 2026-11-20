@@ -2,7 +2,7 @@
 
 Hub pessoal desenvolvido para reunir **animes**, **mangás** e um **arcade de jogos e experimentos web** em uma única interface PWA rápida e responsiva.
 
-🌐 **Acesse online:** [otakuversehub.netlify.app](https://otakuversehub.netlify.app)
+ **Acesse online:** [otakuversehub.netlify.app](https://otakuversehub.netlify.app)
 
 ---
 
