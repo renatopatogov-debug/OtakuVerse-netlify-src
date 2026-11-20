@@ -6,7 +6,7 @@
     <title>Pure P2P Share — Acervo Digital</title>
     <meta name="description" content="Transferência direta de arquivos entre navegadores via WebRTC ponto a ponto, sem intermediários.">
     <meta name="theme-color" content="#0f0f12">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -253,7 +253,7 @@
 </head>
 <body>
 
-<a href="/arcade" class="back-hub">← Arcade</a>
+<a href="/?v=arcade" class="back-hub">← Arcade</a>
 
 <div class="container">
     <h2 class="header-title">Pure P2P Share ⚡</h2>
@@ -292,6 +292,7 @@
             <div class="progress-bar"><div class="progress-fill connecting" id="progressBar"></div></div>
             <div id="statusLabel" class="status-msg">Conectando à rede de sinalização...</div>
             
+            <button id="acceptBtn" class="btn btn-success hidden">Aceitar e Salvar Arquivo</button>
             <button id="downloadBtn" class="btn btn-success hidden">Salvar Arquivo</button>
             <button class="btn btn-danger" id="btnCancel">Cancelar Operação</button>
         </div>
@@ -308,8 +309,10 @@
     };
 
     const CHUNK_SIZE = 32 * 1024; // 32KB seguro para dados WebRTC
+    const MAX_RAM_AUTO_BYTES = 500 * 1024 * 1024; // 500MB limite para auto-download em RAM
 
     const rtcConfig = { 
+        iceCandidatePoolSize: 4,
         iceServers: [
             { urls: [
                 'stun:stun.l.google.com:19302',
@@ -317,32 +320,77 @@
                 'stun:stun2.l.google.com:19302',
                 'stun:stun3.l.google.com:19302'
             ]}
+            // Opcional: adicione seu servidor TURN aqui para redes 4G/5G ou NAT simétrico:
+            // ,{ urls: 'turn:seu-turn.exemplo.com:3478', username: '...', credential: '...' }
         ]
     };
 
-    let db = null;
+    let db = null, roomRef = null;
     let peerConnection, dataChannel;
     let selectedFile, role, roomId;
     let receivedChunks = [], receivedSize = 0, metaData = null;
     let fileWritableStream = null, isAborted = false;
-    let handshakeStarted = false, transferenciaConcluida = false;
-    let signalWatchdog = null;
+    let handshakeStarted = false, transferenciaConcluida = false, eofRecebido = false;
+    let signalWatchdog = null, iceDisconnectTimer = null;
+    let pendingCandidates = [];
+    let writeQueue = Promise.resolve();
+    let metaAckSent = false;
+    let peerIdConnected = null;
+    let transferStartTime = 0;
+    let activeDownloadUrl = null;
 
-    const myClientId = Math.random().toString(36).substring(2, 12);
+    function formatBytes(bytes) {
+        if (!bytes || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const val = bytes / Math.pow(1024, i);
+        return `${val.toFixed(i === 0 ? 0 : (i >= 2 ? 2 : 1))} ${units[i]}`;
+    }
+
+    function generateSecureId(prefix = '', bytesLen = 8) {
+        if (window.crypto && window.crypto.getRandomValues) {
+            const arr = new Uint8Array(bytesLen);
+            window.crypto.getRandomValues(arr);
+            const token = Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+            return prefix + token;
+        }
+        return prefix + Math.random().toString(36).substring(2, 12);
+    }
+
+    function isValidRoomId(id) {
+        return typeof id === 'string' && /^[a-zA-Z0-9_-]{6,48}$/.test(id);
+    }
+
+    function sanitizeFileName(name) {
+        if (typeof name !== 'string') return 'arquivo_recebido';
+        const base = name.split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g, '').trim();
+        if (!base || base === '.' || base === '..') return 'arquivo_recebido';
+        return base.slice(0, 200);
+    }
+
+    const myClientId = generateSecureId('cli_', 6);
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
 
     document.addEventListener('DOMContentLoaded', () => {
         try {
+            if (typeof firebase === 'undefined') {
+                falhaCritica("Serviço de sinalização indisponível. Verifique sua conexão.");
+                return;
+            }
             firebase.initializeApp(FIREBASE_CONFIG);
             db = firebase.database();
             
-            if (roomParam) {
+            if (roomParam !== null) {
                 role = "receiver";
-                roomId = roomParam;
                 document.getElementById('viewSelection').classList.add('hidden');
                 document.getElementById('viewStatus').classList.remove('hidden');
                 document.getElementById('boxShare').classList.add('hidden');
+                if (!isValidRoomId(roomParam)) {
+                    falhaCritica("Link de sala inválido ou corrompido.");
+                    return;
+                }
+                roomId = roomParam;
                 document.getElementById('progressTitle').innerText = "Preparando Recepção...";
                 document.getElementById('statusLabel').innerText = "Conectando ao remetente...";
                 inicializarP2P();
@@ -375,39 +423,58 @@
 
     function prepararEnvio(file) {
         selectedFile = file;
-        roomId = 'room_' + Math.random().toString(36).substring(2, 9);
+        roomId = generateSecureId('room_', 8);
         
         document.getElementById('viewSelection').classList.add('hidden');
         document.getElementById('viewStatus').classList.remove('hidden');
+        document.getElementById('fileMeta').style.display = "block";
+        document.getElementById('fileMeta').innerText = `${file.name} (${formatBytes(file.size)})`;
         
         const linkCompleto = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
         document.getElementById('shareLink').innerText = linkCompleto;
         
         const qrEl = document.getElementById("shareQr");
         qrEl.innerHTML = '';
-        new QRCode(qrEl, { 
-            text: linkCompleto, 
-            width: 150, 
-            height: 150, 
-            colorDark: "#0f0f12", 
-            colorLight: "#ffffff" 
-        });
+        if (typeof QRCode !== 'undefined') {
+            qrEl.parentElement.style.display = 'block';
+            new QRCode(qrEl, { 
+                text: linkCompleto, 
+                width: 150, 
+                height: 150, 
+                colorDark: "#0f0f12", 
+                colorLight: "#ffffff" 
+            });
+        } else {
+            qrEl.parentElement.style.display = 'none';
+        }
         
-        document.getElementById('btnCopyLink').onclick = () => {
+        document.getElementById('btnCopyLink').onclick = async () => {
+            let copied = false;
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(linkCompleto);
-            } else {
+                try {
+                    await navigator.clipboard.writeText(linkCompleto);
+                    copied = true;
+                } catch(e) {}
+            }
+            if (!copied) {
                 const temp = document.createElement("textarea");
                 temp.value = linkCompleto;
+                temp.style.position = "fixed";
+                temp.style.opacity = "0";
                 document.body.appendChild(temp);
                 temp.select();
-                document.execCommand("copy");
+                try { copied = document.execCommand("copy"); } catch(e) {}
                 document.body.removeChild(temp);
             }
             const btn = document.getElementById('btnCopyLink');
             const orig = btn.innerText;
-            btn.innerText = "Link Copiado!";
-            btn.style.backgroundColor = "var(--success)";
+            if (copied) {
+                btn.innerText = "Link Copiado!";
+                btn.style.backgroundColor = "var(--success)";
+            } else {
+                btn.innerText = "Selecione e copie o link acima";
+                btn.style.backgroundColor = "var(--warning)";
+            }
             setTimeout(() => {
                 btn.innerText = orig;
                 btn.style.backgroundColor = "var(--card-secondary)";
@@ -417,9 +484,22 @@
         inicializarP2P();
     }
 
+    function limparSalaFirebase() {
+        if (roomRef) {
+            try { roomRef.off(); } catch(e){}
+            roomRef = null;
+        }
+        if (db && roomId) {
+            db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{});
+        }
+    }
+
     function inicializarP2P() {
         if (!db) return;
-        const roomRef = db.ref(`p2p_rooms/${roomId}`);
+        roomRef = db.ref(`p2p_rooms/${roomId}`);
+        if (role === "sender") {
+            try { roomRef.onDisconnect().remove(); } catch(e){}
+        }
 
         configurarWebRTC();
 
@@ -438,33 +518,64 @@
         // Escuta os sinais de sinalização na sala
         roomRef.on('child_added', async (snap) => {
             const msg = snap.val();
-            if (!msg || msg.senderId === myClientId) return;
+            if (!msg || msg.senderId === myClientId || isAborted) return;
+
+            // Trava a sala ao primeiro par conectado para evitar interferência de terceiros
+            if (peerIdConnected && msg.senderId !== peerIdConnected) return;
 
             // Remove o sinal após o consumo
             snap.ref.remove().catch(() => {});
 
             if (msg.action === "client_ready" && role === "sender") {
                 if (!handshakeStarted) {
+                    peerIdConnected = msg.senderId;
                     handshakeStarted = true;
                     clearTimeout(signalWatchdog);
                     iniciarHandshake();
                 }
             } else if (msg.sdp) {
-                if (msg.sdp.type === 'offer') {
-                    clearTimeout(signalWatchdog);
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    enviarSinal({ sdp: peerConnection.localDescription });
-                } else if (msg.sdp.type === 'answer') {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                try {
+                    if (!peerIdConnected) peerIdConnected = msg.senderId;
+                    if (msg.sdp.type === 'offer') {
+                        clearTimeout(signalWatchdog);
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        await flushPendingCandidates();
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        enviarSinal({ sdp: peerConnection.localDescription });
+                    } else if (msg.sdp.type === 'answer') {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        await flushPendingCandidates();
+                    }
+                } catch (e) {
+                    falhaCritica("Falha na negociação SDP da conexão P2P.");
                 }
             } else if (msg.candidate) {
-                try {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate));
-                } catch(e) {}
+                if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(msg.candidate));
+                    } catch(e) {}
+                } else {
+                    pendingCandidates.push(msg.candidate);
+                }
             }
         });
+    }
+
+    async function flushPendingCandidates() {
+        while (pendingCandidates.length > 0 && peerConnection) {
+            const cand = pendingCandidates.shift();
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+            } catch(e) {}
+        }
+    }
+
+    function sendChannelData(payload) {
+        if (!dataChannel || dataChannel.readyState !== 'open') {
+            throw new Error("Canal de dados fechado.");
+        }
+        dataChannel.send(payload);
     }
 
     function configurarWebRTC() {
@@ -477,12 +588,28 @@
         peerConnection.oniceconnectionstatechange = () => {
             const state = peerConnection.iceConnectionState;
             if (state === "connected" || state === "completed") {
+                clearTimeout(iceDisconnectTimer);
                 document.getElementById('progressBar').classList.remove('connecting');
                 document.getElementById('statusLabel').style.color = "var(--success)";
                 if (role === "sender") document.getElementById('boxShare').classList.add('hidden');
+            } else if (state === "disconnected") {
+                if (!isAborted && !transferenciaConcluida && !eofRecebido) {
+                    document.getElementById('statusLabel').style.color = "var(--warning)";
+                    document.getElementById('statusLabel').innerText = "Conexão instável, tentando reconectar...";
+                    clearTimeout(iceDisconnectTimer);
+                    iceDisconnectTimer = setTimeout(() => {
+                        if (!isAborted && !transferenciaConcluida && !eofRecebido && peerConnection && peerConnection.iceConnectionState === "disconnected") {
+                            falhaCritica("Conexão P2P perdida (tempo limite excedido).");
+                        }
+                    }, 10000);
+                }
             } else if (["failed", "closed"].includes(state)) {
-                if (!isAborted && !transferenciaConcluida) {
-                    falhaCritica("Conexão P2P interrompida.");
+                clearTimeout(iceDisconnectTimer);
+                if (!isAborted && !transferenciaConcluida && !eofRecebido) {
+                    const msgErro = (!dataChannel || dataChannel.readyState !== 'open')
+                        ? "Falha ao fechar conexão direta (rede com NAT restrito ou firewall)."
+                        : "Conexão P2P interrompida.";
+                    falhaCritica(msgErro);
                 }
             }
         };
@@ -491,12 +618,54 @@
             dataChannel = peerConnection.createDataChannel("fileTransfer", { ordered: true });
             dataChannel.binaryType = "arraybuffer";
             dataChannel.bufferedAmountLowThreshold = 256 * 1024;
-            dataChannel.onopen = () => transmitirArquivo();
+            dataChannel.onopen = () => {
+                if (isAborted || !selectedFile) return;
+                document.getElementById('progressTitle').innerText = "Aguardando Aceite";
+                document.getElementById('statusLabel').innerText = "Aguardando o destinatário aceitar o arquivo...";
+                try {
+                    sendChannelData(JSON.stringify({
+                        type: "meta",
+                        name: selectedFile.name,
+                        size: selectedFile.size
+                    }));
+                } catch (err) {
+                    falhaCritica("Falha ao enviar metadados do arquivo.");
+                }
+            };
+            dataChannel.onmessage = (e) => {
+                if (isAborted || typeof e.data !== "string") return;
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === "meta_ack") {
+                        transmitirArquivo();
+                    }
+                } catch (err) {}
+            };
+            dataChannel.onclose = () => {
+                if (!isAborted && !transferenciaConcluida) {
+                    falhaCritica("Conexão encerrada pelo destinatário.");
+                }
+            };
+            dataChannel.onerror = () => {
+                if (!isAborted && !transferenciaConcluida) {
+                    falhaCritica("Erro no canal de transmissão P2P.");
+                }
+            };
         } else {
             peerConnection.ondatachannel = (event) => {
                 dataChannel = event.channel;
                 dataChannel.binaryType = "arraybuffer";
                 dataChannel.bufferedAmountLowThreshold = 256 * 1024;
+                dataChannel.onclose = () => {
+                    if (!isAborted && !transferenciaConcluida && !eofRecebido) {
+                        falhaCritica("Remetente encerrou a conexão.");
+                    }
+                };
+                dataChannel.onerror = () => {
+                    if (!isAborted && !transferenciaConcluida && !eofRecebido) {
+                        falhaCritica("Erro no canal de recebimento P2P.");
+                    }
+                };
                 configurarRecebimento();
             };
         }
@@ -523,131 +692,269 @@
         const label = document.getElementById('statusLabel');
         const bar = document.getElementById('progressBar');
         document.getElementById('progressTitle').innerText = "Enviando Arquivo";
+        label.style.color = "var(--text-muted)";
         label.innerText = "Iniciando transferência...";
         bar.style.width = "0%";
-        
-        dataChannel.send(JSON.stringify({ 
-            type: "meta", 
-            name: selectedFile.name, 
-            size: selectedFile.size 
-        }));
+        transferStartTime = Date.now();
+        let lastUiUpdate = 0;
 
         let offset = 0;
         const SAFE_BUFFER_LIMIT = 512 * 1024;
 
-        while (offset < selectedFile.size) {
-            if (isAborted) return;
+        try {
+            while (offset < selectedFile.size) {
+                if (isAborted || !dataChannel || dataChannel.readyState !== 'open') {
+                    throw new Error("Canal de transmissão indisponível.");
+                }
 
-            if (dataChannel.bufferedAmount > SAFE_BUFFER_LIMIT) {
-                await new Promise(resolve => {
-                    let liberado = false;
-                    const concluir = () => {
-                        if (liberado) return;
-                        liberado = true;
-                        dataChannel.onbufferedamountlow = null;
-                        clearTimeout(limite);
-                        resolve();
-                    };
-                    const limite = setTimeout(concluir, 4000);
-                    dataChannel.onbufferedamountlow = concluir;
-                });
+                if (dataChannel.bufferedAmount > SAFE_BUFFER_LIMIT) {
+                    await new Promise((resolve, reject) => {
+                        let liberado = false;
+                        const concluir = (erro) => {
+                            if (liberado) return;
+                            liberado = true;
+                            if (dataChannel) dataChannel.onbufferedamountlow = null;
+                            clearTimeout(limite);
+                            if (erro) reject(erro);
+                            else resolve();
+                        };
+                        const limite = setTimeout(() => {
+                            if (isAborted || !dataChannel || dataChannel.readyState !== 'open') {
+                                concluir(new Error("Canal fechado durante espera do buffer."));
+                            } else {
+                                concluir();
+                            }
+                        }, 4000);
+                        dataChannel.onbufferedamountlow = () => concluir();
+                    });
+                }
+
+                if (isAborted) return;
+
+                const slice = selectedFile.slice(offset, offset + CHUNK_SIZE);
+                const buffer = await slice.arrayBuffer();
+                sendChannelData(buffer);
+                offset = Math.min(offset + CHUNK_SIZE, selectedFile.size);
+
+                const now = Date.now();
+                if (now - lastUiUpdate >= 80 || offset === selectedFile.size) {
+                    lastUiUpdate = now;
+                    const percent = selectedFile.size > 0 ? Math.min((offset / selectedFile.size) * 100, 100) : 100;
+                    const elapsedSec = Math.max((now - transferStartTime) / 1000, 0.1);
+                    const speedText = formatBytes(offset / elapsedSec);
+                    bar.style.width = `${percent}%`;
+                    label.innerText = `${Math.round(percent)}% (${formatBytes(offset)} de ${formatBytes(selectedFile.size)}) • ${speedText}/s`;
+                }
             }
-            
-            const slice = selectedFile.slice(offset, offset + CHUNK_SIZE);
-            const buffer = await slice.arrayBuffer();
-            dataChannel.send(buffer);
-            offset += CHUNK_SIZE;
 
-            const percent = Math.min((offset / selectedFile.size) * 100, 100);
-            bar.style.width = `${percent}%`;
-            label.innerText = `${Math.round(percent)}% (${(offset / (1024*1024)).toFixed(1)} de ${(selectedFile.size / (1024*1024)).toFixed(1)} MB)`;
+            sendChannelData(JSON.stringify({ type: "eof" }));
+            bar.style.width = "100%";
+            transferenciaConcluida = true;
+            document.getElementById('progressTitle').innerText = "Envio Concluído! 🎉";
+            label.style.color = "var(--success)";
+            label.innerText = `Arquivo entregue com sucesso (${formatBytes(selectedFile.size)}).`;
+
+            const btnCancel = document.getElementById('btnCancel');
+            btnCancel.innerText = "Voltar ao Início";
+            btnCancel.classList.remove("btn-danger");
+
+            limparSalaFirebase();
+        } catch (err) {
+            if (!isAborted && !transferenciaConcluida) {
+                falhaCritica("Transferência interrompida: conexão perdida.");
+            }
         }
-        
-        dataChannel.send(JSON.stringify({ type: "eof" }));
-        transferenciaConcluida = true;
-        document.getElementById('progressTitle').innerText = "Envio Concluído! 🎉";
-        label.innerText = "O arquivo foi entregue com sucesso.";
-        
-        const btnCancel = document.getElementById('btnCancel');
-        btnCancel.innerText = "Voltar ao Início";
-        btnCancel.classList.replace("btn-danger", "btn");
-        
-        // Limpa a sala do Firebase após o envio
-        if (db && roomId) db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{});
     }
 
     function configurarRecebimento() {
-        dataChannel.onmessage = async (e) => {
+        let lastUiUpdate = 0;
+
+        dataChannel.onmessage = (e) => {
             if (isAborted) return;
 
             if (typeof e.data === "string") {
-                const msg = JSON.parse(e.data);
+                let msg;
+                try {
+                    msg = JSON.parse(e.data);
+                } catch (err) {
+                    return;
+                }
+
                 if (msg.type === "meta") {
-                    metaData = msg;
+                    const validSize = typeof msg.size === 'number' && Number.isFinite(msg.size) && msg.size >= 0;
+                    if (!validSize) {
+                        falhaCritica("Metadados de arquivo inválidos.");
+                        return;
+                    }
+                    metaData = {
+                        type: "meta",
+                        name: sanitizeFileName(msg.name),
+                        size: msg.size
+                    };
+                    writeQueue = Promise.resolve();
+                    metaAckSent = false;
+                    eofRecebido = false;
+                    receivedChunks = [];
+                    receivedSize = 0;
+                    lastUiUpdate = 0;
+
                     const bar = document.getElementById('progressBar');
                     bar.classList.remove('connecting');
                     bar.style.width = "0%";
-                    
-                    document.getElementById('progressTitle').innerText = "Recebendo Arquivo";
-                    document.getElementById('fileMeta').style.display = "block";
-                    document.getElementById('fileMeta').innerText = `${msg.name} (${(msg.size / (1024*1024)).toFixed(2)} MB)`;
-                    document.getElementById('statusLabel').innerText = "Baixando fluxo direto...";
 
-                    // Se suportado no desktop, usa stream direta em disco
-                    if (window.showSaveFilePicker && window.isSecureContext) {
+                    document.getElementById('fileMeta').style.display = "block";
+                    document.getElementById('fileMeta').innerText = `${metaData.name} (${formatBytes(metaData.size)})`;
+
+                    const enviarAck = () => {
+                        if (metaAckSent || isAborted) return;
+                        metaAckSent = true;
+                        transferStartTime = Date.now();
+                        document.getElementById('progressTitle').innerText = "Recebendo Arquivo";
                         try {
-                            const handle = await window.showSaveFilePicker({ suggestedName: metaData.name });
-                            fileWritableStream = await handle.createWritable();
-                            document.getElementById('statusLabel').innerText = "Stream direta em disco ativada";
-                        } catch (err) { fileWritableStream = null; }
+                            sendChannelData(JSON.stringify({ type: "meta_ack" }));
+                        } catch (err) {
+                            falhaCritica("Falha ao confirmar início do recebimento.");
+                        }
+                    };
+
+                    // Se suportado no desktop, solicita clique do usuário para liberar showSaveFilePicker
+                    if (window.showSaveFilePicker && window.isSecureContext) {
+                        const acceptBtn = document.getElementById('acceptBtn');
+                        acceptBtn.innerText = "Aceitar e Salvar Arquivo";
+                        document.getElementById('progressTitle').innerText = "Arquivo Pronto";
+                        document.getElementById('statusLabel').style.color = "var(--text-muted)";
+                        document.getElementById('statusLabel').innerText = "Clique abaixo para escolher onde salvar e iniciar:";
+                        acceptBtn.classList.remove('hidden');
+                        acceptBtn.onclick = async () => {
+                            acceptBtn.classList.add('hidden');
+                            try {
+                                const handle = await window.showSaveFilePicker({ suggestedName: metaData.name });
+                                fileWritableStream = await handle.createWritable();
+                                document.getElementById('statusLabel').style.color = "var(--text-muted)";
+                                document.getElementById('statusLabel').innerText = "Stream direta em disco ativada...";
+                                enviarAck();
+                            } catch (err) {
+                                fileWritableStream = null;
+                                if (err && err.name === 'AbortError') {
+                                    document.getElementById('progressTitle').innerText = "Arquivo Pronto";
+                                    document.getElementById('statusLabel').style.color = "var(--warning)";
+                                    document.getElementById('statusLabel').innerText = "Seleção de arquivo cancelada. Escolha onde salvar para iniciar:";
+                                    acceptBtn.classList.remove('hidden');
+                                    return;
+                                }
+                                if (metaData.size > MAX_RAM_AUTO_BYTES) {
+                                    acceptBtn.innerText = `Baixar em RAM Mesmo Assim (${formatBytes(metaData.size)})`;
+                                    document.getElementById('progressTitle').innerText = "Arquivo Grande Detectado";
+                                    document.getElementById('statusLabel').style.color = "var(--warning)";
+                                    document.getElementById('statusLabel').innerText = "Stream em disco indisponível. Este arquivo usará memória RAM antes do download.";
+                                    acceptBtn.classList.remove('hidden');
+                                    acceptBtn.onclick = () => {
+                                        acceptBtn.classList.add('hidden');
+                                        document.getElementById('statusLabel').style.color = "var(--text-muted)";
+                                        document.getElementById('statusLabel').innerText = "Baixando fluxo direto...";
+                                        enviarAck();
+                                    };
+                                    return;
+                                }
+                                document.getElementById('statusLabel').style.color = "var(--text-muted)";
+                                document.getElementById('statusLabel').innerText = "Salvamento em memória ativado...";
+                                enviarAck();
+                            }
+                        };
+                    } else if (metaData.size > MAX_RAM_AUTO_BYTES) {
+                        const acceptBtn = document.getElementById('acceptBtn');
+                        acceptBtn.innerText = `Baixar Mesmo Assim (${formatBytes(metaData.size)})`;
+                        document.getElementById('progressTitle').innerText = "Arquivo Grande Detectado";
+                        document.getElementById('statusLabel').style.color = "var(--warning)";
+                        document.getElementById('statusLabel').innerText = "Este navegador salvará o arquivo na memória RAM antes do download.";
+                        acceptBtn.classList.remove('hidden');
+                        acceptBtn.onclick = () => {
+                            acceptBtn.classList.add('hidden');
+                            document.getElementById('statusLabel').style.color = "var(--text-muted)";
+                            document.getElementById('statusLabel').innerText = "Baixando fluxo direto...";
+                            enviarAck();
+                        };
+                    } else {
+                        document.getElementById('statusLabel').style.color = "var(--text-muted)";
+                        document.getElementById('statusLabel').innerText = "Baixando fluxo direto...";
+                        enviarAck();
                     }
                 } else if (msg.type === "eof") {
-                    transferenciaConcluida = true;
-                    document.getElementById('progressTitle').innerText = "Download Concluído! 🎉";
-                    document.getElementById('statusLabel').style.color = "var(--success)";
-                    
-                    const btnCancel = document.getElementById('btnCancel');
-                    btnCancel.innerText = "Voltar ao Início";
-                    btnCancel.classList.replace("btn-danger", "btn");
+                    eofRecebido = true;
+                    writeQueue = writeQueue.then(async () => {
+                        if (isAborted) return;
+                        if (receivedSize !== metaData.size) {
+                            throw new Error("Transferência incompleta: tamanho do arquivo não confere.");
+                        }
+                        if (fileWritableStream) {
+                            await fileWritableStream.close();
+                            fileWritableStream = null;
+                            document.getElementById('statusLabel').innerText = `Salvo diretamente no seu dispositivo (${formatBytes(metaData.size)}).`;
+                        } else {
+                            document.getElementById('statusLabel').innerText = `Arquivo pronto para download (${formatBytes(metaData.size)})!`;
+                            if (activeDownloadUrl) {
+                                try { URL.revokeObjectURL(activeDownloadUrl); } catch(e){}
+                            }
+                            const blob = new Blob(receivedChunks, { type: "application/octet-stream" });
+                            receivedChunks = [];
+                            activeDownloadUrl = URL.createObjectURL(blob);
+                            const btn = document.getElementById('downloadBtn');
 
-                    if (fileWritableStream) {
-                        await fileWritableStream.close();
-                        fileWritableStream = null;
-                        document.getElementById('statusLabel').innerText = "Salvo diretamente no seu dispositivo.";
-                    } else {
-                        document.getElementById('statusLabel').innerText = "Arquivo pronto para download!";
-                        const blob = new Blob(receivedChunks, { type: "application/octet-stream" });
-                        const url = URL.createObjectURL(blob);
-                        const btn = document.getElementById('downloadBtn');
-                        
-                        btn.classList.remove('hidden');
-                        btn.onclick = () => {
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = metaData.name;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            setTimeout(() => URL.revokeObjectURL(url), 2000); 
-                        };
-                    }
+                            btn.classList.remove('hidden');
+                            btn.onclick = () => {
+                                const a = document.createElement('a');
+                                a.href = activeDownloadUrl;
+                                a.download = metaData.name;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                            };
+                        }
 
-                    if (db && roomId) db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{});
+                        transferenciaConcluida = true;
+                        document.getElementById('progressBar').style.width = "100%";
+                        document.getElementById('progressTitle').innerText = "Download Concluído! 🎉";
+                        document.getElementById('statusLabel').style.color = "var(--success)";
+
+                        const btnCancel = document.getElementById('btnCancel');
+                        btnCancel.innerText = "Voltar ao Início";
+                        btnCancel.classList.remove("btn-danger");
+
+                        limparSalaFirebase();
+                    }).catch((err) => {
+                        falhaCritica(err && err.message ? err.message : "Erro ao finalizar a gravação do arquivo.");
+                    });
                 }
             } else {
-                if (!metaData) return;
-                try {
-                    if (fileWritableStream) await fileWritableStream.write(e.data);
-                    else receivedChunks.push(e.data);
-                } catch (err) {
-                    falhaCritica("Sem espaço ou permissão para salvar no disco.");
-                    return;
-                }
-                
-                receivedSize += e.data.byteLength;
-                const percent = Math.min((receivedSize / metaData.size) * 100, 100);
-                document.getElementById('progressBar').style.width = `${percent}%`;
-                document.getElementById('statusLabel').innerText = `${Math.round(percent)}% transferido`;
+                if (!metaData || isAborted || eofRecebido || transferenciaConcluida) return;
+                const chunkData = e.data;
+                const byteLen = chunkData instanceof ArrayBuffer ? chunkData.byteLength : (chunkData && typeof chunkData.size === 'number' ? chunkData.size : 0);
+                if (byteLen <= 0) return;
+
+                writeQueue = writeQueue.then(async () => {
+                    if (isAborted) return;
+                    if (receivedSize + byteLen > metaData.size) {
+                        throw new Error("Tamanho recebido excedeu os metadados declarados.");
+                    }
+                    if (fileWritableStream) {
+                        await fileWritableStream.write(chunkData);
+                    } else {
+                        receivedChunks.push(chunkData);
+                    }
+
+                    receivedSize += byteLen;
+                    const now = Date.now();
+                    if (now - lastUiUpdate >= 80 || receivedSize === metaData.size) {
+                        lastUiUpdate = now;
+                        const percent = metaData.size > 0 ? Math.min((receivedSize / metaData.size) * 100, 100) : 100;
+                        const elapsedSec = Math.max((now - transferStartTime) / 1000, 0.1);
+                        const speedText = formatBytes(receivedSize / elapsedSec);
+                        document.getElementById('progressBar').style.width = `${percent}%`;
+                        document.getElementById('statusLabel').innerText = `${Math.round(percent)}% (${formatBytes(receivedSize)} de ${formatBytes(metaData.size)}) • ${speedText}/s`;
+                    }
+                }).catch((err) => {
+                    falhaCritica(err && err.message && err.message.includes("excedeu") ? err.message : "Sem espaço ou permissão para salvar no disco.");
+                });
             }
         };
     }
@@ -656,6 +963,19 @@
         if (isAborted) return;
         isAborted = true;
         clearTimeout(signalWatchdog);
+        clearTimeout(iceDisconnectTimer);
+        pendingCandidates = [];
+        receivedChunks = [];
+
+        if (fileWritableStream) {
+            try { fileWritableStream.abort ? fileWritableStream.abort() : fileWritableStream.close(); } catch(e){}
+            fileWritableStream = null;
+        }
+
+        limparSalaFirebase();
+
+        const acceptBtn = document.getElementById('acceptBtn');
+        if (acceptBtn) acceptBtn.classList.add('hidden');
 
         const titulo = document.getElementById('progressTitle');
         const label = document.getElementById('statusLabel');
@@ -685,13 +1005,30 @@
     function voltarAoInicio() {
         isAborted = true;
         clearTimeout(signalWatchdog);
-        if (fileWritableStream) { try { fileWritableStream.close(); } catch(e){} }
+        clearTimeout(iceDisconnectTimer);
+        pendingCandidates = [];
+        receivedChunks = [];
+        if (activeDownloadUrl) { try { URL.revokeObjectURL(activeDownloadUrl); } catch(e){} activeDownloadUrl = null; }
+        if (fileWritableStream) { try { fileWritableStream.abort ? fileWritableStream.abort() : fileWritableStream.close(); } catch(e){} fileWritableStream = null; }
         if (dataChannel) { try { dataChannel.close(); } catch(e){} }
         if (peerConnection) { try { peerConnection.close(); } catch(e){} }
-        if (db && roomId) { db.ref(`p2p_rooms/${roomId}`).remove().catch(()=>{}); }
+        limparSalaFirebase();
 
         window.location.href = window.location.pathname;
     }
+
+    window.addEventListener('beforeunload', (e) => {
+        if (handshakeStarted && !transferenciaConcluida && !isAborted) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    window.addEventListener('pagehide', () => {
+        if (!transferenciaConcluida && role === 'sender') {
+            limparSalaFirebase();
+        }
+    });
 
     document.getElementById('btnCancel').onclick = voltarAoInicio;
 </script>
