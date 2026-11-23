@@ -9,6 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
@@ -249,6 +250,98 @@
             .qr-container { padding: 10px; }
             .dropzone { padding: 2.2rem 1rem; }
         }
+
+        .mode-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 18px;
+            background: var(--card-secondary);
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .mode-tab {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .mode-tab:hover { color: var(--text); }
+
+        .mode-tab.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 173, 181, 0.28);
+        }
+
+        .qr-scanner-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-height: 290px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: #000;
+            border: 1px solid var(--border);
+            margin-top: 12px;
+        }
+
+        .qr-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .qr-reticle {
+            position: absolute;
+            inset: 50% auto auto 50%;
+            width: 66%;
+            height: 66%;
+            transform: translate(-50%, -50%);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.42);
+            pointer-events: none;
+        }
+
+        .manual-join {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .manual-input {
+            flex: 1;
+            min-width: 0;
+            background: var(--card-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+
+        .manual-input:focus { border-color: var(--primary); }
+
+        .manual-btn {
+            width: auto;
+            margin-top: 0;
+            padding: 0 16px;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -259,15 +352,51 @@
     <h2 class="header-title">Pure P2P Share ⚡</h2>
     <p class="header-sub">Transferência direta entre dispositivos via WebRTC</p>
     
-    <!-- Tela 1: Escolha do Arquivo (Remetente) -->
+    <!-- Tela 1: Escolha de Modo (Enviar ou Receber via QR Code) -->
     <div id="viewSelection">
-        <div class="dropzone" id="dropzone">
-            <span class="dropzone-icon">📤</span>
-            <p style="margin: 0; font-weight: 600;">Clique ou arraste um arquivo</p>
-            <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
-                Transmissão direta P2P. Sem armazenamento em nuvem.
+        <div class="mode-tabs" role="tablist" aria-label="Modo de transferência">
+            <button type="button" id="tabSend" class="mode-tab active" role="tab" aria-selected="true">
+                📤 Enviar
+            </button>
+            <button type="button" id="tabReceive" class="mode-tab" role="tab" aria-selected="false">
+                📷 Receber
+            </button>
+        </div>
+
+        <!-- Função 1: Enviar Arquivo -->
+        <div id="panelSend">
+            <div class="dropzone" id="dropzone">
+                <span class="dropzone-icon">📤</span>
+                <p style="margin: 0; font-weight: 600;">Clique ou arraste um arquivo</p>
+                <p style="margin: 6px 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
+                    Transmissão direta P2P. Sem armazenamento em nuvem.
+                </p>
+                <input type="file" id="fileInput" style="display:none;">
+            </div>
+        </div>
+
+        <!-- Função 2: Receber Arquivo (Leitor de QR Code + Link) -->
+        <div id="panelReceive" class="hidden">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">
+                Escaneie o QR Code gerado pelo remetente para receber o arquivo direto neste dispositivo.
             </p>
-            <input type="file" id="fileInput" style="display:none;">
+            <button type="button" id="btnStartScan" class="btn">📷 Abrir Leitor de QR Code</button>
+            <div id="qrScannerBox" class="qr-scanner-box hidden">
+                <video id="qrVideo" class="qr-video" playsinline muted autoplay></video>
+                <div class="qr-reticle"></div>
+            </div>
+            <canvas id="qrCanvas" class="hidden"></canvas>
+            <div id="qrStatus" class="status-msg"></div>
+            <button type="button" id="btnStopScan" class="btn btn-danger hidden">Parar Câmera</button>
+
+            <hr style="border: 0; height: 1px; background: var(--border); margin: 18px 0 12px;">
+            <p style="font-size: 0.78rem; color: var(--text-muted);">
+                Ou cole o link / código da sala manualmente:
+            </p>
+            <div class="manual-join">
+                <input type="text" id="manualRoomInput" class="manual-input" placeholder="https://...?room=... ou room_..." aria-label="Link ou código da sala">
+                <button type="button" id="btnJoinManual" class="btn manual-btn">Conectar</button>
+            </div>
         </div>
     </div>
 
@@ -338,6 +467,7 @@
     let peerIdConnected = null;
     let transferStartTime = 0;
     let activeDownloadUrl = null;
+    let qrStream = null, qrScanTimer = null, qrScanning = false, qrBarcodeDetector = null;
 
     function formatBytes(bytes) {
         if (!bytes || bytes <= 0) return '0 B';
@@ -361,6 +491,20 @@
         return typeof id === 'string' && /^[a-zA-Z0-9_-]{6,48}$/.test(id);
     }
 
+    function extrairRoomId(raw) {
+        if (typeof raw !== 'string') return null;
+        const text = raw.trim();
+        if (!text) return null;
+        if (isValidRoomId(text)) return text;
+        try {
+            const parsed = new URL(text, window.location.origin);
+            const param = parsed.searchParams.get('room');
+            if (param && isValidRoomId(param)) return param;
+        } catch (e) {}
+        const match = text.match(/[?&]room=([a-zA-Z0-9_-]{6,48})/);
+        return match && isValidRoomId(match[1]) ? match[1] : null;
+    }
+
     function sanitizeFileName(name) {
         if (typeof name !== 'string') return 'arquivo_recebido';
         const base = name.split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g, '').trim();
@@ -380,29 +524,37 @@
             }
             firebase.initializeApp(FIREBASE_CONFIG);
             db = firebase.database();
-            
+
+            document.getElementById('tabSend').onclick = () => iniciarFuncaoEnviar();
+            document.getElementById('tabReceive').onclick = () => iniciarFuncaoReceber();
+
             if (roomParam !== null) {
-                role = "receiver";
-                document.getElementById('viewSelection').classList.add('hidden');
-                document.getElementById('viewStatus').classList.remove('hidden');
-                document.getElementById('boxShare').classList.add('hidden');
-                if (!isValidRoomId(roomParam)) {
-                    falhaCritica("Link de sala inválido ou corrompido.");
-                    return;
-                }
-                roomId = roomParam;
-                document.getElementById('progressTitle').innerText = "Preparando Recepção...";
-                document.getElementById('statusLabel').innerText = "Conectando ao remetente...";
-                inicializarP2P();
+                iniciarRecepcao(roomParam);
             } else {
-                role = "sender";
                 configurarPainelEnvio();
+                configurarPainelRecebimento();
+                iniciarFuncaoEnviar();
             }
         } catch(e) {
             console.error(e);
             falhaCritica("Falha ao inicializar serviço de rede.");
         }
     });
+
+    /* ---------- FUNÇÃO 1: ENVIAR ARQUIVO ---------- */
+
+    function iniciarFuncaoEnviar() {
+        pararLeitorQr();
+        role = "sender";
+        const tabSend = document.getElementById('tabSend');
+        const tabReceive = document.getElementById('tabReceive');
+        tabSend.classList.add('active');
+        tabSend.setAttribute('aria-selected', 'true');
+        tabReceive.classList.remove('active');
+        tabReceive.setAttribute('aria-selected', 'false');
+        document.getElementById('panelSend').classList.remove('hidden');
+        document.getElementById('panelReceive').classList.add('hidden');
+    }
 
     function configurarPainelEnvio() {
         const dropzone = document.getElementById('dropzone');
@@ -422,6 +574,8 @@
     }
 
     function prepararEnvio(file) {
+        pararLeitorQr();
+        role = "sender";
         selectedFile = file;
         roomId = generateSecureId('room_', 8);
         
@@ -482,6 +636,221 @@
         };
 
         inicializarP2P();
+    }
+
+    /* ---------- FUNÇÃO 2: RECEBER ARQUIVO (QR CODE + LINK) ---------- */
+
+    function iniciarFuncaoReceber() {
+        role = "receiver";
+        const tabSend = document.getElementById('tabSend');
+        const tabReceive = document.getElementById('tabReceive');
+        tabReceive.classList.add('active');
+        tabReceive.setAttribute('aria-selected', 'true');
+        tabSend.classList.remove('active');
+        tabSend.setAttribute('aria-selected', 'false');
+        document.getElementById('panelSend').classList.add('hidden');
+        document.getElementById('panelReceive').classList.remove('hidden');
+    }
+
+    function configurarPainelRecebimento() {
+        document.getElementById('btnStartScan').onclick = () => iniciarLeitorQr();
+        document.getElementById('btnStopScan').onclick = () => pararLeitorQr();
+
+        const manualInput = document.getElementById('manualRoomInput');
+        const conectarManual = () => {
+            const parsedId = extrairRoomId(manualInput.value);
+            const statusEl = document.getElementById('qrStatus');
+            if (!parsedId) {
+                statusEl.style.color = "var(--danger)";
+                statusEl.innerText = "Link ou código de sala inválido.";
+                return;
+            }
+            statusEl.innerText = "";
+            iniciarRecepcao(parsedId);
+        };
+        document.getElementById('btnJoinManual').onclick = conectarManual;
+        manualInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                conectarManual();
+            }
+        };
+    }
+
+    function iniciarRecepcao(targetRoomId) {
+        pararLeitorQr();
+        role = "receiver";
+        document.getElementById('viewSelection').classList.add('hidden');
+        document.getElementById('viewStatus').classList.remove('hidden');
+        document.getElementById('boxShare').classList.add('hidden');
+
+        if (!isValidRoomId(targetRoomId)) {
+            falhaCritica("Link de sala inválido ou corrompido.");
+            return;
+        }
+        roomId = targetRoomId;
+        try {
+            const nextUrl = `${window.location.pathname}?room=${encodeURIComponent(targetRoomId)}`;
+            window.history.replaceState(null, "", nextUrl);
+        } catch (e) {}
+
+        document.getElementById('progressTitle').innerText = "Preparando Recepção...";
+        document.getElementById('statusLabel').style.color = "var(--text-muted)";
+        document.getElementById('statusLabel').innerText = "Conectando ao remetente...";
+        inicializarP2P();
+    }
+
+    function pararLeitorQr() {
+        qrScanning = false;
+        if (qrScanTimer) {
+            clearTimeout(qrScanTimer);
+            qrScanTimer = null;
+        }
+        if (qrStream) {
+            try {
+                qrStream.getTracks().forEach((t) => t.stop());
+            } catch (e) {}
+            qrStream = null;
+        }
+        const video = document.getElementById('qrVideo');
+        if (video) {
+            try { video.pause(); } catch (e) {}
+            video.srcObject = null;
+        }
+        const box = document.getElementById('qrScannerBox');
+        const btnStart = document.getElementById('btnStartScan');
+        const btnStop = document.getElementById('btnStopScan');
+        if (box) box.classList.add('hidden');
+        if (btnStop) btnStop.classList.add('hidden');
+        if (btnStart) btnStart.classList.remove('hidden');
+    }
+
+    async function iniciarLeitorQr() {
+        if (qrScanning) return;
+        const statusEl = document.getElementById('qrStatus');
+        const video = document.getElementById('qrVideo');
+        const canvas = document.getElementById('qrCanvas');
+        const box = document.getElementById('qrScannerBox');
+        const btnStart = document.getElementById('btnStartScan');
+        const btnStop = document.getElementById('btnStopScan');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Câmera indisponível neste navegador (use HTTPS ou cole o link abaixo).";
+            return;
+        }
+
+        if ('BarcodeDetector' in window && !qrBarcodeDetector) {
+            try {
+                const formats = typeof window.BarcodeDetector.getSupportedFormats === 'function'
+                    ? await window.BarcodeDetector.getSupportedFormats()
+                    : ['qr_code'];
+                if (Array.isArray(formats) && formats.includes('qr_code')) {
+                    qrBarcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                }
+            } catch (e) {
+                qrBarcodeDetector = null;
+            }
+        }
+
+        if (!qrBarcodeDetector && typeof jsQR !== 'function') {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Leitor de QR Code indisponível offline. Cole o link abaixo.";
+            return;
+        }
+
+        statusEl.style.color = "var(--text-muted)";
+        statusEl.innerText = "Solicitando permissão da câmera...";
+        btnStart.classList.add('hidden');
+
+        try {
+            try {
+                qrStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } },
+                    audio: false
+                });
+            } catch (errEnv) {
+                if (errEnv && (errEnv.name === 'NotAllowedError' || errEnv.name === 'SecurityError')) {
+                    throw errEnv;
+                }
+                qrStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            }
+
+            video.srcObject = qrStream;
+            await video.play();
+
+            box.classList.remove('hidden');
+            btnStop.classList.remove('hidden');
+            statusEl.style.color = "var(--primary)";
+            statusEl.innerText = "Aponte a câmera para o QR Code...";
+            qrScanning = true;
+
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const escanearFrame = async () => {
+                if (!qrScanning) return;
+                let delay = 120;
+                try {
+                    if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
+                        const scale = Math.min(1, 640 / video.videoWidth);
+                        const w = Math.max(1, Math.floor(video.videoWidth * scale));
+                        const h = Math.max(1, Math.floor(video.videoHeight * scale));
+                        if (canvas.width !== w || canvas.height !== h) {
+                            canvas.width = w;
+                            canvas.height = h;
+                        }
+                        ctx.drawImage(video, 0, 0, w, h);
+
+                        let rawValue = null;
+                        if (qrBarcodeDetector) {
+                            try {
+                                const codes = await qrBarcodeDetector.detect(canvas);
+                                if (codes && codes.length > 0 && codes[0].rawValue) {
+                                    rawValue = codes[0].rawValue;
+                                }
+                            } catch (e) {
+                                qrBarcodeDetector = null;
+                            }
+                        }
+                        if (!rawValue && typeof jsQR === 'function') {
+                            const imgData = ctx.getImageData(0, 0, w, h);
+                            const decoded = jsQR(imgData.data, w, h, { inversionAttempts: "dontInvert" });
+                            if (decoded && decoded.data) rawValue = decoded.data;
+                        }
+
+                        if (rawValue) {
+                            const foundRoom = extrairRoomId(rawValue);
+                            if (foundRoom) {
+                                statusEl.style.color = "var(--success)";
+                                statusEl.innerText = "QR Code reconhecido! Conectando...";
+                                iniciarRecepcao(foundRoom);
+                                return;
+                            }
+                            statusEl.style.color = "var(--warning)";
+                            statusEl.innerText = "QR Code inválido para Pure P2P Share. Tente novamente...";
+                            delay = 900;
+                        }
+                    }
+                } catch (e) {}
+
+                if (qrScanning) {
+                    qrScanTimer = setTimeout(escanearFrame, delay);
+                }
+            };
+
+            qrScanTimer = setTimeout(escanearFrame, 150);
+        } catch (err) {
+            pararLeitorQr();
+            statusEl.style.color = "var(--danger)";
+            if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+                statusEl.innerText = "Permissão da câmera negada. Libere o acesso ou cole o link abaixo.";
+            } else if (err && err.name === 'NotFoundError') {
+                statusEl.innerText = "Nenhuma câmera encontrada neste dispositivo.";
+            } else if (err && err.name === 'NotReadableError') {
+                statusEl.innerText = "Câmera em uso por outro aplicativo.";
+            } else {
+                statusEl.innerText = "Não foi possível abrir a câmera.";
+            }
+        }
     }
 
     function limparSalaFirebase() {
@@ -962,6 +1331,7 @@
     function falhaCritica(motivo) {
         if (isAborted) return;
         isAborted = true;
+        pararLeitorQr();
         clearTimeout(signalWatchdog);
         clearTimeout(iceDisconnectTimer);
         pendingCandidates = [];
@@ -973,6 +1343,13 @@
         }
 
         limparSalaFirebase();
+
+        const viewSel = document.getElementById('viewSelection');
+        const viewSt = document.getElementById('viewStatus');
+        const boxSh = document.getElementById('boxShare');
+        if (viewSel) viewSel.classList.add('hidden');
+        if (viewSt) viewSt.classList.remove('hidden');
+        if (boxSh) boxSh.classList.add('hidden');
 
         const acceptBtn = document.getElementById('acceptBtn');
         if (acceptBtn) acceptBtn.classList.add('hidden');
@@ -1004,6 +1381,7 @@
 
     function voltarAoInicio() {
         isAborted = true;
+        pararLeitorQr();
         clearTimeout(signalWatchdog);
         clearTimeout(iceDisconnectTimer);
         pendingCandidates = [];
@@ -1025,6 +1403,7 @@
     });
 
     window.addEventListener('pagehide', () => {
+        pararLeitorQr();
         if (!transferenciaConcluida && role === 'sender') {
             limparSalaFirebase();
         }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MANICÔMIO — Experimento B</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <meta name="description" content="Roguelike em pixel art: sobrevivência e terror psicológico no manicômio.">
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
   <style>
@@ -270,17 +270,17 @@
       93%{transform:skewX(1deg) translateX(3px);filter:hue-rotate(-90deg)}
       95%{transform:none;filter:none}
     }
-    .san-glitch { animation: sanGlitch 0.8s infinite; }
+    .san-glitch { display: inline-block; animation: sanGlitch 0.8s infinite; }
 
     /* ── WHISPER log entry ── */
     .whisper { color: #1a3a1a; font-style: italic; letter-spacing: 3px; }
   </style>
 </head>
 <body>
-<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+<a href="/?v=arcade" id="back-hub" aria-label="Voltar ao Arcade"
    style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
    onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
-   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Arcade</a>
   <div class="vignette"></div>
   <div class="danger-pulse" id="danger-pulse"></div>
   <div id="tint-layer"></div>
@@ -342,7 +342,9 @@
           <span style="color:var(--amarelo)">N</span> Nota/Documento &nbsp;&nbsp;
           <span style="color:var(--azul)">?</span> Item no chão &nbsp;&nbsp;
           <span style="color:var(--verde)">@</span> Você &nbsp;&nbsp;
-          <span style="color:#550000">%</span> Cadáver (lootável)
+          <span style="color:#550000">%</span> Cadáver &nbsp;&nbsp;
+          <span style="color:var(--roxo)">~</span> Vazio &nbsp;&nbsp;
+          <span style="color:#aa2222">[X]</span> Descartar
         </p>
       </div>
       <div class="menu-opt" style="margin-top:24px;" onclick="voltarMenu()">[ VOLTAR ]</div>
@@ -359,17 +361,17 @@
     <pre id="grid"></pre>
     <div id="log"></div>
     <div id="btn-row">
-      <button class="btn-retro" id="btn-inv"   onclick="toggleInv()">[ MOCHILA (I) ]</button>
-      <button class="btn-retro" id="btn-flash" onclick="toggleFlash()">[ LANTERNA (F) ]</button>
-      <button class="btn-retro" id="btn-restart" style="display:none;" onclick="voltarHomepage()">[ MENU PRINCIPAL ]</button>
+      <button class="btn-retro" id="btn-inv"   onclick="this.blur(); toggleInv()">[ MOCHILA (I) ]</button>
+      <button class="btn-retro" id="btn-flash" onclick="this.blur(); toggleFlash()">[ LANTERNA (F) ]</button>
+      <button class="btn-retro" id="btn-restart" style="display:none;" onclick="this.blur(); voltarHomepage()">[ MENU PRINCIPAL ]</button>
     </div>
   </div>
 
   <!-- Lore screen -->
-  <div id="lore-screen" class="overlay-screen">
+  <div id="lore-screen" class="overlay-screen" style="cursor:pointer;" onclick="fecharLore()">
     <h2 class="amarelo" style="letter-spacing:5px;margin-bottom:18px;">DOCUMENTO ENCONTRADO</h2>
     <pre id="lore-text" class="cinza" style="white-space:pre-wrap;max-width:580px;text-align:center;font-size:16px;line-height:1.7;"></pre>
-    <p class="verde" style="margin-top:28px;animation:blink 1s infinite;font-size:16px;letter-spacing:2px;">[ ENTER para largar o papel ]</p>
+    <p class="verde" style="margin-top:28px;animation:blink 1s infinite;font-size:16px;letter-spacing:2px;">[ ENTER ou toque para largar o papel ]</p>
   </div>
 
   <!-- Inventory -->
@@ -378,14 +380,14 @@
     <p class="cinza" id="inv-status" style="margin-top:6px;font-size:15px;letter-spacing:2px;"></p>
     <p class="cinza" id="arma-status" style="margin-top:2px;font-size:13px;letter-spacing:1px;"></p>
     <div id="inv-list" style="margin-top:18px;"></div>
-    <button class="btn-retro" style="margin-top:30px;" onclick="toggleInv()">[ FECHAR ]</button>
+    <button class="btn-retro" style="margin-top:30px;" onclick="this.blur(); toggleInv()">[ FECHAR (I / ESC) ]</button>
   </div>
 
   <!-- Boss warning -->
-  <div id="boss-warning">
+  <div id="boss-warning" style="cursor:pointer;" onclick="fecharBossWarning()">
     <div style="text-align:center;">
       <div id="boss-text" style="color:var(--vermelho);font-size:clamp(28px,5vw,56px);letter-spacing:8px;text-shadow:0 0 30px var(--vermelho);animation:glitchTitle 0.4s infinite;"></div>
-      <div style="font-size:20px;color:#444;margin-top:18px;letter-spacing:3px;">[ PRESSIONE QUALQUER TECLA ]</div>
+      <div style="font-size:20px;color:#444;margin-top:18px;letter-spacing:3px;">[ PRESSIONE QUALQUER TECLA OU TOQUE ]</div>
     </div>
   </div>
 
@@ -423,7 +425,7 @@
   // STATE
   // ============================================================
   let estado = 'HOMEPAGE';
-  let mapa=[], jogador={}, lanterna=true;
+  let mapa=[], explorado=[], jogador={}, lanterna=true;
   let inimigos=[], itens=[], alucs=[], notas=[];
   let cadaveres=[]; // blood stains / lootable corpses
   let porta={}, arma={}, logs=[];
@@ -431,6 +433,8 @@
   let killed=0, turnos=0;
   let textosLore=[];
   let hbInterval=null, whisperTimer=null, ambientTimer=null;
+  let victoryTimers=[];
+  let bossShownAt=0;
   let flickerThisTurn=false;
 
   // ============================================================
@@ -531,15 +535,20 @@
     }catch(e){}
   };
 
-  // Heartbeat: speed depends on HP
+  // Heartbeat: speed depends on HP (runs once at a time; pauses cleanly on overlays)
   function startHeartbeat() {
-    stopHeartbeat();
+    if(hbInterval) return;
     function beat() {
-      if(estado!=='JOGANDO') return;
+      hbInterval=null;
+      if(estado==='GAMEOVER'||estado==='VITORIA'||estado==='HOMEPAGE') return;
       const hp=jogador.hp||0;
       if(hp>40) return;
+      if(estado!=='JOGANDO') {
+        hbInterval=setTimeout(beat,700);
+        return;
+      }
       const spd = hp>25?900:hp>15?600:350;
-      tone(55,0.08,'sine',0.35); 
+      tone(55,0.08,'sine',0.35);
       setTimeout(()=>tone(48,0.1,'sine',0.28),120);
       document.getElementById('hud').style.setProperty('--hb-speed',spd+'ms');
       hbInterval=setTimeout(beat,spd);
@@ -624,11 +633,19 @@
     document.getElementById('diff-label').textContent=DIFFS[d].nome;
     voltarMenu();
   }
+  function isTouchDevice() {
+    return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  }
+  function clearVictoryTimers() {
+    victoryTimers.forEach(t => clearTimeout(t));
+    victoryTimers = [];
+  }
   function iniciarJogo() {
     clearTimeout(fTimer);
+    clearVictoryTimers();
     document.getElementById('homepage').style.display='none';
     document.getElementById('game-wrapper').style.display='flex';
-    if ('ontouchstart' in window) {
+    if (isTouchDevice()) {
       document.getElementById('dpad').style.display='block';
       document.getElementById('mob-actions').style.display='flex';
     }
@@ -636,12 +653,15 @@
     startWhispers(); startAmbient();
   }
   function voltarHomepage() {
+    clearVictoryTimers();
     ['lore-screen','inv-screen','boss-warning'].forEach(id=>{
       document.getElementById(id).style.display='none';
     });
+    document.getElementById('dpad').style.display='none';
+    document.getElementById('mob-actions').style.display='none';
     document.getElementById('danger-pulse').classList.remove('ativo');
     stopHeartbeat(); stopWhispers(); stopAmbient();
-    setTint(0,0,0);
+    setTint(0,0,0,0);
     initHomepage(); voltarMenu();
   }
 
@@ -654,15 +674,16 @@
     arma={nome:'Mãos nuas',dano:2,dur:999};
     logs=["Você desperta no frio. O ar cheira a mofo e desinfetante."];
     notasColetadas=0; nivelAtual=1; isBoss=false;
-    killed=0; turnos=0; cadaveres=[];
+    killed=0; turnos=0; cadaveres=[]; notas=[];
     let pool=[...POOL_LORE].sort(()=>Math.random()-0.5);
-    textosLore=[...pool.slice(0,TOTAL_NOTAS-1), LORE_FINAL].sort(()=>Math.random()-0.5);
+    // LORE_FINAL stays at index 0 so .pop() deals the 5 other notes before the elevator code
+    textosLore=[LORE_FINAL, ...pool.slice(0,TOTAL_NOTAS-1)];
     estado='JOGANDO';
     document.getElementById('btn-restart').style.display='none';
     document.getElementById('btn-inv').style.display='inline-block';
     document.getElementById('btn-flash').style.display='inline-block';
     document.getElementById('minimapCanvas').style.display='block';
-    setTint(0,0,0);
+    setTint(0,0,0,0);
   }
 
   function addLog(msg,cls='verde') {
@@ -723,8 +744,36 @@
   // ============================================================
   // MAP GENERATION
   // ============================================================
+  function tileOcupado(x,y) {
+    return (x===jogador.x&&y===jogador.y) ||
+           (x===porta.x&&y===porta.y) ||
+           inimigos.some(e=>e.x===x&&e.y===y) ||
+           itens.some(i=>i.x===x&&i.y===y) ||
+           notas.some(n=>n.x===x&&n.y===y);
+  }
+  function acharTileLivreSala(s, tentativas=25) {
+    for(let t=0;t<tentativas;t++){
+      const tx=s.x+Math.floor(Math.random()*s.w);
+      const ty=s.y+Math.floor(Math.random()*s.h);
+      if(tx>0&&tx<W-1&&ty>0&&ty<H-1&&mapa[ty][tx]==='.'&&!tileOcupado(tx,ty))
+        return {x:tx, y:ty};
+    }
+    return null;
+  }
+  function devolverNotasNaoColetadas() {
+    if(!Array.isArray(notas)||notas.length===0) return;
+    notas.forEach(n=>{
+      if(n.texto===LORE_FINAL){
+        if(!textosLore.includes(LORE_FINAL)) textosLore.unshift(LORE_FINAL);
+      } else {
+        textosLore.push(n.texto);
+      }
+    });
+  }
   function gerarNivel() {
+    devolverNotasNaoColetadas();
     mapa=Array.from({length:H},()=>Array(W).fill('#'));
+    explorado=Array.from({length:H},()=>Array(W).fill(false));
     let salas=[];
     isBoss=(nivelAtual%3===0);
     const nSalas=6+Math.min(Math.floor(nivelAtual/2),4);
@@ -749,10 +798,16 @@
 
     inimigos=[]; itens=[]; notas=[]; alucs=[]; cadaveres=[];
 
-    // Lore note
-    if(textosLore.length>0&&salas.length>2){
-      let s=salas[1+Math.floor(Math.random()*(salas.length-2))];
-      notas.push({x:s.x+Math.floor(Math.random()*s.w),y:s.y+Math.floor(Math.random()*s.h),texto:textosLore.pop()});
+    // Lore note (prevents softlock if previous floor notes were skipped)
+    if(notasColetadas<TOTAL_NOTAS){
+      if(textosLore.length===0){
+        textosLore.push(POOL_LORE[Math.floor(Math.random()*POOL_LORE.length)]);
+      }
+      if(salas.length>2){
+        let s=salas[1+Math.floor(Math.random()*(salas.length-2))];
+        const posN=acharTileLivreSala(s);
+        if(posN) notas.push({x:posN.x,y:posN.y,texto:textosLore.pop()});
+      }
     }
 
     const d=DIFFS[diff];
@@ -765,8 +820,8 @@
       // Guaranteed strong weapon before the boss
       if(salas.length>=2){
         let ps=salas[salas.length-2];
-        itens.push({nome:'Machado de Bombeiro',dano:20,dur:8,classe:'vermelho',
-          x:ps.x+Math.floor(Math.random()*ps.w), y:ps.y+Math.floor(Math.random()*ps.h)});
+        const posAxe=acharTileLivreSala(ps)||{x:ps.c.x,y:ps.c.y};
+        itens.push({nome:'Machado de Bombeiro',dano:20,dur:8,classe:'vermelho',x:posAxe.x,y:posAxe.y});
         addLog(`Andar de Boss! Algo reluz na sala anterior...`,'amarelo');
       }
     }
@@ -774,13 +829,16 @@
     for(let i=1;i<salas.length-(isBoss?1:0);i++){
       let s=salas[i];
       if(Math.random()<chanceE){
-        inimigos.push(mkEnemy(s.x+Math.floor(Math.random()*s.w),s.y+Math.floor(Math.random()*s.h)));
-        if(nivelAtual>=3&&Math.random()<nivelAtual*0.08)
-          inimigos.push(mkEnemy(s.x+Math.floor(Math.random()*s.w),s.y+Math.floor(Math.random()*s.h)));
+        const posE1=acharTileLivreSala(s);
+        if(posE1) inimigos.push(mkEnemy(posE1.x,posE1.y));
+        if(nivelAtual>=3&&Math.random()<nivelAtual*0.08){
+          const posE2=acharTileLivreSala(s);
+          if(posE2) inimigos.push(mkEnemy(posE2.x,posE2.y));
+        }
       }
       if(Math.random()<0.68*d.itemM){
-        let it={...gerarItem(),x:s.x+Math.floor(Math.random()*s.w),y:s.y+Math.floor(Math.random()*s.h)};
-        itens.push(it);
+        const posIt=acharTileLivreSala(s);
+        if(posIt) itens.push({...gerarItem(),x:posIt.x,y:posIt.y});
       }
     }
 
@@ -788,6 +846,7 @@
       document.getElementById('boss-text').innerHTML=
         `A N D A R &nbsp; B-${nivelAtual}<br><span style="font-size:0.5em;color:#880000;">O &nbsp; D I R E T O R &nbsp; E S T Á &nbsp; A Q U I</span>`;
       document.getElementById('boss-warning').style.display='flex';
+      bossShownAt=Date.now();
       estado='BOSS';
       sndBoss();
     }
@@ -803,9 +862,9 @@
         if(Math.random()<0.28){
           let rx=jogador.x+Math.floor(Math.random()*9)-4;
           let ry=jogador.y+Math.floor(Math.random()*9)-4;
-          if(rx>0&&rx<W-1&&ry>0&&ry<H-1&&(rx!==porta.x||ry!==porta.y)){
+          if(rx>0&&rx<W-1&&ry>0&&ry<H-1&&!tileOcupado(rx,ry)){
             if(mapa[ry][rx]==='#') mapa[ry][rx]='.';
-            else if(mapa[ry][rx]==='.'&&!inimigos.some(e=>e.x===rx&&e.y===ry)) mapa[ry][rx]=' ';
+            else if(mapa[ry][rx]==='.') mapa[ry][rx]=' ';
           }
         }
       }
@@ -867,6 +926,7 @@
   }
   function descartarItem(idx) {
     const it = jogador.inv[idx];
+    if(!it) return;
     // Drop on current tile if empty, else just destroy
     const tileOk = !itens.some(i=>i.x===jogador.x&&i.y===jogador.y);
     if(tileOk) itens.push({...it, x:jogador.x, y:jogador.y});
@@ -874,10 +934,11 @@
     addLog(`Descartou ${it.nome}${tileOk?' (no chão)':' (perdido)'}`, 'cinza');
     // Tiny drop sound
     try{ tone(200,0.08,'sine',0.12); }catch(e){}
-    renderInv();
+    renderInv(); render();
   }
   function usarItem(idx) {
     let it=jogador.inv[idx];
+    if(!it) return;
     let msg=`Usou ${it.nome}: `;
     if(it.bat){jogador.bat=Math.min(100,jogador.bat+it.bat); msg+=`+${it.bat} Bat `;}
     if(it.hp) {jogador.hp =Math.min(100,jogador.hp +it.hp ); msg+=`+${it.hp} HP `;}
@@ -887,17 +948,39 @@
       arma={nome:it.nome,dano:it.dano,dur:it.dur};
       msg+='(Equipado)';
       jogador.inv.splice(idx,1);
-      if(old.nome!=='Mãos nuas') jogador.inv.push({...old});
+      if(old.nome!=='Mãos nuas') jogador.inv.push({...old, classe:old.classe||'cinza'});
     } else { jogador.inv.splice(idx,1); }
     addLog(msg,it.classe);
     sndPickup();
-    renderInv();
+    updateScreenEffects();
+    renderInv(); render();
   }
   function toggleFlash() {
     if(estado!=='JOGANDO') return;
+    if(!lanterna&&jogador.bat<=0){
+      addLog("Sem bateria! Encontre pilhas.",'vermelho');
+      render(); return;
+    }
     lanterna=!lanterna;
     addLog(`Lanterna ${lanterna?'LIGADA':'DESLIGADA'}`,lanterna?'amarelo':'cinza');
     sndFlash(); render();
+  }
+  function fecharLore() {
+    if(estado!=='LENDO') return;
+    document.getElementById('lore-screen').style.display='none';
+    estado='JOGANDO';
+    if(document.activeElement && typeof document.activeElement.blur==='function')
+      document.activeElement.blur();
+    render();
+  }
+  function fecharBossWarning() {
+    if(estado!=='BOSS') return;
+    if(Date.now()-bossShownAt<350) return;
+    document.getElementById('boss-warning').style.display='none';
+    estado='JOGANDO';
+    if(document.activeElement && typeof document.activeElement.blur==='function')
+      document.activeElement.blur();
+    render();
   }
 
   // ============================================================
@@ -929,6 +1012,12 @@
   // ============================================================
   // GAME TURN
   // ============================================================
+  function podeMoverInimigo(x,y,self) {
+    return x>0&&x<W-1&&y>0&&y<H-1&&
+           mapa[y][x]==='.'&&
+           !(x===jogador.x&&y===jogador.y)&&
+           !inimigos.some(o=>o!==self&&o.x===x&&o.y===y);
+  }
   function processar(dx,dy) {
     if(estado!=='JOGANDO') return;
     turnos++;
@@ -957,20 +1046,19 @@
       if(inim.hp<=0){
         // ── SPAWN CORPSE ──
         const temItem = inim.tipo!=='S' && Math.random()<0.55;
-        cadaveres.push({
+        const novaCad = {
           x:inim.x, y:inim.y,
           item: temItem ? gerarItem() : null,
           looted: false
-        });
+        };
+        if(inim.tipo==='Z'&&Math.random()<0.6){
+          novaCad.item=gerarItem();
+        }
+        cadaveres.push(novaCad);
         inimigos=inimigos.filter(e=>e!==inim);
         killed++;
         addLog(`${inim.nome} eliminado!`,"verde");
         jogador.san=Math.min(100,jogador.san+3);
-        if(inim.tipo==='Z'&&Math.random()<0.6){
-          // Zumbi drops on corpse tile
-          const cad=cadaveres.find(c=>c.x===inim.x&&c.y===inim.y);
-          if(cad) cad.item=gerarItem();
-        }
         if(inim.tipo==='B'){
           addLog("O DIRETOR CAIU! +30 Saúde +30 Mente","amarelo");
           jogador.hp=Math.min(100,jogador.hp+30);
@@ -1009,13 +1097,18 @@
     }
 
     // Note
+    let abriuLore=false;
     let nIdx=notas.findIndex(n=>n.x===jogador.x&&n.y===jogador.y);
     if(nIdx!==-1){
       document.getElementById('lore-text').innerText=notas[nIdx].texto;
-      document.getElementById('lore-screen').style.display='flex';
-      estado='LENDO'; notasColetadas++;
+      abriuLore=true;
+      notasColetadas++;
       addLog(`Documento! (${notasColetadas}/${TOTAL_NOTAS})`,"amarelo");
-      notas.splice(nIdx,1); sndNote(); return;
+      if(notasColetadas>=TOTAL_NOTAS){
+        porta.tipo='E';
+        addLog("Todos os documentos coletados! O Elevador (E) está ativo!","amarelo");
+      }
+      notas.splice(nIdx,1); sndNote();
     }
 
     // Item
@@ -1028,15 +1121,9 @@
       } else { addLog(`Mochila cheia!`,"vermelho"); }
     }
 
-    // Porta
-    if(jogador.x===porta.x&&jogador.y===porta.y){
-      if(porta.tipo==='E'){ mostrarVitoria(); return; }
-      else { nivelAtual++; addLog(`Descendo para B-${nivelAtual}...`,"amarelo"); sndLevel(); gerarNivel(); }
-    }
-
     // Battery
     const d=DIFFS[diff];
-    if(lanterna) jogador.bat=Math.max(0,jogador.bat-d.drainM);
+    if(lanterna) jogador.bat=Math.max(0,Math.round((jogador.bat-d.drainM)*100)/100);
     else jogador.san=Math.max(0,jogador.san-2);
     if(jogador.bat<=0&&lanterna){ addLog("A luz pisca e morre.","vermelho"); lanterna=false; }
 
@@ -1047,6 +1134,30 @@
       sndBleed();
       if(jogador.sangramento===0) addLog("O sangramento estancou.",'cinza');
       else addLog(`Você está sangrando... (${jogador.sangramento} turnos)`,'vermelho');
+    }
+
+    if(jogador.hp<=0||jogador.san<=0){
+      updateScreenEffects();
+      mostrarGameOver();
+      return;
+    }
+
+    // Porta (checked after self-damage/bleed so you don't descend while dead, and returns before new-floor AI runs)
+    if(jogador.x===porta.x&&jogador.y===porta.y){
+      if(porta.tipo==='E'){ mostrarVitoria(); return; }
+      else {
+        nivelAtual++;
+        addLog(`Descendo para B-${nivelAtual}...`,"amarelo");
+        sndLevel();
+        gerarNivel();
+        updateScreenEffects();
+        if(abriuLore && estado!=='BOSS'){
+          document.getElementById('lore-screen').style.display='flex';
+          estado='LENDO';
+        }
+        render();
+        return;
+      }
     }
 
     // Enemy AI — patrol when no aggro, charge when aggro
@@ -1060,17 +1171,16 @@
           const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
           const [px,py]=dirs[Math.floor(Math.random()*4)];
           const wx=e.x+px, wy=e.y+py;
-          if(wx>0&&wx<W-1&&wy>0&&wy<H-1&&mapa[wy][wx]==='.'&&!inimigos.some(o=>o!==e&&o.x===wx&&o.y===wy))
-            { e.x=wx; e.y=wy; }
+          if(podeMoverInimigo(wx,wy,e)){ e.x=wx; e.y=wy; }
         }
         return;
       }
 
-      // Sombra teleports
+      // Sombra teleports (never onto player or door)
       if(e.tipo==='S'&&Math.random()<0.18){
         let tx=jogador.x+Math.floor(Math.random()*7)-3;
         let ty=jogador.y+Math.floor(Math.random()*7)-3;
-        if(tx>0&&tx<W&&ty>0&&ty<H&&mapa[ty][tx]==='.'&&!inimigos.some(o=>o!==e&&o.x===tx&&o.y===ty)){
+        if(podeMoverInimigo(tx,ty,e)&&!(tx===porta.x&&ty===porta.y)){
           e.x=tx; e.y=ty;
         }
         return;
@@ -1094,11 +1204,11 @@
         let ex=jogador.x>e.x?1:(jogador.x<e.x?-1:0);
         let ey=jogador.y>e.y?1:(jogador.y<e.y?-1:0);
         let nx2=e.x+ex, ny2=e.y+ey;
-        if(ny2>=0&&ny2<H&&nx2>=0&&nx2<W&&mapa[ny2][nx2]==='.'&&!inimigos.some(o=>o!==e&&o.x===nx2&&o.y===ny2)){
+        if(podeMoverInimigo(nx2,ny2,e)){
           e.x=nx2; e.y=ny2;
-        } else if(ex!==0&&mapa[e.y][e.x+ex]==='.'&&!inimigos.some(o=>o!==e&&o.x===e.x+ex&&o.y===e.y)){
+        } else if(ex!==0&&podeMoverInimigo(e.x+ex,e.y,e)){
           e.x+=ex;
-        } else if(ey!==0&&mapa[e.y+ey]&&mapa[e.y+ey][e.x]==='.'&&!inimigos.some(o=>o!==e&&o.x===e.x&&o.y===e.y+ey)){
+        } else if(ey!==0&&podeMoverInimigo(e.x,e.y+ey,e)){
           e.y+=ey;
         }
       }
@@ -1114,12 +1224,21 @@
       if(Math.random()<halChance){
         let hx=jogador.x+Math.floor(Math.random()*11)-5;
         let hy=jogador.y+Math.floor(Math.random()*11)-5;
-        if(hx>0&&hx<W&&hy>0&&hy<H&&(mapa[hy][hx]==='.'||mapa[hy][hx]===' ')) alucs.push({x:hx,y:hy});
+        if(hx>0&&hx<W-1&&hy>0&&hy<H-1&&
+           (mapa[hy][hx]==='.'||mapa[hy][hx]===' ')&&
+           !(hx===jogador.x&&hy===jogador.y)&&
+           !inimigos.some(e=>e.x===hx&&e.y===hy)){
+          alucs.push({x:hx,y:hy});
+        }
       }
     }
 
     updateScreenEffects();
     if(jogador.hp<=0||jogador.san<=0){ mostrarGameOver(); return; }
+    if(abriuLore){
+      document.getElementById('lore-screen').style.display='flex';
+      estado='LENDO';
+    }
     render();
   }
 
@@ -1128,14 +1247,19 @@
   // ============================================================
   // Characters that replace floor tiles at low sanity
   const GLITCH_CHARS = ['?','!','|','/','\\','~','+','×','¿','░','▒','▓'];
+  function getVisaoAtual() {
+    let visao = flickerThisTurn ? 1 : (lanterna ? 8 : 2);
+    if(!flickerThisTurn && inimigos.some(e=>e.tipo==='S'&&dst(jogador.x,jogador.y,e.x,e.y)<=4))
+      visao=Math.max(2,visao-3);
+    return visao;
+  }
   function render() {
     if(estado==='GAMEOVER'||estado==='VITORIA') return;
 
-    // Lantern flicker collapses vision
-    let visao = flickerThisTurn ? 1 : (lanterna ? 8 : 2);
-    // Sombra shrinks vision
-    if(!flickerThisTurn && inimigos.some(e=>e.tipo==='S'&&dst(jogador.x,jogador.y,e.x,e.y)<=4))
-      visao=Math.max(2,visao-3);
+    const visao = getVisaoAtual();
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(dst(jogador.x,jogador.y,x,y)<=visao) explorado[y][x]=true;
+    }
 
     const perigoReal=inimigos.some(e=>dst(jogador.x,jogador.y,e.x,e.y)<=3);
     const perigoFalso=alucs.some(a=>dst(jogador.x,jogador.y,a.x,a.y)<=3);
@@ -1221,7 +1345,7 @@
             g+=`<span style="color:#0a1a0a">.</span>`;
           else g+=`<span style="color:${shade}">#</span>`;
         } else if(mapa[y][x]===' '){
-          g+=`<span class="roxo" style="opacity:0.5"> </span>`;
+          g+=`<span class="roxo" style="opacity:0.8">~</span>`;
         } else {
           // Floor: sanity distorts characters
           if(distortChance>0&&Math.random()<distortChance){
@@ -1237,63 +1361,61 @@
     if(gridGlitch) g+='</span>';
     document.getElementById('grid').innerHTML=g;
     document.getElementById('log').innerHTML=logs.join('<br>');
-    renderMinimap();
+    renderMinimap(visao);
   }
 
   // ============================================================
-  // MINIMAP
+  // MINIMAP (Fog-of-War + vision sync)
   // ============================================================
-  function renderMinimap(){
+  function renderMinimap(visao){
     const cv=document.getElementById('minimapCanvas');
     if(!cv) return;
     const S=5; // pixels per tile
     cv.width=W*S; cv.height=H*S;
     const ctx=cv.getContext('2d');
 
-    // Background
+    // Background (unexplored darkness)
     ctx.fillStyle='#050505'; ctx.fillRect(0,0,cv.width,cv.height);
 
-    // Floor tiles
+    // Explored floor tiles
     for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-      if(mapa[y][x]!=='#'){
+      if(explorado[y]&&explorado[y][x]&&mapa[y][x]!=='#'){
         ctx.fillStyle='#0d2a0d';
         ctx.fillRect(x*S,y*S,S,S);
-        // Tiny border to separate cells
         ctx.fillStyle='#071407';
         ctx.fillRect(x*S,y*S,1,1);
       }
     }
 
-    // Corpses (dark red stain)
+    // Explored static markers
     cadaveres.forEach(c=>{
+      if(!(explorado[c.y]&&explorado[c.y][c.x])) return;
       ctx.fillStyle=c.looted?'#1a0000':'#550000';
       ctx.fillRect(c.x*S+1,c.y*S+1,S-2,S-2);
     });
-    // Items (small dot)
     itens.forEach(it=>{
+      if(!(explorado[it.y]&&explorado[it.y][it.x])) return;
       ctx.fillStyle='#4488ff';
       ctx.fillRect(it.x*S+1,it.y*S+1,S-2,S-2);
     });
-
-    // Notes
     notas.forEach(n=>{
+      if(!(explorado[n.y]&&explorado[n.y][n.x])) return;
       ctx.fillStyle='#ddcc00';
       ctx.fillRect(n.x*S+1,n.y*S+1,S-2,S-2);
     });
+    if(explorado[porta.y]&&explorado[porta.y][porta.x]){
+      ctx.fillStyle=porta.tipo==='E'?'#ffee22':'#2288ff';
+      ctx.fillRect(porta.x*S,porta.y*S,S,S);
+      ctx.strokeStyle=porta.tipo==='E'?'#ffee22':'#44aaff';
+      ctx.lineWidth=1; ctx.strokeRect(porta.x*S,porta.y*S,S,S);
+    }
 
-    // Porta
-    ctx.fillStyle=porta.tipo==='E'?'#ffee22':'#2288ff';
-    ctx.fillRect(porta.x*S,porta.y*S,S,S);
-    // Porta glow border
-    ctx.strokeStyle=porta.tipo==='E'?'#ffee22':'#44aaff';
-    ctx.lineWidth=1; ctx.strokeRect(porta.x*S,porta.y*S,S,S);
-
-    // Enemies
+    // Live enemies only inside current vision radius
     inimigos.forEach(e=>{
+      if(dst(jogador.x,jogador.y,e.x,e.y)>visao) return;
       const col=e.tipo==='B'?'#ff5500':e.tipo==='S'?'#ff44ff':e.tipo==='Z'?'#ffcc00':'#ff2222';
       ctx.fillStyle=col;
       if(e.tipo==='B'){
-        // Boss: full tile + outline
         ctx.fillRect(e.x*S-1,e.y*S-1,S+2,S+2);
         ctx.strokeStyle='#ffffff'; ctx.lineWidth=1;
         ctx.strokeRect(e.x*S-1,e.y*S-1,S+2,S+2);
@@ -1305,17 +1427,15 @@
     // Player — bright green 3×3 cross
     const px=jogador.x*S, py=jogador.y*S;
     ctx.fillStyle='#00ff41';
-    ctx.fillRect(px,      py+S/2-1, S,   2); // horizontal
-    ctx.fillRect(px+S/2-1,py,       2,   S); // vertical
-    // Bright center
+    ctx.fillRect(px,      py+S/2-1, S,   2);
+    ctx.fillRect(px+S/2-1,py,       2,   S);
     ctx.fillStyle='#ffffff';
     ctx.fillRect(px+S/2-1,py+S/2-1,2,2);
 
-    // Vision radius overlay (dim fog outside vision range)
-    const visao=lanterna?8:2;
+    // Dim fog outside current vision (never hides unexplored darkness)
     ctx.fillStyle='rgba(0,0,0,0.55)';
     for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-      if(dst(jogador.x,jogador.y,x,y)>visao)
+      if(explorado[y]&&explorado[y][x]&&dst(jogador.x,jogador.y,x,y)>visao)
         ctx.fillRect(x*S,y*S,S,S);
     }
   }
@@ -1324,6 +1444,12 @@
   // GAME OVER / VICTORY
   // ============================================================
   function endCleanup(){
+    clearVictoryTimers();
+    ['lore-screen','inv-screen','boss-warning'].forEach(id=>{
+      document.getElementById(id).style.display='none';
+    });
+    document.getElementById('dpad').style.display='none';
+    document.getElementById('mob-actions').style.display='none';
     document.getElementById('hud').innerHTML='';
     document.getElementById('perigo').innerText='';
     document.getElementById('log').innerHTML='';
@@ -1348,7 +1474,8 @@
   }
   function mostrarVitoria(){
     estado='VITORIA'; endCleanup();
-    sndLevel(); setTimeout(sndLevel,400); setTimeout(sndLevel,800);
+    sndLevel();
+    victoryTimers.push(setTimeout(sndLevel,400), setTimeout(sndLevel,800));
     document.getElementById('grid').innerHTML=`<span class="verde"><br><br>
   V O C Ê &nbsp; D I G I T A &nbsp; O &nbsp; C Ó D I G O .<br><br>
   <span class="cinza">A porta do elevador se fecha lentamente.</span><br>
@@ -1367,15 +1494,31 @@
     const k=e.key.toLowerCase();
 
     if(estado==='BOSS'){
-      document.getElementById('boss-warning').style.display='none';
-      estado='JOGANDO'; render(); return;
+      e.preventDefault();
+      fecharBossWarning();
+      return;
     }
-    if(estado==='LENDO'&&e.key==='Enter'){
-      document.getElementById('lore-screen').style.display='none';
-      estado='JOGANDO'; render(); return;
+    if(estado==='LENDO'&&(e.key==='Enter'||e.key==='Escape')){
+      e.preventDefault();
+      fecharLore();
+      return;
     }
-    if(k==='i'&&(estado==='JOGANDO'||estado==='INVENTARIO')){ toggleInv(); return; }
-    if(estado==='HOMEPAGE'&&e.key==='Enter'){ iniciarJogo(); return; }
+    if(estado==='INVENTARIO'&&e.key==='Escape'){
+      e.preventDefault();
+      toggleInv();
+      return;
+    }
+    if(k==='i'&&(estado==='JOGANDO'||estado==='INVENTARIO')){
+      e.preventDefault();
+      toggleInv();
+      return;
+    }
+    if(estado==='HOMEPAGE'){
+      if(e.key==='Escape'){ voltarMenu(); return; }
+      const mainVisible=document.getElementById('menu-main').style.display!=='none';
+      if(e.key==='Enter'&&mainVisible){ e.preventDefault(); iniciarJogo(); return; }
+      return;
+    }
     if(estado!=='JOGANDO') return;
 
     if(k==='w'||k==='arrowup')    { e.preventDefault(); processar(0,-1); }

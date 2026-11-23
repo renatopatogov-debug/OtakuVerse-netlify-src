@@ -2,8 +2,9 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manicômio ASCII</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <meta name="description" content="Roguelike em arte ASCII: sobrevivência e terror psicológico no manicômio.">
     <style>
         body {
@@ -16,6 +17,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            width: 100vw;
             user-select: none;
         }
         #crt-overlay {
@@ -35,17 +37,22 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            max-width: 100vw;
+            padding: 8px;
+            box-sizing: border-box;
         }
         pre {
-            font-size: 18px;
-            line-height: 18px;
+            font-size: clamp(10px, 2.1vw, 18px);
+            line-height: clamp(11px, 2.1vw, 18px);
             letter-spacing: 2px;
-            margin: 20px 0;
+            margin: 14px 0;
             text-align: left;
             display: inline-block;
+            max-width: calc(100vw - 16px);
+            overflow-x: auto;
         }
-        .hud { font-weight: bold; margin-bottom: 10px; }
-        .log-box { height: 100px; display: flex; flex-direction: column; justify-content: flex-end; }
+        .hud { font-weight: bold; margin-bottom: 10px; font-size: clamp(11px, 1.5vw, 15px); }
+        .log-box { min-height: 84px; display: flex; flex-direction: column; justify-content: flex-end; font-size: clamp(11px, 1.4vw, 14px); }
         
         .verde { color: #0f0; }
         .vermelho { color: #f22; text-shadow: 0 0 8px #f22; }
@@ -53,19 +60,21 @@
         .amarelo { color: #ff2; text-shadow: 0 0 8px #ff2; }
         .azul { color: #4af; text-shadow: 0 0 8px #4af; }
         .roxo { color: #f4f; text-shadow: 0 0 8px #f4f; }
+        @keyframes blink { 50% { opacity: 0; } }
         
         .overlay-screen {
             display: none;
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            position: fixed;
+            inset: 0;
             background: rgba(0,0,0,0.95);
             color: #0f0;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 5;
+            z-index: 20;
             padding: 20px;
             box-sizing: border-box;
+            overflow-y: auto;
         }
 
         .btn-retro {
@@ -73,18 +82,18 @@
             color: #0f0;
             border: 1px solid #0f0;
             font-family: 'Courier New', Courier, monospace;
-            font-size: 16px;
-            padding: 8px 16px;
+            font-size: 15px;
+            padding: 8px 14px;
             cursor: pointer;
             text-shadow: 0 0 5px #0f0;
             box-shadow: 0 0 5px #0f0;
-            margin: 10px;
+            margin: 6px;
         }
         .btn-retro:hover { background: #0f0; color: #000; text-shadow: none; }
         
         .inv-item {
-            display: flex; justify-content: space-between; align-items: center;
-            width: 350px; margin: 8px 0; border-bottom: 1px dashed #333; padding-bottom: 5px;
+            display: flex; justify-content: space-between; align-items: center; gap: 10px;
+            width: min(380px, 90vw); margin: 8px 0; border-bottom: 1px dashed #333; padding-bottom: 5px;
         }
         .inv-btn {
             background: #000; color: #0f0; border: 1px solid #0f0;
@@ -92,13 +101,23 @@
         }
         .inv-btn:hover { background: #0f0; color: #000; }
 
+        #dpad-v1 { display: none; position: fixed; bottom: 14px; left: 14px; z-index: 15; }
+        .dpad-row { display: flex; justify-content: center; }
+        .dpad-btn {
+            width: 46px; height: 46px;
+            background: rgba(0, 255, 0, 0.08); border: 1px solid rgba(0, 255, 0, 0.45);
+            color: #0f0; font-size: 18px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+        }
+        .dpad-btn:active { background: rgba(0, 255, 0, 0.25); }
     </style>
 </head>
 <body>
-<a href="/" id="back-hub" aria-label="Voltar ao acervo"
+<a href="/?v=arcade" id="back-hub" aria-label="Voltar ao Arcade"
    style="position:fixed;top:14px;left:14px;z-index:2147483000;font:600 11px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e5e7eb;text-decoration:none;background:rgba(15,15,18,.75);border:1px solid rgba(255,255,255,.22);padding:8px 12px;border-radius:999px;backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s,border-color .2s;"
    onmouseover="this.style.opacity='1';this.style.borderColor='#00adb5'"
-   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Acervo</a>
+   onmouseout="this.style.opacity='.55';this.style.borderColor='rgba(255,255,255,.22)'">&larr; Arcade</a>
     <div id="crt-overlay"></div>
     
     <div id="game-container">
@@ -108,22 +127,34 @@
         <div id="log" class="log-box"></div>
         
         <div>
-            <button class="btn-retro" id="btn-inventory" onclick="toggleInventario()">[ INVENTÁRIO (I) ]</button>
-            <button class="btn-retro" id="btn-restart" style="display:none;" onclick="reiniciarJogo()">[ REINICIAR EXPERIMENTO ]</button>
+            <button class="btn-retro" id="btn-inventory" onclick="this.blur(); toggleInventario()">[ INVENTÁRIO (I) ]</button>
+            <button class="btn-retro" id="btn-flash" onclick="this.blur(); toggleLanterna()">[ LANTERNA (F) ]</button>
+            <button class="btn-retro" id="btn-restart" style="display:none;" onclick="this.blur(); reiniciarJogo()">[ REINICIAR EXPERIMENTO ]</button>
         </div>
     </div>
 
-    <div id="lore-screen" class="overlay-screen">
+    <div id="lore-screen" class="overlay-screen" style="cursor:pointer;" onclick="fecharLore()">
         <h2 class="amarelo">DOCUMENTO ANTIGO</h2>
         <pre id="lore-text" class="cinza" style="white-space: pre-wrap; max-width: 600px; text-align: center;"></pre>
-        <p class="verde" style="margin-top: 30px; animation: blink 1s infinite;">[ Pressione ENTER para soltar o papel ]</p>
+        <p class="verde" style="margin-top: 30px; animation: blink 1s infinite;">[ ENTER ou toque para soltar o papel ]</p>
     </div>
 
     <div id="inventory-screen" class="overlay-screen" style="justify-content: flex-start; padding-top: 60px;">
         <h2 class="verde">M O C H I L A</h2>
         <p class="cinza" id="inv-status">Capacidade: 0/10</p>
+        <p class="cinza" id="inv-weapon" style="font-size: 13px; margin-top: 2px;"></p>
         <div id="inventory-list" style="margin-top: 20px; text-shadow: none;"></div>
-        <button class="btn-retro" style="margin-top: 40px;" onclick="toggleInventario()">[ FECHAR ]</button>
+        <button class="btn-retro" style="margin-top: 30px;" onclick="this.blur(); toggleInventario()">[ FECHAR (I / ESC) ]</button>
+    </div>
+
+    <div id="dpad-v1">
+        <div class="dpad-row"><div class="dpad-btn" id="v1-up">▲</div></div>
+        <div class="dpad-row">
+            <div class="dpad-btn" id="v1-lt">◄</div>
+            <div class="dpad-btn" style="opacity:0.2;">·</div>
+            <div class="dpad-btn" id="v1-rt">►</div>
+        </div>
+        <div class="dpad-row"><div class="dpad-btn" id="v1-dn">▼</div></div>
     </div>
 
     <script>
@@ -173,18 +204,19 @@
             logs = ["Você desperta no frio. O ar cheira a mofo e desinfetante."];
             notasColetadas = 0;
             nivelAtual = 1;
-            
-            // Sorteia 5 notas únicas do pool gigante
+            notas = [];
+
+            // Garante 5 notas aleatórias + a nota final do elevador sempre por último (pop retira do fim)
             let poolEmbaralhado = [...poolLoreBizarro].sort(() => Math.random() - 0.5);
-            let selecionadas = poolEmbaralhado.slice(0, totalNotas - 1); // Pega 5
-            selecionadas.push(loreElevadorFinal); // Adiciona a do elevador
-            
-            // Embaralha essas 6 notas para o elevador não ser sempre a última a aparecer
-            textosLore = selecionadas.sort(() => Math.random() - 0.5);
-            
+            let selecionadas = poolEmbaralhado.slice(0, totalNotas - 1);
+            textosLore = [loreElevadorFinal, ...selecionadas];
+
             estadoJogo = 'JOGANDO';
+            document.getElementById('lore-screen').style.display = 'none';
+            document.getElementById('inventory-screen').style.display = 'none';
             document.getElementById('btn-restart').style.display = 'none';
             document.getElementById('btn-inventory').style.display = 'inline-block';
+            document.getElementById('btn-flash').style.display = 'inline-block';
         }
 
         function reiniciarJogo() {
@@ -208,21 +240,52 @@
             return Math.random() < 0.5 ? { nome: 'Bisturi', dano: 12, durabilidade: 3, classe: 'cinza' } : { nome: 'Cano de Chumbo', dano: 8, durabilidade: 8, classe: 'cinza' };
         }
 
+        function tileOcupado(x, y) {
+            return (x === jogador.x && y === jogador.y) ||
+                   (x === porta.x && y === porta.y) ||
+                   inimigos.some(e => e.x === x && e.y === y) ||
+                   itens.some(i => i.x === x && i.y === y) ||
+                   notas.some(n => n.x === x && n.y === y);
+        }
+
+        function acharTileLivreSala(sala, tentativas = 25) {
+            for (let t = 0; t < tentativas; t++) {
+                const tx = sala.x + Math.floor(Math.random() * sala.w);
+                const ty = sala.y + Math.floor(Math.random() * sala.h);
+                if (tx > 0 && tx < LARGURA - 1 && ty > 0 && ty < ALTURA - 1 && mapa[ty][tx] === '.' && !tileOcupado(tx, ty)) {
+                    return { x: tx, y: ty };
+                }
+            }
+            return null;
+        }
+
+        function devolverNotasNaoColetadas() {
+            if (!Array.isArray(notas) || notas.length === 0) return;
+            notas.forEach(n => {
+                if (n.texto === loreElevadorFinal) {
+                    if (!textosLore.includes(loreElevadorFinal)) textosLore.unshift(loreElevadorFinal);
+                } else {
+                    textosLore.push(n.texto);
+                }
+            });
+        }
+
         function gerarNivel() {
+            devolverNotasNaoColetadas();
             mapa = Array.from({ length: ALTURA }, () => Array(LARGURA).fill('#'));
             let salas = [];
-            
+
             for (let i = 0; i < 6; i++) {
                 let w = Math.floor(Math.random() * 5) + 4;
                 let h = Math.floor(Math.random() * 3) + 3;
                 let x = Math.floor(Math.random() * (LARGURA - w - 2)) + 1;
                 let y = Math.floor(Math.random() * (ALTURA - h - 2)) + 1;
-                let centro = { x: Math.floor(x + w/2), y: Math.floor(y + h/2) };
-                
+                let centro = { x: Math.floor(x + w / 2), y: Math.floor(y + h / 2) };
+
                 for (let j = y; j < y + h; j++) {
-                    for (let i = x; i < x + w; i++) mapa[j][i] = '.';
+                    for (let k = x; k < x + w; k++) mapa[j][k] = '.';
                 }
-                
+
                 if (salas.length > 0) {
                     let prev = salas[salas.length - 1].centro;
                     for (let px = Math.min(centro.x, prev.x); px <= Math.max(centro.x, prev.x); px++) mapa[prev.y][px] = '.';
@@ -232,28 +295,43 @@
             }
 
             jogador.x = salas[0].centro.x; jogador.y = salas[0].centro.y;
-            porta = { x: salas[salas.length-1].centro.x, y: salas[salas.length-1].centro.y, tipo: notasColetadas >= totalNotas ? 'E' : 'D' };
+            porta = { x: salas[salas.length - 1].centro.x, y: salas[salas.length - 1].centro.y, tipo: notasColetadas >= totalNotas ? 'E' : 'D' };
             mapa[porta.y][porta.x] = '.';
 
             inimigos = []; itens = []; notas = []; alucinacoes = [];
-            
-            if (textosLore.length > 0 && salas.length > 2) {
-                let s = salas[Math.floor(Math.random() * (salas.length - 2)) + 1];
-                notas.push({ x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h), texto: textosLore.pop() });
+
+            // Evita softlock: sempre haverá nota para coletar enquanto faltarem documentos
+            if (notasColetadas < totalNotas) {
+                if (textosLore.length === 0) {
+                    const fallback = poolLoreBizarro[Math.floor(Math.random() * poolLoreBizarro.length)];
+                    textosLore.push(fallback);
+                }
+                if (salas.length > 2) {
+                    let s = salas[Math.floor(Math.random() * (salas.length - 2)) + 1];
+                    const posNota = acharTileLivreSala(s) || { x: s.centro.x, y: s.centro.y };
+                    if (posNota.x !== porta.x || posNota.y !== porta.y) {
+                        notas.push({ x: posNota.x, y: posNota.y, texto: textosLore.pop() });
+                    }
+                }
             }
 
-            let chanceInimigo = 0.15 + (nivelAtual * 0.10); 
-            if (chanceInimigo > 0.8) chanceInimigo = 0.8; 
+            let chanceInimigo = 0.15 + (nivelAtual * 0.10);
+            if (chanceInimigo > 0.8) chanceInimigo = 0.8;
 
             for (let i = 1; i < salas.length; i++) {
                 let s = salas[i];
                 if (Math.random() < chanceInimigo) {
-                    inimigos.push({ x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h), hp: Math.floor(Math.random()*8)+8 });
+                    const posE1 = acharTileLivreSala(s);
+                    if (posE1) inimigos.push({ x: posE1.x, y: posE1.y, hp: Math.floor(Math.random() * 8) + 8 });
                     if (nivelAtual >= 3 && Math.random() < (nivelAtual * 0.1)) {
-                        inimigos.push({ x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h), hp: Math.floor(Math.random()*8)+8 });
+                        const posE2 = acharTileLivreSala(s);
+                        if (posE2) inimigos.push({ x: posE2.x, y: posE2.y, hp: Math.floor(Math.random() * 8) + 8 });
                     }
                 }
-                if (Math.random() < 0.7) itens.push({ ...gerarItem(), x: s.x + Math.floor(Math.random() * s.w), y: s.y + Math.floor(Math.random() * s.h) });
+                if (Math.random() < 0.7) {
+                    const posItem = acharTileLivreSala(s);
+                    if (posItem) itens.push({ ...gerarItem(), x: posItem.x, y: posItem.y });
+                }
             }
         }
 
@@ -264,13 +342,35 @@
                     if (Math.random() < 0.3) {
                         let rx = jogador.x + Math.floor(Math.random() * 9) - 4;
                         let ry = jogador.y + Math.floor(Math.random() * 9) - 4;
-                        if (rx > 0 && rx < LARGURA-1 && ry > 0 && ry < ALTURA-1 && (rx !== porta.x || ry !== porta.y)) {
+                        if (rx > 0 && rx < LARGURA - 1 && ry > 0 && ry < ALTURA - 1 && !tileOcupado(rx, ry)) {
                             if (mapa[ry][rx] === '#') mapa[ry][rx] = '.';
-                            else if (mapa[ry][rx] === '.' && !inimigos.some(e => e.x===rx && e.y===ry) && !itens.some(i => i.x===rx && i.y===ry)) mapa[ry][rx] = ' ';
+                            else if (mapa[ry][rx] === '.') mapa[ry][rx] = ' ';
                         }
                     }
                 }
             }
+        }
+
+        function toggleLanterna() {
+            if (estadoJogo !== 'JOGANDO') return;
+            if (!lanternaLigada && jogador.bateria <= 0) {
+                addLog("Sem bateria! Encontre pilhas.", "vermelho");
+                renderizar();
+                return;
+            }
+            lanternaLigada = !lanternaLigada;
+            addLog(`Lanterna ${lanternaLigada ? 'LIGADA' : 'DESLIGADA'}`);
+            renderizar();
+        }
+
+        function fecharLore() {
+            if (estadoJogo !== 'LENDO') return;
+            document.getElementById('lore-screen').style.display = 'none';
+            estadoJogo = 'JOGANDO';
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+            renderizar();
         }
 
         function toggleInventario() {
@@ -287,45 +387,67 @@
 
         function renderizarInventario() {
             document.getElementById('inv-status').innerText = `Capacidade: ${jogador.inventario.length}/${MAX_INVENTARIO}`;
+            document.getElementById('inv-weapon').innerText = `Equipada: ${arma.nome} (Dano: ${arma.dano} | Durab: ${arma.nome === 'Mãos nuas' ? '∞' : arma.durabilidade})`;
             let html = '';
-            
+
             if (jogador.inventario.length === 0) {
                 html = '<p class="cinza" style="text-align:center; margin-top:30px;">Sua mochila está vazia.</p>';
             } else {
                 jogador.inventario.forEach((item, index) => {
                     let acao = item.dano ? 'Equipar' : 'Usar';
+                    let extras = [];
+                    if (item.hp) extras.push(`+${item.hp} HP`);
+                    if (item.sanidade) extras.push(`+${item.sanidade} Mente`);
+                    if (item.carga) extras.push(`+${item.carga} Bat`);
+                    if (item.dano) extras.push(`Dano:${item.dano} Dur:${item.durabilidade}`);
                     html += `
                     <div class="inv-item">
-                        <span class="${item.classe}">- ${item.nome}</span>
-                        <button class="inv-btn" onclick="usarItem(${index})">[ ${acao} ]</button>
+                        <span class="${item.classe}">- ${item.nome} <small class="cinza">(${extras.join(', ')})</small></span>
+                        <span style="display:flex; gap:6px; flex-shrink:0;">
+                            <button class="inv-btn" onclick="usarItem(${index})">[ ${acao} ]</button>
+                            <button class="inv-btn" style="color:#f44; border-color:#f44;" onclick="descartarItem(${index})">[ X ]</button>
+                        </span>
                     </div>`;
                 });
             }
             document.getElementById('inventory-list').innerHTML = html;
         }
 
+        function descartarItem(index) {
+            const it = jogador.inventario[index];
+            if (!it) return;
+            const podeNoChao = !itens.some(i => i.x === jogador.x && i.y === jogador.y);
+            if (podeNoChao) itens.push({ ...it, x: jogador.x, y: jogador.y });
+            jogador.inventario.splice(index, 1);
+            addLog(`Descartou ${it.nome}${podeNoChao ? ' (no chão)' : ''}.`, 'cinza');
+            renderizarInventario();
+            renderizar();
+        }
+
         function usarItem(index) {
             let it = jogador.inventario[index];
+            if (!it) return;
             let msg = `Usou ${it.nome}: `;
-            
+
             if (it.carga) { jogador.bateria = Math.min(100, jogador.bateria + it.carga); msg += `+${it.carga} Bat `; }
             if (it.hp) { jogador.hp = Math.min(100, jogador.hp + it.hp); msg += `+${it.hp} HP `; }
             if (it.sanidade) { jogador.sanidade = Math.min(100, jogador.sanidade + it.sanidade); msg += `+${it.sanidade} Mente `; }
-            
-            if (it.dano) { 
+
+            if (it.dano) {
                 let armaAntiga = arma;
-                arma = { nome: it.nome, dano: it.dano, durabilidade: it.durabilidade }; 
-                msg += `(Equipado)`; 
+                arma = { nome: it.nome, dano: it.dano, durabilidade: it.durabilidade };
+                msg += `(Equipado)`;
                 jogador.inventario.splice(index, 1);
                 if (armaAntiga.nome !== 'Mãos nuas') {
-                    jogador.inventario.push({nome: armaAntiga.nome, dano: armaAntiga.dano, durabilidade: armaAntiga.durabilidade, classe: 'cinza'});
+                    jogador.inventario.push({ nome: armaAntiga.nome, dano: armaAntiga.dano, durabilidade: armaAntiga.durabilidade, classe: 'cinza' });
                 }
             } else {
                 jogador.inventario.splice(index, 1);
             }
-            
+
             addLog(msg, it.classe);
-            renderizarInventario(); 
+            renderizarInventario();
+            renderizar();
         }
 
         function renderizar() {
@@ -334,27 +456,28 @@
             let visao = lanternaLigada ? 7 : 2;
             let perigoReal = inimigos.some(e => dist(jogador.x, jogador.y, e.x, e.y) <= 3);
             let perigoFalso = alucinacoes.some(a => dist(jogador.x, jogador.y, a.x, a.y) <= 3);
+            const durTxt = arma.nome === 'Mãos nuas' ? '∞' : arma.durabilidade;
 
-            document.getElementById('hud').innerHTML = 
-                `VIDA: ${jogador.hp}% | MENTE: ${jogador.sanidade}% | BATERIA: ${jogador.bateria}% | ANDAR: B-${nivelAtual}<br>` +
-                `ARMA: ${arma.nome} (Dano: ${arma.dano} | Durab: ${arma.durabilidade}) | LORE: ${notasColetadas}/${totalNotas}`;
-            
+            document.getElementById('hud').innerHTML =
+                `VIDA: ${Math.max(0, jogador.hp)}% | MENTE: ${Math.max(0, jogador.sanidade)}% | BATERIA: ${Math.max(0, jogador.bateria)}% | ANDAR: B-${nivelAtual}<br>` +
+                `ARMA: ${arma.nome} (Dano: ${arma.dano} | Durab: ${durTxt}) | LORE: ${notasColetadas}/${totalNotas}`;
+
             document.getElementById('perigo').innerText = (perigoReal || (perigoFalso && jogador.sanidade < 30)) ? "[!] O MEDO PULSA... ALGO ESTÁ PERTO." : "";
 
             let gridStr = "";
             for (let y = 0; y < ALTURA; y++) {
                 for (let x = 0; x < LARGURA; x++) {
                     if (dist(jogador.x, jogador.y, x, y) > visao) { gridStr += " "; continue; }
-                    
+
                     if (x === jogador.x && y === jogador.y) gridStr += "@";
-                    else if (x === porta.x && y === porta.y) gridStr += porta.tipo === 'E' ? `<span class="amarelo">E</span>` : "D";
+                    else if (x === porta.x && y === porta.y) gridStr += porta.tipo === 'E' ? `<span class="amarelo">E</span>` : `<span class="azul">D</span>`;
                     else if (inimigos.some(e => e.x === x && e.y === y) || alucinacoes.some(a => a.x === x && a.y === y)) gridStr += `<span class="vermelho">!</span>`;
                     else if (notas.some(n => n.x === x && n.y === y)) gridStr += `<span class="amarelo">N</span>`;
                     else {
                         let item = itens.find(i => i.x === x && i.y === y);
                         if (item) gridStr += `<span class="${item.classe}">?</span>`;
                         else if (mapa[y][x] === '#') gridStr += `<span class="cinza">#</span>`;
-                        else if (mapa[y][x] === ' ') gridStr += `<span class="roxo"> </span>`;
+                        else if (mapa[y][x] === ' ') gridStr += `<span class="roxo">~</span>`;
                         else gridStr += ".";
                     }
                 }
@@ -366,42 +489,57 @@
 
         function mostrarGameOver() {
             estadoJogo = 'GAMEOVER';
+            document.getElementById('lore-screen').style.display = 'none';
+            document.getElementById('inventory-screen').style.display = 'none';
             document.getElementById('hud').innerHTML = "";
             document.getElementById('perigo').innerText = "";
             document.getElementById('log').innerHTML = "";
             document.getElementById('btn-inventory').style.display = 'none';
-            
-            document.getElementById('grid').innerHTML = 
+            document.getElementById('btn-flash').style.display = 'none';
+
+            document.getElementById('grid').innerHTML =
                 `<span class="vermelho"><br><br><br>` +
                 `  O   R U Í D O   I N T E R N O   T E   C O N S U M I U .<br><br>` +
                 `  Sua mente quebrou no Andar B-${nivelAtual}.<br>` +
                 `  Seu corpo agora é apenas mais uma sombra nos corredores.<br><br>` +
                 `</span>`;
-                
+
             document.getElementById('btn-restart').style.display = 'inline-block';
         }
 
         function mostrarVitoria() {
             estadoJogo = 'VITORIA';
+            document.getElementById('lore-screen').style.display = 'none';
+            document.getElementById('inventory-screen').style.display = 'none';
             document.getElementById('hud').innerHTML = "";
             document.getElementById('perigo').innerText = "";
             document.getElementById('log').innerHTML = "";
             document.getElementById('btn-inventory').style.display = 'none';
-            
-            document.getElementById('grid').innerHTML = 
+            document.getElementById('btn-flash').style.display = 'none';
+
+            document.getElementById('grid').innerHTML =
                 `<span class="verde"><br><br><br>` +
                 `  V O C Ê   D I G I T A   O   C Ó D I G O .<br><br>` +
                 `  A porta do elevador se fecha.<br>` +
                 `  Você sente o vento frio da superfície.<br>` +
                 `  Você escapou do Abismo após descer ${nivelAtual} andares.<br><br>` +
                 `</span>`;
-                
+
             document.getElementById('btn-restart').style.display = 'inline-block';
         }
 
+        function podeMoverInimigo(x, y, self) {
+            return x > 0 && x < LARGURA - 1 && y > 0 && y < ALTURA - 1 &&
+                   mapa[y][x] === '.' &&
+                   !(x === jogador.x && y === jogador.y) &&
+                   !inimigos.some(o => o !== self && o.x === x && o.y === y);
+        }
+
         function processarTurno(dx, dy) {
+            if (estadoJogo !== 'JOGANDO') return;
             let nx = jogador.x + dx, ny = jogador.y + dy;
-            
+            if (nx < 0 || nx >= LARGURA || ny < 0 || ny >= ALTURA) return;
+
             let aluc = alucinacoes.find(a => a.x === nx && a.y === ny);
             let inimigo = inimigos.find(e => e.x === nx && e.y === ny);
 
@@ -411,7 +549,7 @@
                 alucinacoes = alucinacoes.filter(a => a !== aluc);
             } else if (inimigo) {
                 inimigo.hp -= arma.dano;
-                arma.durabilidade--;
+                if (arma.nome !== 'Mãos nuas') arma.durabilidade--;
                 if (arma.durabilidade <= 0 && arma.nome !== 'Mãos nuas') {
                     addLog(`Sua ${arma.nome} QUEBROU!`, "vermelho");
                     arma = { nome: 'Mãos nuas', dano: 2, durabilidade: 999 };
@@ -431,15 +569,18 @@
                 jogador.x = nx; jogador.y = ny;
             }
 
+            let abriuLore = false;
             let notaIdx = notas.findIndex(n => n.x === jogador.x && n.y === jogador.y);
             if (notaIdx !== -1) {
                 document.getElementById('lore-text').innerText = notas[notaIdx].texto;
-                document.getElementById('lore-screen').style.display = 'flex';
-                estadoJogo = 'LENDO';
+                abriuLore = true;
                 notasColetadas++;
                 addLog(`Lore revelada. (${notasColetadas}/${totalNotas})`, "amarelo");
+                if (notasColetadas >= totalNotas) {
+                    porta.tipo = 'E';
+                    addLog("Todos os documentos coletados! O Elevador (E) está ativo!", "amarelo");
+                }
                 notas.splice(notaIdx, 1);
-                return;
             }
 
             let itemIdx = itens.findIndex(i => i.x === jogador.x && i.y === jogador.y);
@@ -454,22 +595,33 @@
                 }
             }
 
-            if (jogador.x === porta.x && jogador.y === porta.y) {
-                if (porta.tipo === 'E') {
-                    mostrarVitoria();
-                    return;
-                } else {
-                    nivelAtual++; 
-                    addLog(`Descendo para o Andar B-${nivelAtual}...`);
-                    gerarNivel();
-                }
-            }
-
             if (lanternaLigada) jogador.bateria -= 1; else jogador.sanidade -= 2;
             if (jogador.bateria <= 0) {
                 jogador.bateria = 0;
                 if (lanternaLigada) addLog("A luz pisca e morre.", "vermelho");
                 lanternaLigada = false;
+            }
+
+            if (jogador.hp <= 0 || jogador.sanidade <= 0) {
+                mostrarGameOver();
+                return;
+            }
+
+            if (jogador.x === porta.x && jogador.y === porta.y) {
+                if (porta.tipo === 'E') {
+                    mostrarVitoria();
+                    return;
+                } else {
+                    nivelAtual++;
+                    addLog(`Descendo para o Andar B-${nivelAtual}...`);
+                    gerarNivel();
+                    if (abriuLore) {
+                        document.getElementById('lore-screen').style.display = 'flex';
+                        estadoJogo = 'LENDO';
+                    }
+                    renderizar();
+                    return;
+                }
             }
 
             inimigos.forEach(e => {
@@ -478,19 +630,29 @@
                     let ex = jogador.x > e.x ? 1 : (jogador.x < e.x ? -1 : 0);
                     let ey = jogador.y > e.y ? 1 : (jogador.y < e.y ? -1 : 0);
                     if (d <= 1.5) {
-                        jogador.hp -= Math.floor(Math.random()*8)+8;
+                        jogador.hp -= Math.floor(Math.random() * 8) + 8;
                         addLog("Garras rasgam sua carne!", "vermelho");
-                    } else if (mapa[e.y+ey][e.x+ex] !== '#' && mapa[e.y+ey][e.x+ex] !== ' ') {
+                    } else if (podeMoverInimigo(e.x + ex, e.y + ey, e)) {
                         e.x += ex; e.y += ey;
+                    } else if (ex !== 0 && podeMoverInimigo(e.x + ex, e.y, e)) {
+                        e.x += ex;
+                    } else if (ey !== 0 && podeMoverInimigo(e.x, e.y + ey, e)) {
+                        e.y += ey;
                     }
                 }
             });
 
             distorcer();
             alucinacoes = [];
-            if (jogador.sanidade < 50 && Math.random() < (50 - jogador.sanidade)/100) {
-                let hx = jogador.x + Math.floor(Math.random()*11)-5, hy = jogador.y + Math.floor(Math.random()*11)-5;
-                if (hx > 0 && hx < LARGURA && hy > 0 && hy < ALTURA && (mapa[hy][hx] === '.' || mapa[hy][hx] === ' ')) alucinacoes.push({x: hx, y: hy});
+            if (jogador.sanidade < 50 && Math.random() < (50 - jogador.sanidade) / 100) {
+                let hx = jogador.x + Math.floor(Math.random() * 11) - 5;
+                let hy = jogador.y + Math.floor(Math.random() * 11) - 5;
+                if (hx > 0 && hx < LARGURA - 1 && hy > 0 && hy < ALTURA - 1 &&
+                    (mapa[hy][hx] === '.' || mapa[hy][hx] === ' ') &&
+                    !(hx === jogador.x && hy === jogador.y) &&
+                    !inimigos.some(e => e.x === hx && e.y === hy)) {
+                    alucinacoes.push({ x: hx, y: hy });
+                }
             }
 
             if (jogador.hp <= 0 || jogador.sanidade <= 0) {
@@ -498,39 +660,58 @@
                 return;
             }
 
+            if (abriuLore) {
+                document.getElementById('lore-screen').style.display = 'flex';
+                estadoJogo = 'LENDO';
+            }
+
             renderizar();
         }
 
         window.addEventListener('keydown', (e) => {
             let key = e.key.toLowerCase();
-            
-            if (estadoJogo === 'LENDO' && e.key === 'Enter') {
-                document.getElementById('lore-screen').style.display = 'none';
-                estadoJogo = 'JOGANDO';
-                renderizar();
+
+            if (estadoJogo === 'LENDO' && (e.key === 'Enter' || e.key === 'Escape')) {
+                e.preventDefault();
+                fecharLore();
                 return;
             }
-            
+
+            if (estadoJogo === 'INVENTARIO' && e.key === 'Escape') {
+                e.preventDefault();
+                toggleInventario();
+                return;
+            }
+
             if (key === 'i') {
                 if (estadoJogo === 'JOGANDO' || estadoJogo === 'INVENTARIO') {
+                    e.preventDefault();
                     toggleInventario();
                     return;
                 }
             }
 
             if (estadoJogo !== 'JOGANDO') return;
-            
-            if (key === 'w' || key === 'arrowup') processarTurno(0, -1);
-            else if (key === 's' || key === 'arrowdown') processarTurno(0, 1);
-            else if (key === 'a' || key === 'arrowleft') processarTurno(-1, 0);
-            else if (key === 'd' || key === 'arrowright') processarTurno(1, 0);
-            else if (key === 'f') { 
-                lanternaLigada = !lanternaLigada; 
-                addLog(`Lanterna ${lanternaLigada ? 'LIGADA' : 'DESLIGADA'}`);
-                renderizar(); 
-            }
+
+            if (key === 'w' || key === 'arrowup') { e.preventDefault(); processarTurno(0, -1); }
+            else if (key === 's' || key === 'arrowdown') { e.preventDefault(); processarTurno(0, 1); }
+            else if (key === 'a' || key === 'arrowleft') { e.preventDefault(); processarTurno(-1, 0); }
+            else if (key === 'd' || key === 'arrowright') { e.preventDefault(); processarTurno(1, 0); }
+            else if (key === 'f') toggleLanterna();
         });
 
+        function setupMobileV1() {
+            const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            if (isTouch) document.getElementById('dpad-v1').style.display = 'block';
+            const dirs = { 'v1-up': [0, -1], 'v1-dn': [0, 1], 'v1-lt': [-1, 0], 'v1-rt': [1, 0] };
+            Object.entries(dirs).forEach(([id, [dx, dy]]) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('touchstart', (ev) => { ev.preventDefault(); processarTurno(dx, dy); }, { passive: false });
+            });
+        }
+
+        setupMobileV1();
         inicializarVariaveis();
         gerarNivel();
         renderizar();
