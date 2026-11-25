@@ -69,7 +69,8 @@ function ContinueCard({
   const pct = watchPercent(entry);
   const isManga = entry.source === "manga";
   const target = resumeTarget(entry);
-  const showThumb = Boolean(entry.thumbUrl && entry.thumbUrl !== failedThumb);
+  const thumbSrc =
+    entry.thumbUrl && entry.thumbUrl !== failedThumb ? entry.thumbUrl : null;
 
   return (
     <div className="group relative w-44 shrink-0 sm:w-52">
@@ -83,12 +84,12 @@ function ContinueCard({
       >
         {/* Capa 16:9 */}
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-fuchsia-500/60 group-hover:shadow-lg group-hover:shadow-fuchsia-950/40">
-          {showThumb ? (
+          {thumbSrc ? (
             <img
-              src={entry.thumbUrl}
+              src={thumbSrc}
               alt=""
               loading="lazy"
-              onError={() => setFailedThumb(entry.thumbUrl ?? null)}
+              onError={() => setFailedThumb(thumbSrc)}
               className="h-full w-full object-cover"
             />
           ) : entry.posterUrl ? (
