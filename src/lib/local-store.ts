@@ -270,6 +270,8 @@ export function useProgressSaver(intervalSeconds = 5) {
   const lastWriteRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<Pending | null>(null);
+  const completedKeyRef = useRef<string>("");
+  const lastKnownDurRef = useRef<Record<string, number>>({});
 
   const flush = useCallback(() => {
     timerRef.current = null;
@@ -301,9 +303,37 @@ export function useProgressSaver(intervalSeconds = 5) {
       duration: number,
       force = false,
     ): void => {
-      pendingRef.current = { entry, position, duration };
+      const validDur =
+        Number.isFinite(duration) && duration > 1
+          ? duration
+          : (lastKnownDurRef.current[entry.key] ?? duration);
+      if (Number.isFinite(validDur) && validDur > 1) {
+        lastKnownDurRef.current[entry.key] = validDur;
+      }
+
+      const isEnding = validDur > 0 && position >= validDur;
+      if (isEnding) {
+        completedKeyRef.current = entry.key;
+      } else if (completedKeyRef.current === entry.key) {
+        // Se já concluiu este episódio, ignora ticks tardios de timeupdate no fim
+        // a menos que o usuário tenha voltado manualmente para antes de 90%.
+        if (!force && validDur > 0 && position >= validDur * 0.9) {
+          return;
+        }
+        completedKeyRef.current = "";
+      }
+
+      pendingRef.current = {
+        entry,
+        position: isEnding ? validDur : position,
+        duration: validDur,
+      };
       const now = Date.now();
-      if (force || now - lastWriteRef.current >= intervalSeconds * 1000) {
+      if (
+        force ||
+        isEnding ||
+        now - lastWriteRef.current >= intervalSeconds * 1000
+      ) {
         if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;

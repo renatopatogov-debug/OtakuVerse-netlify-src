@@ -260,7 +260,7 @@ function feedParams(lang: string): URLSearchParams {
   return p;
 }
 
-/** Capítulos de UM idioma selecionado (rápido em 1 chamada única de até 500 caps). */
+/** Capítulos de UM idioma selecionado (pagina até 2.000 itens para séries longas). */
 export async function chaptersForLang(
   id: string,
   lang: string,
@@ -277,15 +277,7 @@ export async function chaptersForLang(
     };
     relationships: { id: string; type: string; attributes?: { name?: string } }[];
   };
-  const p = feedParams(lang);
-  p.set("limit", "500");
-  p.set("offset", "0");
-  const feed = await mdFetch<{ total: number; data: FeedItem[] }>(
-    `/manga/${id}/feed`,
-    p,
-  );
-
-  const chapters: ChapterItem[] = (feed.data ?? []).map((c) => ({
+  const mapItem = (c: FeedItem): ChapterItem => ({
     id: c.id,
     chapter: c.attributes.chapter,
     title: c.attributes.title,
@@ -295,13 +287,49 @@ export async function chaptersForLang(
       c.relationships.find((r) => r.type === "scanlation_group")?.attributes
         ?.name ?? null,
     publishAt: c.attributes.publishAt,
-  }));
-  return { chapters, total: feed.total };
+  });
+
+  const p0 = feedParams(lang);
+  p0.set("limit", "500");
+  p0.set("offset", "0");
+  const first = await mdFetch<{ total: number; data: FeedItem[] }>(
+    `/manga/${id}/feed`,
+    p0,
+  );
+
+  const allRaw: FeedItem[] = [...(first.data ?? [])];
+  const maxTotal = Math.min(first.total ?? 0, 2000);
+  if (maxTotal > 500) {
+    const offsets: number[] = [];
+    for (let off = 500; off < maxTotal; off += 500) offsets.push(off);
+    const pages = await Promise.allSettled(
+      offsets.map((off) => {
+        const p = feedParams(lang);
+        p.set("limit", "500");
+        p.set("offset", String(off));
+        return mdFetch<{ total: number; data: FeedItem[] }>(`/manga/${id}/feed`, p);
+      }),
+    );
+    for (const res of pages) {
+      if (res.status === "fulfilled" && res.value.data?.length) {
+        allRaw.push(...res.value.data);
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+  const chapters: ChapterItem[] = [];
+  for (const item of allRaw) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    chapters.push(mapItem(item));
+  }
+  return { chapters, total: first.total };
 }
 
 /**
  * Detalhe do mangá + capítulos do idioma selecionado.
- * Busca APENAS o idioma requisitado para responder instantaneamente e não sobrecarregar a API.
+ * Busca o idioma requisitado e, se estiver vazio, percorre os demais idiomas de LANG_PRIORITY.
  */
 export async function mangaDetail(
   id: string,
@@ -321,33 +349,33 @@ export async function mangaDetail(
   let chapters: ChapterItem[] = [];
   let total = 0;
   let loadedLang = targetLang;
+  const langTotalsMap: Record<string, number> = {};
 
-  try {
-    const res = await chaptersForLang(id, targetLang);
-    chapters = res.chapters;
-    total = res.total;
-  } catch {
-    chapters = [];
-    total = 0;
-  }
+  const fallbackOrder = [
+    targetLang,
+    ...LANG_PRIORITY.filter((l) => l !== targetLang),
+  ];
 
-  // Fallback se pt-br não tiver capítulos
-  if (chapters.length === 0 && targetLang === "pt-br") {
+  for (const lang of fallbackOrder) {
     try {
-      const enRes = await chaptersForLang(id, "en");
-      if (enRes.chapters.length > 0) {
-        chapters = enRes.chapters;
-        total = enRes.total;
-        loadedLang = "en";
+      const res = await chaptersForLang(id, lang);
+      langTotalsMap[lang] = res.total;
+      if (res.chapters.length > 0) {
+        chapters = res.chapters;
+        total = res.total;
+        loadedLang = lang;
+        break;
       }
-    } catch {}
+    } catch {
+      langTotalsMap[lang] = 0;
+    }
   }
 
   return {
     manga,
     author: authorName ?? null,
     chapters,
-    langTotals: { [loadedLang]: total },
+    langTotals: { ...langTotalsMap, [loadedLang]: total },
     loadedLang,
   };
 }

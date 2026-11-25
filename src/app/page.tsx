@@ -193,12 +193,20 @@ export default function Home() {
         "",
         stackItemToUrl(active[active.length - 1]),
       );
-    } else if (!historySnapshots.has(stateObj.otvId)) {
-      saveSnapshot(stateObj.otvId, active);
+    } else {
+      if (stateObj.otvId >= nextEntryId) {
+        nextEntryId = stateObj.otvId + 1;
+      }
+      if (!historySnapshots.has(stateObj.otvId)) {
+        saveSnapshot(stateObj.otvId, active);
+      }
     }
 
     const onPopState = (ev: PopStateEvent) => {
       const id = (ev.state as { otvId?: number } | null)?.otvId;
+      if (typeof id === "number" && id >= nextEntryId) {
+        nextEntryId = id + 1;
+      }
       if (typeof id === "number" && historySnapshots.has(id)) {
         navStack = historySnapshots.get(id)!;
       } else {
@@ -235,6 +243,29 @@ export default function Home() {
     );
     emitNav();
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
+
+  const replaceCurrent = useCallback((item: StackItem) => {
+    const prev = ensureInit();
+    const top = prev[prev.length - 1];
+    if (top.t === item.t && JSON.stringify(top) === JSON.stringify(item)) {
+      return;
+    }
+    const next = [...prev.slice(0, -1), item];
+    const stateObj = window.history.state as {
+      otvId?: number;
+      otvCanBack?: boolean;
+    } | null;
+    const id = typeof stateObj?.otvId === "number" ? stateObj.otvId : nextEntryId++;
+    const canBackFlag = Boolean(stateObj?.otvCanBack) || next.length > 1;
+    navStack = next;
+    saveSnapshot(id, next);
+    window.history.replaceState(
+      { otvId: id, otvCanBack: canBackFlag },
+      "",
+      stackItemToUrl(item),
+    );
+    emitNav();
   }, []);
 
   const back = useCallback(() => {
@@ -284,6 +315,7 @@ export default function Home() {
 
   const nav: Nav = {
     push,
+    replaceCurrent,
     back,
     replaceAll,
     canBack: stack.length > 1,

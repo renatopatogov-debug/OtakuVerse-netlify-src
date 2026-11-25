@@ -55,6 +55,34 @@ export async function validateImageUpstream(
   return { ok: true };
 }
 
+export function limitImageStream(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes = MAX_IMAGE_BYTES,
+): ReadableStream<Uint8Array> | null {
+  if (!body) return null;
+  const reader = body.getReader();
+  let total = 0;
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        controller.close();
+        return;
+      }
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel("Image exceeds MAX_IMAGE_BYTES").catch(() => {});
+        controller.error(new Error("Imagem excede o limite permitido"));
+        return;
+      }
+      controller.enqueue(value);
+    },
+    async cancel(reason) {
+      await reader.cancel(reason).catch(() => {});
+    },
+  });
+}
+
 export async function streamImageProxyResponse(
   res: Response,
   headers: Record<string, string>,
@@ -65,7 +93,7 @@ export async function streamImageProxyResponse(
     return NextResponse.json({ error: check.error }, { status: check.status });
   }
   const contentType = res.headers.get("content-type") || fallbackContentType;
-  return new NextResponse(res.body, {
+  return new NextResponse(limitImageStream(res.body), {
     status: 200,
     headers: {
       "Content-Type": contentType,

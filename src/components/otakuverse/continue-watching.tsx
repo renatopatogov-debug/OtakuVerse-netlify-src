@@ -5,6 +5,7 @@
 // Cards 16:9 estilo streaming com barra de progresso, badge de áudio e
 // botão de remover. Retomar navega direto pro episódio salvo.
 
+import { useState } from "react";
 import { BookOpen, History, Play, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWatchHistory, watchPercent, type WatchEntry } from "@/lib/local-store";
@@ -23,6 +24,13 @@ function resumeTarget(e: WatchEntry) {
           } as const)
         : null;
     case "sfhd":
+      if (e.cid != null) {
+        return {
+          t: "anime-detail",
+          cid: e.cid,
+          epId: e.episodeId || undefined,
+        } as const;
+      }
       return e.seriesId
         ? ({ t: "sfhd-detail", seriesId: e.seriesId, epId: e.episodeId } as const)
         : null;
@@ -57,9 +65,11 @@ function ContinueCard({
   nav: Nav;
 }) {
   const { remove } = useWatchHistory();
+  const [failedThumb, setFailedThumb] = useState<string | null>(null);
   const pct = watchPercent(entry);
   const isManga = entry.source === "manga";
   const target = resumeTarget(entry);
+  const showThumb = Boolean(entry.thumbUrl && entry.thumbUrl !== failedThumb);
 
   return (
     <div className="group relative w-44 shrink-0 sm:w-52">
@@ -69,15 +79,16 @@ function ContinueCard({
         }}
         disabled={!target}
         className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl disabled:cursor-not-allowed"
-        aria-label={`Continuar ${entry.title}${entry.episodeNumber ? (isManga ? `, capítulo ${entry.episodeNumber}` : `, episódio ${entry.episodeNumber}`) : ""}`}
+        aria-label={`Continuar ${entry.title}${entry.episodeNumber != null ? (isManga ? `, capítulo ${entry.episodeNumber}` : `, episódio ${entry.episodeNumber}`) : ""}`}
       >
         {/* Capa 16:9 */}
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-fuchsia-500/60 group-hover:shadow-lg group-hover:shadow-fuchsia-950/40">
-          {entry.thumbUrl ? (
+          {showThumb ? (
             <img
               src={entry.thumbUrl}
               alt=""
               loading="lazy"
+              onError={() => setFailedThumb(entry.thumbUrl ?? null)}
               className="h-full w-full object-cover"
             />
           ) : entry.posterUrl ? (

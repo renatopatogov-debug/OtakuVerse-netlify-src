@@ -29,7 +29,16 @@ export function Header({
   onNavigate: (item: StackItem) => void;
   onSearch: (q: string) => void;
 }) {
-  const [term, setTerm] = useState("");
+  const searchQuery = current.t === "search" ? current.q : null;
+  const [termState, setTermState] = useState<{
+    queryKey: string | null;
+    value: string;
+  }>({ queryKey: searchQuery, value: searchQuery ?? "" });
+  const term =
+    searchQuery != null && termState.queryKey !== searchQuery
+      ? searchQuery
+      : termState.value;
+
   const { entries: favs } = useFavorites();
   const { entries: dls } = useDownloads();
 
@@ -94,7 +103,9 @@ export function Header({
           {tabs.map((tab) => (
             <button
               key={tab.key}
+              type="button"
               onClick={() => onNavigate(tab.item)}
+              aria-current={active === tab.key ? "page" : undefined}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 active === tab.key
@@ -120,7 +131,9 @@ export function Header({
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={term}
-              onChange={(e) => setTerm(e.target.value)}
+              onChange={(e) =>
+                setTermState({ queryKey: searchQuery, value: e.target.value })
+              }
               placeholder="Buscar animes e mangás..."
               className="h-10 w-full rounded-lg border border-input bg-card/70 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-fuchsia-500/70 focus:outline-none focus:ring-1 focus:ring-fuchsia-500/70"
               aria-label="Buscar animes e mangás"
@@ -131,6 +144,7 @@ export function Header({
           <button
             type="button"
             onClick={() => onNavigate({ t: "downloads" })}
+            aria-current={active === "downloads" ? "page" : undefined}
             className={cn(
               "relative shrink-0 rounded-lg p-2 transition-colors",
               active === "downloads"
@@ -152,6 +166,7 @@ export function Header({
           <button
             type="button"
             onClick={() => onNavigate({ t: "favorites" })}
+            aria-current={active === "favorites" ? "page" : undefined}
             className={cn(
               "relative shrink-0 rounded-lg p-2 transition-colors",
               active === "favorites"
@@ -184,6 +199,7 @@ export function Header({
             key={tab.key}
             type="button"
             onClick={() => onNavigate(tab.item)}
+            aria-current={active === tab.key ? "page" : undefined}
             className={cn(
               "flex flex-1 items-center justify-center gap-1 py-2 text-xs font-medium transition-colors sm:gap-1.5 sm:text-sm",
               active === tab.key

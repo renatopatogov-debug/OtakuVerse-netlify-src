@@ -36,6 +36,7 @@ const STATUS_PT: Record<string, string> = {
 const LANG_OPTIONS = [
   { key: "pt-br", label: "🇧🇷 Português" },
   { key: "en", label: "🇺🇸 Inglês" },
+  { key: "es-la", label: "🇲🇽 Esp. Latam" },
   { key: "es", label: "🇪🇸 Espanhol" },
 ];
 
@@ -62,13 +63,14 @@ export function MangaDetail({
   // Último capítulo lido deste mangá (chip "Continuar leitura")
   const lastRead = historyEntries.find((e) => e.key === `mg:${id}`) ?? null;
 
-  // Idioma selecionado (padrão: pt-br ou o último lido)
+  // Idioma selecionado (padrão: pt-br ou o último lido, preservando es-la)
   const initialLang =
-    lastRead?.lang === "en"
-      ? "en"
-      : lastRead?.lang === "es" || lastRead?.lang === "es-la"
-        ? "es"
-        : "pt-br";
+    lastRead?.lang === "en" ||
+    lastRead?.lang === "es" ||
+    lastRead?.lang === "es-la" ||
+    lastRead?.lang === "pt-br"
+      ? lastRead.lang
+      : "pt-br";
   const detailKey = `${id}:${initialLang}`;
 
   // Busca inicial dos detalhes + capítulos APENAS do idioma selecionado
@@ -198,16 +200,19 @@ export function MangaDetail({
     };
   };
 
-  // Retomada: deep-link do histórico abre direto o capítulo salvo
+  // Retomada: deep-link do histórico abre direto o capítulo salvo,
+  // limpando `chapterId` da entrada `manga-detail` atual para que o botão
+  // Voltar do leitor retorne à página do mangá sem reabrir o leitor em loop.
   useEffect(() => {
     if (resumedRef.current || !chapterId || !data) return;
     const all = langChapters[selectedLang] ?? data.chapters ?? [];
     const item = readerItemFor(data, all, chapterId);
     if (item) {
       resumedRef.current = true;
+      nav.replaceCurrent({ t: "manga-detail", id });
       nav.push(item);
     }
-  }, [chapterId, data, langChapters, selectedLang, nav]);
+  }, [id, chapterId, data, langChapters, selectedLang, nav]);
 
   if (loading) {
     return (
@@ -265,7 +270,7 @@ export function MangaDetail({
               </span>
             ) : null}
             <span className="rounded bg-emerald-600/80 px-2 py-1 font-bold text-white">
-              MangaDex
+              {data.source === "kakamanga" ? "KakaManga" : "MangaDex"}
             </span>
             <FavButton
               entry={{
@@ -303,7 +308,10 @@ export function MangaDetail({
                       index: 0,
                       mangaId: id,
                       mangaCoverUrl: manga.coverUrl,
-                      chapterNumber: lastRead.episodeNumber ? String(lastRead.episodeNumber) : null,
+                      chapterNumber:
+                        lastRead.episodeNumber != null
+                          ? String(lastRead.episodeNumber)
+                          : null,
                     });
                   }
                 }}
@@ -388,6 +396,7 @@ export function MangaDetail({
           </div>
         ) : (
           <CollapsibleChapterList
+            key={selectedLang}
             chapters={currentChapters}
             lastReadId={lastRead?.episodeId ?? null}
             onSelectChapter={(targetId) => {
@@ -464,22 +473,34 @@ function CollapsibleChapterList({
       const lastCap = slice[slice.length - 1]?.chapter;
       const label =
         firstCap && lastCap && firstCap !== lastCap
-          ? `Capítulos ${lastCap} – ${firstCap}`
+          ? sortAsc
+            ? `Capítulos ${firstCap} – ${lastCap}`
+            : `Capítulos ${lastCap} – ${firstCap}`
           : firstCap
             ? `Capítulo ${firstCap}`
             : `Capítulos ${start + 1} – ${end}`;
       return { id: i, label, slice, count: slice.length };
     });
-  }, [processedChapters, isShortList]);
+  }, [processedChapters, isShortList, sortAsc]);
 
-  // Controle de quais grupos estão abertos (o primeiro grupo ou o que tem o último lido vem aberto)
-  const [openGroups, setOpenGroups] = useState<Record<number, boolean>>({ 0: true });
+  // Grupo que contém o último capítulo lido (ou 0 por padrão)
+  const defaultOpenId = useMemo(() => {
+    if (!lastReadId || groups.length === 0) return 0;
+    const found = groups.find((g) => g.slice.some((c) => c.id === lastReadId));
+    return found ? found.id : 0;
+  }, [groups, lastReadId]);
+
+  const [manualGroups, setManualGroups] = useState<Record<number, boolean> | null>(null);
+  const openGroups: Record<number, boolean> = manualGroups ?? { [defaultOpenId]: true };
 
   const toggleGroup = (groupId: number) => {
-    setOpenGroups((prev) => ({
-      ...prev,
-      [groupId]: !prev[groupId],
-    }));
+    setManualGroups((prev) => {
+      const base = prev ?? { [defaultOpenId]: true };
+      return {
+        ...base,
+        [groupId]: !base[groupId],
+      };
+    });
   };
 
   const expandAll = () => {
@@ -487,11 +508,11 @@ function CollapsibleChapterList({
     groups.forEach((g) => {
       all[g.id] = true;
     });
-    setOpenGroups(all);
+    setManualGroups(all);
   };
 
   const collapseAll = () => {
-    setOpenGroups({});
+    setManualGroups({});
   };
 
   const renderSingleChapter = (c: ChapterItem) => (

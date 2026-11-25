@@ -25,7 +25,6 @@ import type { AnimeCatalogDetail, EpisodeInfo } from "@/lib/otakulogia";
 import type { TomatoMatchItem, TomatoStreamResult } from "@/lib/tomato";
 import {
   type AudioPref,
-  saveWatchProgress,
   useProgressSaver,
 } from "@/lib/local-store";
 import { cn } from "@/lib/utils";
@@ -45,7 +44,7 @@ export function AnimePlayerPanel({
   anime,
   ep,
   startAt,
-  seasonIdx,
+  seasonNumber,
   quality,
   mode,
   media,
@@ -59,7 +58,7 @@ export function AnimePlayerPanel({
   anime: AnimeCatalogDetail["anime"];
   ep: EpisodeInfo;
   startAt: number;
-  seasonIdx: number;
+  seasonNumber: number;
   quality: VideoQuality;
   mode: PlayerMode;
   media: AniListMedia | null;
@@ -72,6 +71,7 @@ export function AnimePlayerPanel({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const seekAppliedForKeyRef = useRef<string>("");
+  const resumeTimeOnSwitchRef = useRef<number | null>(null);
   const saveProgress = useProgressSaver(5);
 
   const playingEpNum = epNumFromTitle(ep.title) ?? ep.episodeNumber ?? null;
@@ -126,7 +126,7 @@ export function AnimePlayerPanel({
   /* ----- Fonte Tomato (1080p FHD) ----- */
   const tomatoKey =
     mode === "tomato" && tomatoPick && playingEpNum
-      ? `${ep.id}:${tomatoPick.id}:${playingEpNum}:${seasonIdx}:${audioPref}`
+      ? `${ep.id}:${tomatoPick.id}:${playingEpNum}:${seasonNumber}:${audioPref}`
       : "";
   const [tomatoRes, setTomatoRes] = useState<TomatoFetchResult | null>(null);
 
@@ -135,7 +135,7 @@ export function AnimePlayerPanel({
     const controller = new AbortController();
     let alive = true;
     fetchJson<TomatoStreamResult>(
-      `/api/anime/tomato-source?animeId=${tomatoPick.id}&epNumber=${playingEpNum}&seasonNumber=${seasonIdx + 1}&audio=${audioPref || ""}`,
+      `/api/anime/tomato-source?animeId=${tomatoPick.id}&epNumber=${playingEpNum}&seasonNumber=${seasonNumber}&audio=${audioPref || ""}`,
       { signal: controller.signal },
     )
       .then((res) => {
@@ -167,7 +167,7 @@ export function AnimePlayerPanel({
       alive = false;
       controller.abort();
     };
-  }, [tomatoKey, tomatoPick, playingEpNum, seasonIdx, audioPref]);
+  }, [tomatoKey, tomatoPick, playingEpNum, seasonNumber, audioPref]);
 
   const tomatoStatus = !tomatoKey
     ? { status: "idle" as const }
@@ -192,11 +192,10 @@ export function AnimePlayerPanel({
           `/api/anime/sfhd-detail?seriesId=${encodeURIComponent(sfhdPick.seriesId)}`,
           { signal: controller.signal },
         );
-        const matchEp =
-          det.episodes.find((e) => e.number === playingEpNum) ??
-          det.episodes.find((e) => e.number === playingEpNum - 1) ??
-          det.episodes[0];
-        if (!matchEp) throw new Error("Episódio não existe na fonte HLS");
+        const matchEp = det.episodes.find((e) => e.number === playingEpNum);
+        if (!matchEp) {
+          throw new Error(`Episódio ${playingEpNum} ainda não disponível na fonte HLS`);
+        }
         const src = await fetchJson<SfhdSourcesResult>(
           `/api/anime/sfhd-source?episodeId=${encodeURIComponent(matchEp.id)}`,
           { signal: controller.signal },
@@ -284,7 +283,7 @@ export function AnimePlayerPanel({
     const v = videoRef.current;
     const dur =
       v?.duration && Number.isFinite(v.duration) ? Math.floor(v.duration) : 1;
-    saveWatchProgress({ ...olEntry, position: dur, duration: dur });
+    saveProgress(olEntry, dur, dur, true);
   };
 
   const urlFor = (targetEp: EpisodeInfo) =>
@@ -293,6 +292,19 @@ export function AnimePlayerPanel({
       : quality === "SD"
         ? targetEp.videoUrlSd || targetEp.videoUrl
         : targetEp.videoUrl;
+
+  const primaryUrl = urlFor(ep) || null;
+
+  // Se o episódio não possui URL MP4 primária na Otakulogia, aciona o failover automático.
+  useEffect(() => {
+    if (mode !== "primary" || primaryUrl || primaryFailed) return;
+    setFailedStreamKey(streamKey);
+    if (tomatoPick) {
+      onModeChange("tomato");
+    } else if (sfhdPick) {
+      onModeChange("sfhd");
+    }
+  }, [mode, primaryUrl, primaryFailed, streamKey, tomatoPick, sfhdPick, onModeChange]);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-fuchsia-500/30 bg-black shadow-2xl shadow-fuchsia-950/30">
@@ -330,23 +342,26 @@ export function AnimePlayerPanel({
               );
             }}
             onEnded={() => {
-              saveWatchProgress({
-                key: `tomato:${tomatoStatus.data.animeId}:${tomatoStatus.data.episodeId}`,
-                source: "tomato",
-                title: anime.name,
-                posterUrl:
-                  media?.coverImage?.extraLarge || anime.posterUrl || null,
-                cid: anime.upstreamCid,
-                episodeId: ep.id,
-                episodeNumber: playingEpNum,
-                episodeTitle:
-                  zipTitlePtBr(anizip, playingEpNum) ?? ep.title ?? null,
-                audio: tomatoStatus.data.isDubbed
-                  ? ("dublado" as const)
-                  : ("legendado" as const),
-                position: 1,
-                duration: 1,
-              });
+              saveProgress(
+                {
+                  key: `tomato:${tomatoStatus.data.animeId}:${tomatoStatus.data.episodeId}`,
+                  source: "tomato",
+                  title: anime.name,
+                  posterUrl:
+                    media?.coverImage?.extraLarge || anime.posterUrl || null,
+                  cid: anime.upstreamCid,
+                  episodeId: ep.id,
+                  episodeNumber: playingEpNum,
+                  episodeTitle:
+                    zipTitlePtBr(anizip, playingEpNum) ?? ep.title ?? null,
+                  audio: tomatoStatus.data.isDubbed
+                    ? ("dublado" as const)
+                    : ("legendado" as const),
+                },
+                1,
+                1,
+                true,
+              );
             }}
           />
           <p className="flex items-center gap-1.5 px-1 pb-1 text-[11px] text-rose-400">
@@ -362,6 +377,7 @@ export function AnimePlayerPanel({
             sources={fallbackStatus.data.sources}
             subtitleVttUrl={fallbackStatus.data.subtitleVttUrl}
             title={`${anime.name} ep ${fallbackStatus.data.episodeNumber || playingEpNum || ""}`}
+            startAt={startAt}
             poster={
               ep.thumbnailLarge ||
               zipEpisode(anizip, playingEpNum)?.image ||
@@ -378,7 +394,7 @@ export function AnimePlayerPanel({
                     media?.coverImage?.extraLarge || anime.posterUrl || null,
                   cid: anime.upstreamCid,
                   seriesId: fallbackStatus.seriesId,
-                  episodeId: fallbackStatus.data.episodeId,
+                  episodeId: ep.id,
                   episodeNumber:
                     fallbackStatus.data.episodeNumber || playingEpNum,
                   episodeTitle:
@@ -394,25 +410,29 @@ export function AnimePlayerPanel({
             }}
             onEnded={() => {
               if (!sfhdPick) return;
-              saveWatchProgress({
-                key: `sfhd:${fallbackStatus.seriesId}:${fallbackStatus.data.episodeId}`,
-                source: "sfhd",
-                title: anime.name,
-                posterUrl:
-                  media?.coverImage?.extraLarge || anime.posterUrl || null,
-                seriesId: fallbackStatus.seriesId,
-                episodeId: fallbackStatus.data.episodeId,
-                episodeNumber:
-                  fallbackStatus.data.episodeNumber || playingEpNum,
-                episodeTitle:
-                  zipTitlePtBr(anizip, playingEpNum) ?? ep.title ?? null,
-                audio:
-                  normalizeAudio(sfhdPick.category) === "dub"
-                    ? ("dublado" as const)
-                    : ("legendado" as const),
-                position: 1,
-                duration: 1,
-              });
+              saveProgress(
+                {
+                  key: `sfhd:${fallbackStatus.seriesId}:${fallbackStatus.data.episodeId}`,
+                  source: "sfhd",
+                  title: anime.name,
+                  posterUrl:
+                    media?.coverImage?.extraLarge || anime.posterUrl || null,
+                  cid: anime.upstreamCid,
+                  seriesId: fallbackStatus.seriesId,
+                  episodeId: ep.id,
+                  episodeNumber:
+                    fallbackStatus.data.episodeNumber || playingEpNum,
+                  episodeTitle:
+                    zipTitlePtBr(anizip, playingEpNum) ?? ep.title ?? null,
+                  audio:
+                    normalizeAudio(sfhdPick.category) === "dub"
+                      ? ("dublado" as const)
+                      : ("legendado" as const),
+                },
+                1,
+                1,
+                true,
+              );
             }}
           />
           <p className="flex items-center gap-1.5 px-1 pb-1 text-[11px] text-sky-300">
@@ -427,6 +447,7 @@ export function AnimePlayerPanel({
           <video
             key={streamKey}
             ref={videoRef}
+            src={primaryUrl ?? undefined}
             controls
             autoPlay
             playsInline
@@ -440,16 +461,18 @@ export function AnimePlayerPanel({
             onEnded={onVideoEnded}
             onLoadedMetadata={() => {
               const v = videoRef.current;
+              const targetSeek = resumeTimeOnSwitchRef.current ?? startAt;
               if (
                 v &&
-                seekAppliedForKeyRef.current !== ep.id &&
-                startAt > 1 &&
+                seekAppliedForKeyRef.current !== streamKey &&
+                targetSeek > 1 &&
                 v.duration > 0 &&
-                startAt < v.duration - 5
+                targetSeek < v.duration - 5
               ) {
-                v.currentTime = startAt;
+                v.currentTime = targetSeek;
+                resumeTimeOnSwitchRef.current = null;
               }
-              seekAppliedForKeyRef.current = ep.id;
+              seekAppliedForKeyRef.current = streamKey;
             }}
             onError={() => {
               setFailedStreamKey(streamKey);
@@ -461,7 +484,6 @@ export function AnimePlayerPanel({
             }}
             className="aspect-video w-full bg-black"
           >
-            <source src={urlFor(ep) ?? undefined} type="video/mp4" />
             Seu navegador não suporta reprodução de vídeo.
           </video>
           {skipBtn ? (
@@ -517,7 +539,13 @@ export function AnimePlayerPanel({
               return (
                 <button
                   key={q}
-                  onClick={() => onQualityChange(q)}
+                  onClick={() => {
+                    const v = videoRef.current;
+                    if (v && v.currentTime > 1 && Number.isFinite(v.currentTime)) {
+                      resumeTimeOnSwitchRef.current = v.currentTime;
+                    }
+                    onQualityChange(q);
+                  }}
                   className={cn(
                     "rounded px-2.5 py-1 text-xs font-bold transition-colors",
                     quality === q
@@ -530,6 +558,14 @@ export function AnimePlayerPanel({
               );
             })}
           </div>
+        ) : primaryUrl ? (
+          <button
+            onClick={() => onModeChange("primary")}
+            className="rounded-lg border border-border/70 bg-secondary/70 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title="Voltar ao player principal"
+          >
+            Player principal
+          </button>
         ) : null}
         {tomatoPick && tomatoStatus.status !== "ready" ? (
           <button

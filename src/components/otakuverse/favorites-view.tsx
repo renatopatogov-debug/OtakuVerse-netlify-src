@@ -30,7 +30,7 @@ function FavCard({ fav, nav }: { fav: FavEntry; nav: Nav }) {
   const target = favTarget(fav);
   const tag = SOURCE_TAG[favKeySource(fav.key)];
 
-  const inner = (
+  const cardBody = (
     <>
       <div className="relative overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-rose-500/60 group-hover:shadow-lg group-hover:shadow-rose-950/40">
         <div className="aspect-[2/3] w-full">
@@ -61,18 +61,6 @@ function FavCard({ fav, nav }: { fav: FavEntry; nav: Nav }) {
             ) : null}
           </div>
         ) : null}
-        {/* Remover */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggle(fav);
-          }}
-          className="absolute right-1.5 bottom-1.5 rounded-full bg-black/70 p-1.5 text-white/80 opacity-90 backdrop-blur transition-all hover:bg-rose-950/90 hover:text-rose-300 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
-          aria-label={`Remover ${fav.title} dos favoritos`}
-          title="Remover dos favoritos"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
       </div>
       <p className="mt-2 line-clamp-2 text-sm font-medium leading-tight group-hover:text-rose-300">
         {fav.title}
@@ -83,24 +71,32 @@ function FavCard({ fav, nav }: { fav: FavEntry; nav: Nav }) {
     </>
   );
 
-  if (!target) return <div className="group">{inner}</div>;
-
-  // div com role=button (HTML não permite <button> dentro de <button>,
-  // e o botão de remover é filho do card)
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => nav.push({ ...target })}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          nav.push({ ...target });
-        }
-      }}
-      className="group w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-    >
-      {inner}
+    <div className="group relative w-full">
+      {target ? (
+        <button
+          type="button"
+          onClick={() => nav.push({ ...target })}
+          className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+          aria-label={`Abrir ${fav.title}`}
+        >
+          {cardBody}
+        </button>
+      ) : (
+        <div>{cardBody}</div>
+      )}
+      {/* Botão irmão (evita <button> aninhado dentro de controle interativo — WCAG 4.1.2) */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 aspect-[2/3] transition-transform duration-200 group-hover:-translate-y-1">
+        <button
+          type="button"
+          onClick={() => toggle(fav)}
+          className="pointer-events-auto absolute right-1.5 bottom-1.5 z-10 rounded-full bg-black/70 p-1.5 text-white/80 opacity-90 backdrop-blur transition-all hover:bg-rose-950/90 hover:text-rose-300 focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+          aria-label={`Remover ${fav.title} dos favoritos`}
+          title="Remover dos favoritos"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

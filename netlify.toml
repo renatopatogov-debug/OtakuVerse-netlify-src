@@ -19,21 +19,97 @@
 [functions]
   node_bundler = "esbuild"
 
-# APIs dinâmicas: nunca prender no CDN do Netlify (evita colisão de Durable Cache)
+# APIs dinâmicas (JSON / streams): nunca prender no CDN do Netlify.
+# Escopado por rota para NÃO sobrescrever os headers dinâmicos de cache das capas e páginas de mangá.
 [[headers]]
-  for = "/api/*"
+  for = "/api/anilist/*"
   [headers.values]
     Cache-Control = "private, no-cache, no-store, must-revalidate"
     Netlify-CDN-Cache-Control = "no-store"
     CDN-Cache-Control = "no-store"
 
-# Assets imutáveis / legendas com chave isolada por path + query
+[[headers]]
+  for = "/api/anime/*"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/hls"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+    Netlify-Vary = "query=u"
+
+[[headers]]
+  for = "/api/img"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+    Netlify-Vary = "query=u"
+
+[[headers]]
+  for = "/api/skip-times"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/manga/chapters"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/manga/detail"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/manga/pages"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/manga/popular"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/manga/recommendations"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+[[headers]]
+  for = "/api/manga/search"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store, must-revalidate"
+    Netlify-CDN-Cache-Control = "no-store"
+    CDN-Cache-Control = "no-store"
+
+# Capas e páginas de mangá: chave de variação isolada por query; o TTL (7 dias vs no-store em erro/SVG)
+# vem diretamente da resposta da Function para nunca cachear placeholders ou falhas transitórias.
+[[headers]]
+  for = "/api/manga/cover/*"
+  [headers.values]
+    Netlify-Vary = "query=title|al"
+
 [[headers]]
   for = "/api/manga/page/*"
   [headers.values]
-    Cache-Control = "public, max-age=604800, immutable"
-    Netlify-CDN-Cache-Control = "public, max-age=604800"
-    CDN-Cache-Control = "public, max-age=604800"
     Netlify-Vary = "query=b"
 
 [[headers]]

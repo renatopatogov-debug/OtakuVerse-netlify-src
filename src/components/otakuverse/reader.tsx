@@ -12,7 +12,36 @@ import { ChapterDlButton } from "./dl-button";
 type ReaderItem = Extract<StackItem, { t: "reader" }>;
 
 export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
-  const { data, loading, error } = useAsync<ChapterPages>(
+  // Verifica imediatamente se o capítulo já foi salvo no cache offline
+  // (evita depender do nó dinâmico ?b= do MangaDex ou piscar erro quando sem rede).
+  const [cachedState, setCachedState] = useState<{
+    chapterId: string;
+    pages: string[] | null;
+    checked: boolean;
+  }>({ chapterId: item.chapterId, pages: null, checked: false });
+
+  useEffect(() => {
+    let alive = true;
+    getDownloadedPages(item.chapterId).then((p) => {
+      if (alive) {
+        setCachedState({
+          chapterId: item.chapterId,
+          pages: p && p.length > 0 ? p : null,
+          checked: true,
+        });
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [item.chapterId]);
+
+  const offlinePages =
+    cachedState.chapterId === item.chapterId ? cachedState.pages : null;
+  const cacheChecked =
+    cachedState.chapterId === item.chapterId ? cachedState.checked : false;
+
+  const { data, loading: netLoading, error } = useAsync<ChapterPages>(
     (signal) =>
       fetchJson(
         `/api/manga/pages?chapterId=${encodeURIComponent(item.chapterId)}`,
@@ -20,6 +49,7 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
       ),
     `pages:${item.chapterId}`,
   );
+  const loading = !offlinePages && (netLoading || (Boolean(error) && !cacheChecked));
 
   // Rola para o topo ao abrir/trocar capítulo
   useEffect(() => {
@@ -43,9 +73,12 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
       posterUrl: item.mangaCoverUrl ?? null,
       mangaId: item.mangaId,
       episodeId: item.chapterId,
-      episodeNumber: item.chapterNumber
-        ? Math.floor(Number(item.chapterNumber)) || null
-        : null,
+      episodeNumber:
+        item.chapterNumber != null &&
+        item.chapterNumber !== "" &&
+        Number.isFinite(Number(item.chapterNumber))
+          ? Number(item.chapterNumber)
+          : null,
       episodeTitle: item.chapterLabel,
       lang: historyLang,
       position: 0,
@@ -92,27 +125,14 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
     else if (dx > 0 && canPrev) goRelative(1);
   };
 
-  // Fallback offline: se a rede falhar e o capítulo estiver baixado,
-  // lê direto do cache do service worker.
-  const [offlinePages, setOfflinePages] = useState<string[] | null>(null);
-  useEffect(() => {
-    if (!error) return;
-    let alive = true;
-    getDownloadedPages(item.chapterId).then((p) => {
-      if (alive && p?.length) setOfflinePages(p);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [error, item.chapterId]);
-
-  const pages = data?.pages ?? (error ? offlinePages : null);
+  // Prioriza as páginas salvas no cache offline (evita rebaixar quando o nó ?b= muda)
+  const pages = offlinePages ?? data?.pages ?? null;
 
   const goRelative = (delta: number) => {
     const idx = item.index + delta;
     const target = item.chapters[idx];
     if (!target) return;
-    nav.push({
+    nav.replaceCurrent({
       t: "reader",
       chapterId: target.id,
       chapterLabel: target.chapter ? `Cap. ${target.chapter}` : "Capítulo",
@@ -128,8 +148,8 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
 
   return (
     <div className="space-y-4">
-      {/* Barra do leitor */}
-      <div className="sticky top-[57px] z-40 flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card/90 px-4 py-2.5 backdrop-blur md:top-[65px]">
+      {/* Barra do leitor (abaixo das 2 linhas do Header no mobile e 1 linha no desktop) */}
+      <div className="sticky top-[98px] z-40 flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card/90 px-4 py-2.5 backdrop-blur sm:top-[102px] md:top-[65px]">
         <p className="min-w-0 flex-1 truncate text-sm font-semibold">
           {item.mangaTitle}{" "}
           <span className="font-normal text-muted-foreground">
@@ -139,10 +159,10 @@ export function Reader({ item, nav }: { item: ReaderItem; nav: Nav }) {
         <span className="rounded bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase text-muted-foreground">
           {item.lang}
         </span>
-        {data ? (
-          <span className="text-xs text-muted-foreground">{data.total} págs</span>
+        {pages ? (
+          <span className="text-xs text-muted-foreground">{pages.length} págs</span>
         ) : null}
-        {!error && !loading && data && item.mangaId ? (
+        {!loading && pages && item.mangaId ? (
           <ChapterDlButton
             input={{
               chapterId: item.chapterId,

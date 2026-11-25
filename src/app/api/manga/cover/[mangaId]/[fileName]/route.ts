@@ -5,6 +5,7 @@ import {
   isHttpUrl,
   isSafeImageContentType,
   isSafePathSegment,
+  limitImageStream,
   validateImageUpstream,
 } from "@/lib/image-proxy";
 
@@ -212,12 +213,13 @@ export async function GET(
         const check = await validateImageUpstream(res);
         if (check.ok) {
           const contentType = res.headers.get("content-type") || "image/jpeg";
-          return new NextResponse(res.body, {
+          return new NextResponse(limitImageStream(res.body), {
             status: 200,
             headers: {
               "Content-Type": contentType,
               "Cache-Control": "public, max-age=604800, immutable",
               "Netlify-CDN-Cache-Control": "public, max-age=604800",
+              "CDN-Cache-Control": "public, max-age=604800",
               "Netlify-Vary": "query=title|al",
             },
           });
@@ -237,6 +239,7 @@ export async function GET(
       "Content-Type": "image/svg+xml",
       "Cache-Control": "private, no-cache, no-store, must-revalidate",
       "Netlify-CDN-Cache-Control": "no-store",
+      "CDN-Cache-Control": "no-store",
     },
   });
 }

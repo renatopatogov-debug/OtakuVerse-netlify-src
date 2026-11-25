@@ -79,8 +79,8 @@ export async function fetchJson<T>(
 
 /**
  * Notas do AniList em lote para uma lista de animes do catálogo.
- * Enhancement silencioso: se falhar, devolve null e os cards ficam sem nota.
- * Limitado aos primeiros 24 itens (limite do endpoint batch).
+ * Mantém cache cumulativo por ID (não pisca ao "Carregar mais" e busca
+ * também os novos lotes 25+, em blocos de até 24 por requisição).
  */
 export function useAniListScores(
   items:
@@ -88,44 +88,51 @@ export function useAniListScores(
     | null
     | undefined,
 ): Record<string, number | null> | null {
-  const [state, setState] = useState<{
-    key: string;
-    scores: Record<string, number | null> | null;
-  }>({ key: "", scores: null });
+  const [scores, setScores] = useState<Record<string, number | null>>({});
   const key = items && items.length > 0 ? items.map((i) => i.id).join(",") : "";
 
   useEffect(() => {
     const list = items;
     if (!list || list.length === 0) return;
-    const controller = new AbortController();
-    let alive = true;
-    const entries = list
-      .slice(0, 24)
+    const missing = list
+      .filter((i) => !(i.id in scores))
       .map((i) => ({
         id: i.id,
         title: (i.nameEn || i.name || "").trim(),
       }))
       .filter((e) => e.title.length > 0);
-    if (entries.length === 0) return;
-    fetch("/api/anilist/batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ titles: entries.map((e) => e.title) }),
-      signal: controller.signal,
-    })
-      .then((r) => r.json())
-      .then((j) => {
-        if (!alive || controller.signal.aborted || !Array.isArray(j?.results)) return;
-        const map: Record<string, number | null> = {};
-        (j.results as (number | null)[]).forEach((s, idx) => {
-          const entry = entries[idx];
-          if (entry) map[entry.id] = s;
-        });
-        setState({ key, scores: map });
-      })
-      .catch(() => {
-        /* silencioso */
-      });
+    if (missing.length === 0) return;
+
+    const controller = new AbortController();
+    let alive = true;
+
+    (async () => {
+      for (let offset = 0; offset < missing.length; offset += 24) {
+        if (!alive || controller.signal.aborted) break;
+        const batch = missing.slice(offset, offset + 24);
+        try {
+          const r = await fetch("/api/anilist/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ titles: batch.map((e) => e.title) }),
+            signal: controller.signal,
+          });
+          const j = await r.json();
+          if (!alive || controller.signal.aborted || !Array.isArray(j?.results)) {
+            continue;
+          }
+          const patch: Record<string, number | null> = {};
+          (j.results as (number | null)[]).forEach((s, idx) => {
+            const entry = batch[idx];
+            if (entry) patch[entry.id] = s ?? null;
+          });
+          setScores((prev) => ({ ...prev, ...patch }));
+        } catch {
+          /* silencioso */
+        }
+      }
+    })();
+
     return () => {
       alive = false;
       controller.abort();
@@ -133,6 +140,5 @@ export function useAniListScores(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  // Padrão derivado: enquanto a key não bate, sem dados (estado de loading).
-  return state.key === key ? state.scores : null;
+  return Object.keys(scores).length > 0 ? scores : null;
 }

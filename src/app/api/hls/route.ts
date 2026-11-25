@@ -30,6 +30,16 @@ function isHttpTarget(u: URL): boolean {
   return u.protocol === "https:" || u.protocol === "http:";
 }
 
+/**
+ * Apenas hosts sem CORS aberto (animesfhd.net) precisam passar pelo proxy serverless.
+ * Segmentos na CDN aberta (mywallpaper-4k-image.net) ou em CDNs externas mantêm
+ * URL direta para economizar banda/execução e evitar 403 auto-infligido.
+ */
+function needsHlsProxy(u: URL): boolean {
+  const host = u.hostname.toLowerCase();
+  return host === "animesfhd.net" || host.endsWith(".animesfhd.net");
+}
+
 function proxied(absolute: string, origin: string): string {
   return `${origin}/api/hls?u=${encodeURIComponent(absolute)}`;
 }
@@ -40,7 +50,10 @@ function rewriteAttrUris(line: string, base: URL, origin: string): string {
     try {
       const target = new URL(uri, base);
       if (!isHttpTarget(target)) return `URI="${uri}"`;
-      return `URI="${proxied(target.toString(), origin)}"`;
+      const resolved = needsHlsProxy(target)
+        ? proxied(target.toString(), origin)
+        : target.toString();
+      return `URI="${resolved}"`;
     } catch {
       return `URI="${uri}"`;
     }
@@ -60,7 +73,9 @@ function rewritePlaylist(text: string, baseUrl: string, origin: string): string 
       try {
         const target = new URL(trimmed, base);
         if (!isHttpTarget(target)) return line;
-        return proxied(target.toString(), origin);
+        return needsHlsProxy(target)
+          ? proxied(target.toString(), origin)
+          : target.toString();
       } catch {
         return line;
       }

@@ -14,9 +14,10 @@
 // Os caches otv-downloads-v1 e otv-api-v1 sobrevivem a updates do SW
 // (só o cache de estáticos é limpo por versão).
 
-const CACHE = "otv-v6";
+const CACHE = "otv-v8";
 const DL_CACHE = "otv-downloads-v5";
 const API_CACHE = "otv-api-v5";
+const ARCADE_CACHE = "otv-arcade-v1";
 const API_CACHE_LIMIT = 80;
 
 const API_JSON = /^\/api\/(manga|anime|anilist)\/(?!cover\/|page\/)/;
@@ -26,7 +27,13 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE)
       .then((cache) =>
-        cache.addAll(["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"]),
+        cache.addAll([
+          "/",
+          "/manifest.webmanifest",
+          "/icons/icon.svg",
+          "/icons/icon-192.png",
+          "/icons/icon-512.png",
+        ]),
       )
       .then(() => self.skipWaiting()),
   );
@@ -38,7 +45,13 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((k) => k !== CACHE && k !== DL_CACHE && k !== API_CACHE)
+          .filter(
+            (k) =>
+              k !== CACHE &&
+              k !== DL_CACHE &&
+              k !== API_CACHE &&
+              k !== ARCADE_CACHE,
+          )
           .map((k) => caches.delete(k)),
       );
       await self.clients.claim();
@@ -63,8 +76,8 @@ async function apiMirror(url) {
   // Network-first: tenta a rede, cai pro espelho em caso de falha
   try {
     const res = await fetch(url, { cache: "no-store" });
-    if (res.ok) {
-      await cache.put(url, res.clone());
+    if (res.status === 200) {
+      await cache.put(url, res.clone()).catch(() => {});
       trimApiCache(); // fire-and-forget
     }
     return res;
@@ -96,14 +109,17 @@ self.addEventListener("fetch", (event) => {
 
   // 3a. Páginas de mangá baixadas: cache-first APENAS no DL_CACHE
   // (navegação normal nunca grava no DL_CACHE — só downloads explícitos).
+  // Em /api/manga/page/{hash}/{fileName}, ignoramos ?b= / ?retry= porque o
+  // path já identifica univocamente a página e o nó At-Home muda entre sessões.
   if (
     url.pathname === "/api/img" ||
     url.pathname.startsWith("/api/manga/page/")
   ) {
+    const isMangaPagePath = url.pathname.startsWith("/api/manga/page/");
     event.respondWith(
       (async () => {
         const cache = await caches.open(DL_CACHE);
-        const hit = await cache.match(req);
+        const hit = await cache.match(req, { ignoreSearch: isMangaPagePath });
         if (hit) return hit;
         try {
           return await fetch(req);
@@ -151,8 +167,31 @@ self.addEventListener("fetch", (event) => {
         const hit = await cache.match(req);
         if (hit) return hit;
         const res = await fetch(req);
-        if (res.ok) await cache.put(req, res.clone());
+        if (res.status === 200) await cache.put(req, res.clone()).catch(() => {});
         return res;
+      })(),
+    );
+    return;
+  }
+
+  // 6b. Jogos e apps do Arcade (/arcade/*): network-first com espelho offline
+  if (url.pathname === "/arcade" || url.pathname.startsWith("/arcade/")) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(ARCADE_CACHE);
+        try {
+          const res = await fetch(req);
+          if (res.status === 200) await cache.put(req, res.clone()).catch(() => {});
+          return res;
+        } catch {
+          const hit = await cache.match(req, { ignoreSearch: true });
+          if (hit) return hit;
+          if (req.mode === "navigate") {
+            const shell = await caches.open(CACHE);
+            return (await shell.match("/")) ?? Response.error();
+          }
+          return Response.error();
+        }
       })(),
     );
     return;

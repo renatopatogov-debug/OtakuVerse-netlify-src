@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acervo PnP | Eduardo Borsari</title>
-    <meta name="description" content="Biblioteca pessoal de jogos print-and-play, indexada do Google Drive.">
+    <title>Acervo PnP — Biblioteca de Jogos Print-and-Play</title>
+    <meta name="description" content="Biblioteca de jogos print-and-play, organizada para busca rápida e download direto.">
     <meta name="theme-color" content="#050505">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -46,12 +46,12 @@
         ::-webkit-scrollbar-track { background: #09090b; }
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
         
-        .card-jogo { transition: all 0.3s ease; }
-        .card-jogo:hover { transform: translateY(-5px); border-color: #52525b; }
+        .card-jogo { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .card-jogo:hover { transform: translateY(-5px); border-color: #52525b; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 
         .capa-container { position: relative; overflow: hidden; }
         .capa-jogo { 
-            filter: grayscale(100%) contrast(110%); 
+            filter: grayscale(85%) contrast(105%); 
             transition: all 0.5s ease; 
         }
         .card-jogo:hover .capa-jogo { 
@@ -63,84 +63,121 @@
             display: inline-block; margin-bottom: 8px;
             font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
             color: #a1a1aa; text-decoration: none; border: 1px solid #3f3f46;
-            padding: 5px 10px; border-radius: 999px; transition: color .2s, border-color .2s;
+            padding: 5px 12px; border-radius: 999px; transition: all .2s ease;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
         }
-        .back-hub:hover { color: #fff; border-color: #fff; }
+        .back-hub:hover { color: #fff; border-color: #00adb5; }
 
         .badge-type {
             backdrop-filter: blur(4px);
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.75);
         }
     </style>
 </head>
 <body class="text-zinc-300 min-h-screen flex flex-col">
 
-    <header class="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-zinc-800">
-        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-                <a href="/" class="back-hub">&larr; Acervo</a>
-                <h1 class="text-xl font-bold tracking-tighter text-white uppercase font-mono border-l-4 border-white pl-3">
-                    Acervo <span class="text-zinc-500">PnP</span>
-                </h1>
+    <!-- Header fixo e responsivo com busca -->
+    <header class="sticky top-0 z-50 bg-black/85 backdrop-blur-md border-b border-zinc-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+                <div>
+                    <a href="/?v=arcade" class="back-hub">&larr; Arcade</a>
+                    <h1 class="text-xl font-bold tracking-tighter text-white uppercase font-mono border-l-4 border-cyan-500 pl-3">
+                        Acervo <span class="text-zinc-500 font-sans">PnP</span>
+                    </h1>
+                </div>
+                <div class="md:hidden flex items-center gap-2">
+                    <span id="badge-total-mobile" class="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">...</span>
+                </div>
             </div>
             
-            <div class="relative w-full md:w-96">
-                <input type="text" id="input-busca" placeholder="BUSCAR ARQUIVO..." 
-                    class="w-full bg-zinc-900/50 border border-zinc-700 text-zinc-300 text-sm rounded-sm focus:border-white block w-full pl-4 p-2.5 placeholder-zinc-600 font-mono transition-all focus:bg-black">
+            <div class="relative w-full md:w-96 flex items-center gap-2">
+                <div class="relative w-full">
+                    <input type="text" id="input-busca" placeholder="BUSCAR JOGO OU ARQUIVO..." 
+                        class="w-full bg-zinc-900/60 border border-zinc-700 text-zinc-200 text-sm rounded-sm focus:border-cyan-400 block pl-4 pr-10 py-2.5 placeholder-zinc-500 font-mono transition-all focus:bg-zinc-950 focus:outline-none">
+                    <button id="btn-clear-search" onclick="limparBusca()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white font-mono text-xs">
+                        ✕
+                    </button>
+                </div>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow max-w-7xl mx-auto p-6 w-full mt-8">
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
         
-        <div class="flex justify-between items-end mb-8 border-b border-zinc-800 pb-4">
+        <!-- Barra de Status e Filtros Rápidos -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 border-b border-zinc-800 pb-4 gap-4">
             <div>
-                <h2 class="text-3xl font-bold text-white tracking-tight">Arquivos</h2>
-                <p class="text-sm text-zinc-500 mt-1 font-mono">Status: <span class="text-emerald-500">ONLINE</span></p>
+                <h2 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">Biblioteca de Arquivos</h2>
+                <p class="text-xs sm:text-sm text-zinc-500 mt-1 font-mono flex items-center gap-2">
+                    Status: <span id="status-indicador" class="text-emerald-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> CONECTADO</span>
+                    <span class="text-zinc-600">|</span>
+                    <span id="label-total-jogos">Indexando arquivos...</span>
+                </p>
+            </div>
+            
+            <!-- Filtros rápidos por extensão -->
+            <div class="flex flex-wrap items-center gap-1.5 font-mono text-xs">
+                <button onclick="filtrarTipo('todos')" id="filter-todos" class="px-2.5 py-1 rounded bg-zinc-200 text-black font-semibold transition-all">Todos</button>
+                <button onclick="filtrarTipo('PDF')" id="filter-PDF" class="px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-all">PDFs</button>
+                <button onclick="filtrarTipo('ZIP')" id="filter-ZIP" class="px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-all">ZIPs / RAR</button>
+                <button onclick="forcarAtualizacaoCache()" title="Recarregar acervo direto do Drive" class="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-cyan-400 transition-all">
+                    ↻ Atualizar
+                </button>
             </div>
         </div>
 
+        <!-- Grade de Jogos / Cards -->
         <div id="lista-jogos" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <div class="col-span-full text-center py-20">
-                <div class="inline-block w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <p class="mt-4 text-zinc-500 font-mono text-sm">Carregando acervo...</p>
+            <div class="col-span-full text-center py-24">
+                <div class="inline-block w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                <p class="mt-4 text-zinc-400 font-mono text-sm">Carregando catálogo de jogos...</p>
+                <p class="text-xs text-zinc-600 font-mono mt-1">Sincronizando com cache inteligente</p>
             </div>
         </div>
 
-        <div id="status-msg" class="text-center mt-10 hidden">
-            <p class="text-zinc-500 font-mono text-sm border border-dashed border-zinc-800 inline-block px-4 py-2 rounded">
-                Nenhum arquivo encontrado.
+        <div id="status-msg" class="text-center py-16 hidden">
+            <p class="text-zinc-400 font-mono text-sm border border-dashed border-zinc-800 inline-block px-6 py-4 rounded bg-zinc-950">
+                Nenhum arquivo encontrado com o termo digitado.
             </p>
         </div>
     </main>
 
+    <!-- Rodapé com Apoio PIX Seguro -->
     <footer class="mt-auto border-t border-zinc-800 bg-zinc-950 pt-10 pb-8">
         <div class="max-w-4xl mx-auto px-6 text-center">
-            <div class="flex flex-col md:flex-row items-center justify-center gap-8 bg-zinc-900/50 p-6 rounded-xl border border-zinc-800 mb-8">
-                <div class="bg-white p-2 rounded shadow-lg shrink-0">
-                    <div id="pix-qrcode" class="w-40 h-40 flex items-center justify-center"></div>
+            <div class="flex flex-col md:flex-row items-center justify-center gap-8 bg-zinc-900/40 p-6 rounded-xl border border-zinc-800 mb-8">
+                <div class="bg-white p-2.5 rounded-lg shadow-lg shrink-0">
+                    <div id="pix-qrcode" class="w-36 h-36 flex items-center justify-center"></div>
                 </div>
-                <div class="w-full max-w-sm">
+                <div class="w-full max-w-sm text-left">
+                    <h3 class="text-sm font-bold text-white mb-1 uppercase tracking-wide">Apoie a Manutenção do Acervo</h3>
+                    <p class="text-xs text-zinc-400 mb-3 leading-relaxed">Contribua com qualquer valor para ajudar a manter o repositório online e com novos jogos adicionados.</p>
+                    
                     <input type="text" id="pix-input" readonly value="00020126580014br.gov.bcb.pix0136ba5803b1-d408-48c6-bf5d-62509ff76cf35204000053039865802BR5925EDUARDO GONCALVES BORSARI6014RIO DE JANEIRO62070503***6304D5A8" class="sr-only">
-                    <button onclick="copiarPix()" id="btn-copy" class="w-full bg-white text-black hover:bg-zinc-200 font-bold py-3 px-4 rounded text-xs uppercase tracking-widest transition-all">
-                        Copiar Chave Pix
+                    
+                    <button onclick="copiarPix()" id="btn-copy" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-2.5 px-4 rounded text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2">
+                        <span>Copiar Código Pix Copia & Cola</span>
                     </button>
-                    <span id="btn-text" class="block mt-2 text-[10px] text-zinc-500 font-mono">Clique para copiar</span>
+                    <span id="btn-text" class="block mt-2 text-[10px] text-zinc-500 font-mono text-center md:text-left">Chave aleatória oficial</span>
                 </div>
             </div>
-            <p class="text-zinc-600 text-[10px] font-mono uppercase">Acervo PnP © 2026</p>
+            <p class="text-zinc-600 text-[10px] font-mono uppercase tracking-widest">Acervo PnP &copy; 2026 &middot; Preserva&ccedil;&atilde;o de Jogos de Tabuleiro</p>
         </div>
     </footer>
 
     <script>
-                // CONFIGURAÇÕES
+        // CONFIGURAÇÕES DO GOOGLE DRIVE
         const API_KEY = 'AIzaSyCLscTYHULt_5Ai0ZqLCJclW05tD2B6pnc';
         const FOLDER_ID = '1sZZgnW_XaNiyKSzhYatP3AXClPaI2rjW';
+        const CACHE_KEY = 'acervopnp_cache_v2';
+        const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 horas de validade no cache
 
         let todosOsJogos = [];
         let todasAsCapas = [];
+        let tipoAtivo = 'todos';
 
-        // FUNÇÕES AUXILIARES
+        // Sanitização contra injeção de HTML
         function esc(t) {
             return String(t == null ? '' : t)
                 .replace(/&/g, '&amp;')
@@ -168,10 +205,16 @@
             return 'ARQ';
         }
 
-        // Link direto de download (o webViewLink abre a pré-visualização, não baixa)
+        // Link de download com alternativa para abrir pré-visualização oficial do Drive
         function linkDownload(jogo) {
             if (jogo.id) return 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(jogo.id);
             return jogo.webViewLink || '#';
+        }
+
+        function linkVisualizar(jogo) {
+            if (jogo.webViewLink) return jogo.webViewLink;
+            if (jogo.id) return 'https://drive.google.com/file/d/' + encodeURIComponent(jogo.id) + '/view';
+            return '#';
         }
 
         function tamanhoLegivel(bytes) {
@@ -182,9 +225,9 @@
             return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
         }
 
-        const CAPA_PADRAO = 'https://placehold.co/400x600/1a1a1a/333?text=';
+        const CAPA_PADRAO = 'https://placehold.co/400x600/18181b/52525b?text=';
 
-        // RENDERIZAÇÃO
+        // Renderização dos cards com tratamento de capas e fallback
         function renderizar(lista) {
             const container = document.getElementById('lista-jogos');
             const statusMsg = document.getElementById('status-msg');
@@ -199,30 +242,41 @@
             lista.forEach((jogo) => {
                 const nomeBase = extrairNome(jogo.name);
                 const capaDrive = todasAsCapas.find(c => extrairNome(c.name) === nomeBase);
-                const fallback = CAPA_PADRAO + encodeURIComponent(nomeBase.slice(0, 28)) + '&font=roboto';
+                const fallback = CAPA_PADRAO + encodeURIComponent(nomeBase.slice(0, 26)) + '&font=roboto';
 
                 let imgUrl = fallback;
-                if (capaDrive && capaDrive.thumbnailLink) imgUrl = capaDrive.thumbnailLink.replace('s220', 's800');
-                else if (jogo.thumbnailLink && !/\.(zip|rar|7z)$/i.test(jogo.name)) imgUrl = jogo.thumbnailLink.replace('s220', 's800');
+                if (capaDrive && capaDrive.thumbnailLink) {
+                    imgUrl = capaDrive.thumbnailLink.replace('s220', 's800');
+                } else if (jogo.thumbnailLink && !/\.(zip|rar|7z)$/i.test(jogo.name)) {
+                    imgUrl = jogo.thumbnailLink.replace('s220', 's800');
+                }
 
                 const tamanho = tamanhoLegivel(jogo.size);
+                const iconeTipo = getFileIcon(jogo.mimeType, jogo.name);
 
                 const card = document.createElement('div');
                 card.className = 'card-jogo group relative bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col h-full';
                 card.innerHTML = `
-                    <div class="capa-container h-64 w-full bg-black relative">
-                        <span class="absolute top-2 right-2 badge-type text-[10px] text-white font-mono px-2 py-1 rounded border border-white/20 z-10">
-                            ${esc(getFileIcon(jogo.mimeType, jogo.name))}
+                    <div class="capa-container h-60 w-full bg-zinc-950 relative">
+                        <span class="absolute top-2.5 right-2.5 badge-type text-[10px] text-white font-mono px-2 py-0.5 rounded border border-white/20 z-10 font-bold">
+                            ${esc(iconeTipo)}
                         </span>
                         <img src="${esc(imgUrl)}" class="capa-jogo w-full h-full object-cover" alt="${esc(nomeBase)}" loading="lazy">
                     </div>
                     <div class="p-4 flex flex-col flex-grow">
-                        <h3 class="text-sm font-bold text-white mb-1 line-clamp-2 uppercase">${esc(nomeBase)}</h3>
-                        <p class="text-[10px] text-zinc-500 font-mono mb-4 h-4">${esc(tamanho)}</p>
-                        <a href="${esc(linkDownload(jogo))}" target="_blank" rel="noopener noreferrer"
-                           class="mt-auto block w-full bg-white text-black hover:bg-zinc-200 py-2 text-center text-[10px] font-black uppercase rounded-sm">
-                            Download
-                        </a>
+                        <h3 class="text-sm font-bold text-white mb-1 line-clamp-2 uppercase tracking-tight" title="${esc(nomeBase)}">${esc(nomeBase)}</h3>
+                        <p class="text-[11px] text-zinc-500 font-mono mb-4">${esc(tamanho || 'Tamanho n/d')}</p>
+                        
+                        <div class="mt-auto grid grid-cols-2 gap-2">
+                            <a href="${esc(linkDownload(jogo))}" target="_blank" rel="noopener noreferrer"
+                               class="block w-full bg-cyan-500 hover:bg-cyan-400 text-black py-2 text-center text-[10px] font-black uppercase rounded-sm transition-colors">
+                                Baixar
+                            </a>
+                            <a href="${esc(linkVisualizar(jogo))}" target="_blank" rel="noopener noreferrer"
+                               class="block w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 py-2 text-center text-[10px] font-bold uppercase rounded-sm border border-zinc-700 transition-colors">
+                                Drive
+                            </a>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
@@ -234,8 +288,8 @@
             });
         }
 
-        // CARREGAMENTO INICIAL (paginado: sem isso a API corta em 100 arquivos)
-        async function listarArquivos() {
+        // Requisição paginada na Google Drive API v3
+        async function buscarArquivosDrive() {
             const arquivos = [];
             let pageToken = '';
 
@@ -251,7 +305,10 @@
                 const response = await fetch('https://www.googleapis.com/drive/v3/files?' + params.toString());
                 const data = await response.json();
 
-                if (data.error) throw new Error(data.error.message || 'A API do Drive recusou a requisição');
+                if (data.error) {
+                    throw new Error(data.error.message || 'A API do Google Drive recusou a requisição');
+                }
+
                 (data.files || []).forEach(f => arquivos.push(f));
                 pageToken = data.nextPageToken || '';
             } while (pageToken);
@@ -259,52 +316,158 @@
             return arquivos;
         }
 
-        async function carregarJogos() {
+        // Carregamento com Cache Inteligente e Recuperação de Erros
+        async function carregarJogos(forcarAtualizacao = false) {
             const container = document.getElementById('lista-jogos');
+            const statusIndicador = document.getElementById('status-indicador');
+            const labelTotal = document.getElementById('label-total-jogos');
+            const totalMobile = document.getElementById('badge-total-mobile');
+
+            // 1. Tenta carregar do cache local se disponível
+            if (!forcarAtualizacao) {
+                try {
+                    const cacheRaw = localStorage.getItem(CACHE_KEY);
+                    if (cacheRaw) {
+                        const cache = JSON.parse(cacheRaw);
+                        if (Date.now() - cache.timestamp < CACHE_TTL && cache.jogos && cache.jogos.length > 0) {
+                            todosOsJogos = cache.jogos;
+                            todasAsCapas = cache.capas || [];
+                            atualizarContador(todosOsJogos.length, true);
+                            aplicarFiltros();
+                            return;
+                        }
+                    }
+                } catch(e) {
+                    console.warn('Erro ao ler cache:', e);
+                }
+            }
+
+            // 2. Busca dados frescos da API
             try {
-                const files = await listarArquivos();
+                statusIndicador.innerHTML = '<span class="w-2 h-2 rounded-full bg-cyan-400 animate-spin"></span> ATUALIZANDO';
+                statusIndicador.className = 'text-cyan-400 flex items-center gap-1.5';
+
+                const files = await buscarArquivosDrive();
                 todosOsJogos = files.filter(f => !String(f.mimeType).includes('image') && !String(f.mimeType).includes('folder'));
                 todasAsCapas = files.filter(f => String(f.mimeType).includes('image'));
-                renderizar(todosOsJogos);
+
+                // Salva no cache local para carregamentos futuros instantâneos
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({
+                        timestamp: Date.now(),
+                        jogos: todosOsJogos,
+                        capas: todasAsCapas
+                    }));
+                } catch(e) {
+                    console.warn('Não foi possível gravar cache local:', e);
+                }
+
+                statusIndicador.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span> SINCRONIZADO';
+                statusIndicador.className = 'text-emerald-400 flex items-center gap-1.5';
+                atualizarContador(todosOsJogos.length, false);
+                aplicarFiltros();
             } catch (error) {
                 console.error(error);
-                container.innerHTML = '<p class="col-span-full text-center text-red-500 font-mono text-sm py-16">Erro ao carregar o acervo: ' + esc(error.message) + '</p>';
+                
+                // Fallback para cache antigo se a API falhar ou cota estourar
+                try {
+                    const cacheRaw = localStorage.getItem(CACHE_KEY);
+                    if (cacheRaw) {
+                        const cache = JSON.parse(cacheRaw);
+                        todosOsJogos = cache.jogos || [];
+                        todasAsCapas = cache.capas || [];
+                        statusIndicador.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span> MODO OFFLINE';
+                        statusIndicador.className = 'text-amber-400 flex items-center gap-1.5';
+                        atualizarContador(todosOsJogos.length, true);
+                        aplicarFiltros();
+                        return;
+                    }
+                } catch(e) {}
+
+                statusIndicador.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> ERRO DE CONEXÃO';
+                statusIndicador.className = 'text-red-500 flex items-center gap-1.5';
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-20 px-4">
+                        <p class="text-red-400 font-mono text-sm mb-2">Não foi possível carregar a lista do Google Drive.</p>
+                        <p class="text-xs text-zinc-500 font-mono mb-6">${esc(error.message)}</p>
+                        <button onclick="carregarJogos(true)" class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs rounded border border-zinc-700">
+                            Tentar Novamente
+                        </button>
+                    </div>
+                `;
             }
         }
 
-        // PIX — QR gerado no próprio navegador (antes ia para api.qrserver.com, um terceiro)
+        function atualizarContador(total, isCached) {
+            const label = document.getElementById('label-total-jogos');
+            const mobile = document.getElementById('badge-total-mobile');
+            const txt = `${total} jogos disponíveis${isCached ? ' (cache)' : ''}`;
+            if (label) label.textContent = txt;
+            if (mobile) mobile.textContent = `${total} jogos`;
+        }
+
+        function forcarAtualizacaoCache() {
+            try { localStorage.removeItem(CACHE_KEY); } catch(e) {}
+            carregarJogos(true);
+        }
+
+        // Filtros por Categoria e Busca
+        function filtrarTipo(tipo) {
+            tipoAtivo = tipo;
+            ['todos', 'PDF', 'ZIP'].forEach(t => {
+                const btn = document.getElementById(`filter-${t}`);
+                if (!btn) return;
+                if (t === tipo) {
+                    btn.className = 'px-2.5 py-1 rounded bg-zinc-200 text-black font-semibold transition-all';
+                } else {
+                    btn.className = 'px-2.5 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-all';
+                }
+            });
+            aplicarFiltros();
+        }
+
+        function aplicarFiltros() {
+            const termo = normalizarTexto(document.getElementById('input-busca').value.trim());
+            let lista = todosOsJogos;
+
+            if (tipoAtivo === 'PDF') {
+                lista = lista.filter(j => getFileIcon(j.mimeType, j.name) === 'PDF');
+            } else if (tipoAtivo === 'ZIP') {
+                lista = lista.filter(j => getFileIcon(j.mimeType, j.name) === 'ZIP');
+            }
+
+            if (termo) {
+                lista = lista.filter(j => normalizarTexto(j.name).includes(termo));
+            }
+
+            renderizar(lista);
+        }
+
+        function limparBusca() {
+            const input = document.getElementById('input-busca');
+            input.value = '';
+            document.getElementById('btn-clear-search').classList.add('hidden');
+            aplicarFiltros();
+            input.focus();
+        }
+
+        // QR Code gerado localmente no navegador
         function iniciarPix() {
             const input = document.getElementById('pix-input');
             const alvo = document.getElementById('pix-qrcode');
             if (!input || !alvo) return;
             const codigo = input.value.trim();
             if (!codigo) return;
-            if (typeof QRCode === 'undefined') {
-                alvo.innerHTML = '<span class="text-[9px] text-zinc-500 text-center px-1">QR indisponível — use o botão ao lado</span>';
-                return;
-            }
+            
             alvo.innerHTML = '';
             new QRCode(alvo, {
                 text: codigo,
-                width: 160,
-                height: 160,
+                width: 144,
+                height: 144,
+                colorDark: '#09090b',
+                colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.M
             });
-        }
-
-        function copiaLegacy(texto, aoCopiar) {
-            const ta = document.createElement('textarea');
-            ta.value = texto;
-            ta.setAttribute('readonly', '');
-            ta.style.position = 'fixed';
-            ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.select();
-            ta.setSelectionRange(0, 99999);
-            let copiou = false;
-            try { copiou = document.execCommand('copy'); } catch (e) { copiou = false; }
-            document.body.removeChild(ta);
-            if (copiou) aoCopiar();
         }
 
         function copiarPix() {
@@ -314,8 +477,12 @@
             if (!texto) return;
 
             const aoCopiar = () => {
-                btn.innerText = 'COPIADO!';
-                setTimeout(() => { btn.innerText = 'COPIAR CHAVE PIX'; }, 2000);
+                btn.innerHTML = '<span>CÓDIGO PIX COPIADO! ✓</span>';
+                btn.classList.replace('bg-cyan-500', 'bg-emerald-400');
+                setTimeout(() => {
+                    btn.innerHTML = '<span>Copiar Código Pix Copia & Cola</span>';
+                    btn.classList.replace('bg-emerald-400', 'bg-cyan-500');
+                }, 2500);
             };
 
             if (navigator.clipboard && window.isSecureContext) {
@@ -325,14 +492,31 @@
             }
         }
 
-        // EVENTOS
+        function copiaLegacy(texto, aoCopiar) {
+            const ta = document.createElement('textarea');
+            ta.value = texto;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                if (document.execCommand('copy')) aoCopiar();
+            } catch (e) {}
+            document.body.removeChild(ta);
+        }
+
+        // Ouvintes de eventos
         document.getElementById('input-busca').addEventListener('input', (e) => {
-            const termo = normalizarTexto(e.target.value.trim());
-            if (!termo) return renderizar(todosOsJogos);
-            renderizar(todosOsJogos.filter(j => normalizarTexto(j.name).includes(termo)));
+            const btnClear = document.getElementById('btn-clear-search');
+            if (e.target.value.trim().length > 0) {
+                btnClear.classList.remove('hidden');
+            } else {
+                btnClear.classList.add('hidden');
+            }
+            aplicarFiltros();
         });
 
-        // INICIAR
+        // Inicialização
         iniciarPix();
         carregarJogos();
     </script>

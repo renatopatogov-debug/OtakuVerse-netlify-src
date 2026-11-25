@@ -16,6 +16,8 @@ const BROWSER_UA =
 const PAGE_CACHE_HEADERS = {
   "Cache-Control": "public, max-age=604800, immutable",
   "Netlify-CDN-Cache-Control": "public, max-age=604800",
+  "CDN-Cache-Control": "public, max-age=604800",
+  "Netlify-Vary": "query=b",
 };
 
 function isUsableUpstream(res: Response): boolean {

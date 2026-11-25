@@ -48,7 +48,10 @@ export function HlsPlayer({
   /** Segundo para onde pular assim que a duração estiver disponível. */
   startAt?: number;
 }) {
-  const [idx, setIdx] = useState(initialIndex);
+  const [sourceState, setSourceState] = useState<{
+    sig: string;
+    idx: number;
+  }>({ sig: "", idx: initialIndex });
   const [nonce, setNonce] = useState(0); // re-tentativas da mesma fonte
   const [status, setStatus] = useState<StatusState>({
     key: "",
@@ -57,19 +60,42 @@ export function HlsPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const failedRef = useRef<Set<string>>(new Set());
   const lastSaveRef = useRef(0);
-  const seekedRef = useRef(false);
+  const seekedForKeyRef = useRef<string>("");
+  const resumeTimeRef = useRef<number>(startAt ?? 0);
   const usingHlsJsRef = useRef(false);
+
+  const signature = useMemo(
+    () => sources.map((s) => s.playUrl).join("|"),
+    [sources],
+  );
+
+  const idx =
+    sourceState.sig === signature && sourceState.idx < sources.length
+      ? sourceState.idx
+      : Math.min(initialIndex, Math.max(0, sources.length - 1));
+
+  const setIdx = (nextIdx: number) => {
+    const v = videoRef.current;
+    if (v && v.currentTime > 1 && Number.isFinite(v.currentTime)) {
+      resumeTimeRef.current = v.currentTime;
+    }
+    setSourceState({ sig: signature, idx: nextIdx });
+  };
 
   const isTomatoOnly =
     sources.length > 0 && sources.every((s) => s.provider === "Tomato");
 
   const failAndAdvance = (curFailKey: string, curActiveKey: string) => {
+    const v = videoRef.current;
+    if (v && v.currentTime > 1 && Number.isFinite(v.currentTime)) {
+      resumeTimeRef.current = v.currentTime;
+    }
     failedRef.current.add(curFailKey);
     const next = sources.findIndex(
       (_, i) => !failedRef.current.has(`${i}|${sources[i].playUrl}`),
     );
     if (next >= 0) {
-      setIdx(next);
+      setSourceState({ sig: signature, idx: next });
     } else {
       setStatus({
         key: curActiveKey,
@@ -78,27 +104,6 @@ export function HlsPlayer({
           ? "Todas as qualidades/fontes do Tomato falharam para este episódio."
           : "Todas as fontes deste episódio falharam (os proxies do animesfhd podem estar fora do ar agora).",
       });
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    const v = videoRef.current;
-    if (v && startAt && startAt > 1 && !seekedRef.current) {
-      if (v.duration > 0 && startAt < v.duration - 5) {
-        v.currentTime = startAt;
-        seekedRef.current = true;
-      }
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    const v = videoRef.current;
-    if (!v || !onProgress) return;
-    const now = Date.now();
-    if (now - lastSaveRef.current < 5000) return;
-    lastSaveRef.current = now;
-    if (v.duration > 0 && Number.isFinite(v.duration)) {
-      onProgress(v.currentTime, v.duration);
     }
   };
 
@@ -111,13 +116,39 @@ export function HlsPlayer({
   const currentStatus: PlayStatus =
     status.key === activeKey ? status.value : "loading";
 
-  const signature = useMemo(
-    () => sources.map((s) => s.playUrl).join("|"),
-    [sources],
-  );
+  const handleLoadedMetadata = () => {
+    const v = videoRef.current;
+    const targetTime = resumeTimeRef.current || startAt || 0;
+    if (v && targetTime > 1 && seekedForKeyRef.current !== activeKey) {
+      if (v.duration > 0 && targetTime < v.duration - 5) {
+        v.currentTime = targetTime;
+      }
+      seekedForKeyRef.current = activeKey;
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.currentTime > 0 && Number.isFinite(v.currentTime)) {
+      resumeTimeRef.current = v.currentTime;
+    }
+    if (!onProgress) return;
+    const now = Date.now();
+    if (now - lastSaveRef.current < 5000) return;
+    lastSaveRef.current = now;
+    if (v.duration > 0 && Number.isFinite(v.duration)) {
+      onProgress(v.currentTime, v.duration);
+    }
+  };
 
   useEffect(() => {
     failedRef.current = new Set();
+    resumeTimeRef.current = startAt ?? 0;
+    seekedForKeyRef.current = "";
+    // Só reinicia ao trocar a lista de fontes (`signature`); `startAt` pode mudar
+    // a cada save de progresso sem que o player deva esquecer fontes já falhas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
   useEffect(() => {
@@ -209,8 +240,9 @@ export function HlsPlayer({
       video.removeAttribute("src");
       video.load();
     };
-    // playUrl/nonce mudam juntos na troca de episódio, fonte ou re-tentativa
-  }, [playUrl, nonce]);
+    // activeKey codifica nonce, idx e playUrl — sincronizado 1:1 com <video key={activeKey}>
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey]);
 
   if (sources.length === 0) {
     return (

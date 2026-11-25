@@ -41,22 +41,30 @@ function candidateTitles(m: AniListMedia): string[] {
     .slice(0, 4);
 }
 
+let openingAnimeLock = false;
+
 async function openAnime(media: AniListMedia, nav: Nav) {
-  for (const title of candidateTitles(media)) {
-    try {
-      const r = await fetchJson<{ items: { upstreamCid: number }[] }>(
-        `/api/anime/search?q=${encodeURIComponent(title)}&limit=1`,
-      );
-      if (r.items?.length) {
-        nav.push({ t: "anime-detail", cid: r.items[0].upstreamCid });
-        return;
+  if (openingAnimeLock) return;
+  openingAnimeLock = true;
+  try {
+    for (const title of candidateTitles(media)) {
+      try {
+        const r = await fetchJson<{ items: { upstreamCid: number }[] }>(
+          `/api/anime/search?q=${encodeURIComponent(title)}&limit=1`,
+        );
+        if (r.items?.length) {
+          nav.push({ t: "anime-detail", cid: r.items[0].upstreamCid });
+          return;
+        }
+      } catch {
+        /* tenta o próximo candidato */
       }
-    } catch {
-      /* tenta o próximo candidato */
     }
+    const fallback = media.title.english || media.title.romaji || "";
+    nav.push({ t: "search", q: fallback });
+  } finally {
+    openingAnimeLock = false;
   }
-  const fallback = media.title.english || media.title.romaji || "";
-  nav.push({ t: "search", q: fallback });
 }
 
 function scoreLabel(m: AniListMedia) {
@@ -78,7 +86,10 @@ export function TrailerDialog({
 }) {
   return (
     <Dialog open={!!media} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-3xl border-none bg-black p-0">
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-w-3xl border-none bg-black p-0"
+      >
         <DialogTitle className="sr-only">
           Trailer de {media?.title.romaji ?? "anime"}
         </DialogTitle>
@@ -117,6 +128,12 @@ function HeroCarousel({ items, nav }: { items: AniListMedia[]; nav: Nav }) {
         className="relative overflow-hidden rounded-2xl border border-border/60 bg-black"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
+        onFocusCapture={() => setPaused(true)}
+        onBlurCapture={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setPaused(false);
+          }
+        }}
         aria-roledescription="carrossel"
         aria-label="Animes em alta"
       >
@@ -128,6 +145,7 @@ function HeroCarousel({ items, nav }: { items: AniListMedia[]; nav: Nav }) {
               <div
                 key={m.id}
                 aria-hidden={!active}
+                inert={!active || undefined}
                 className={cn(
                   "absolute inset-0 transition-opacity duration-1000",
                   active

@@ -26,7 +26,6 @@ import type { Nav } from "./types";
 import {
   getWatchHistory,
   isWatched,
-  saveWatchProgress,
   usePreferredAudio,
   useProgressSaver,
   useWatchHistory,
@@ -454,11 +453,12 @@ export function SfhdDetail({
               )
             }
             onEnded={() =>
-              saveWatchProgress({
-                ...progressBase,
-                position: 1,
-                duration: 1,
-              })
+              saveProgress(
+                progressBase,
+                1,
+                1,
+                true,
+              )
             }
           />
           <p className="text-[11px] leading-relaxed text-muted-foreground">

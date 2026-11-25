@@ -191,10 +191,17 @@ export async function downloadChapter(
     let size = 0;
     const missingUrls: string[] = [];
     for (const url of pages) {
-      const hit = await cache.match(url);
+      const hit = await cache.match(url, {
+        ignoreSearch: url.startsWith("/api/manga/page/"),
+      });
       if (hit) {
         done++;
-        size += Number(hit.headers.get("content-length") ?? 0);
+        const lenHeader = Number(hit.headers.get("content-length") ?? 0);
+        size +=
+          lenHeader > 0
+            ? lenHeader
+            : (await hit.clone().arrayBuffer().catch(() => new ArrayBuffer(0)))
+                .byteLength;
       } else {
         missingUrls.push(url);
       }

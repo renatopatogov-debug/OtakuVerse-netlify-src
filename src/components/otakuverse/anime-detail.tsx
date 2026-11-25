@@ -76,15 +76,53 @@ function AnimeDetailContent({
     pref: AudioPref;
     idx: number;
   } | null>(null);
+
+  // Descobre a temporada dona do `epId` caso venha de deep-link ou Continuar Assistindo
+  const epSeasonIdx = useMemo(() => {
+    if (!epId || seasons.length <= 1) return -1;
+    const targetEp = detail.episodes.find((e) => e.id === epId);
+    if (!targetEp || targetEp.upstreamTempId == null) return -1;
+    return seasons.findIndex((s) => s.upstreamTid === targetEp.upstreamTempId);
+  }, [epId, detail.episodes, seasons]);
+
   const preferredSeasonIdx = useMemo(() => {
+    if (epSeasonIdx >= 0) return epSeasonIdx;
     if (!audioPref) return 0;
     const idx = seasons.findIndex((s) => normalizeAudio(s.audioType) === audioPref);
     return idx >= 0 ? idx : 0;
-  }, [audioPref, seasons]);
+  }, [epSeasonIdx, audioPref, seasons]);
+
   const seasonIdx =
     manualSeason && manualSeason.pref === audioPref
       ? manualSeason.idx
       : preferredSeasonIdx;
+
+  // Calcula o número real da temporada (ignorando duplicação por áudio LEG/DUB)
+  const { seasonNumber, effectiveAudioPref } = useMemo(() => {
+    const activeSeason = seasons[seasonIdx];
+    const seasonAud = normalizeAudio(activeSeason?.audioType) ?? audioPref;
+    if (!activeSeason) {
+      return { seasonNumber: 1, effectiveAudioPref: seasonAud };
+    }
+    const m = activeSeason.name.match(
+      /(?:temporada|season|\btemp\.?|\bs)\s*(\d+)|(\d+)[ªº]?\s*(?:temporada|season)/i,
+    );
+    const parsedNum = Number(m?.[1] || m?.[2] || 0);
+    if (parsedNum > 0) {
+      return { seasonNumber: parsedNum, effectiveAudioPref: seasonAud };
+    }
+    const activeNorm = normalizeAudio(activeSeason.audioType);
+    let rank = 0;
+    for (let i = 0; i <= seasonIdx && i < seasons.length; i++) {
+      if (normalizeAudio(seasons[i].audioType) === activeNorm) {
+        rank++;
+      }
+    }
+    return {
+      seasonNumber: Math.max(1, rank),
+      effectiveAudioPref: seasonAud,
+    };
+  }, [seasons, seasonIdx, audioPref]);
 
   const [epSelection, setEpSelection] = useState<
     | { kind: "picked"; ep: EpisodeInfo; startAt: number }
@@ -106,7 +144,7 @@ function AnimeDetailContent({
       historyEntries.find(
         (e) =>
           e.key === `ol:${detail.anime.upstreamCid}:${epKey}` ||
-          (e.source === "tomato" &&
+          ((e.source === "tomato" || e.source === "sfhd") &&
             e.cid === detail.anime.upstreamCid &&
             e.episodeId === epKey),
       ) ?? null,
@@ -117,7 +155,8 @@ function AnimeDetailContent({
       historyEntries.find(
         (e) =>
           e.key.startsWith(`ol:${detail.anime.upstreamCid}:`) ||
-          (e.source === "tomato" && e.cid === detail.anime.upstreamCid),
+          ((e.source === "tomato" || e.source === "sfhd") &&
+            e.cid === detail.anime.upstreamCid),
       ) ?? null,
     [historyEntries, detail.anime.upstreamCid],
   );
@@ -147,14 +186,16 @@ function AnimeDetailContent({
       return { ep: epSelection.ep, startAt: epSelection.startAt };
     }
     if (!epId) return null;
-    const ep = episodes.find((e) => e.id === epId);
+    const ep =
+      episodes.find((e) => e.id === epId) ??
+      detail.episodes.find((e) => e.id === epId);
     if (!ep) return null;
     const entry = olEntryFor(epId);
     return {
       ep,
       startAt: entry && !isWatched(entry) ? entry.position : 0,
     };
-  }, [epSelection, epId, episodes, olEntryFor]);
+  }, [epSelection, epId, episodes, detail.episodes, olEntryFor]);
 
   const activeQuality: VideoQuality =
     playing && playerControl.epId === playing.ep.id
@@ -330,10 +371,18 @@ function AnimeDetailContent({
                 <ResumeChip
                   entry={lastWatched}
                   onResume={() => {
-                    const ep = episodes.find(
-                      (e) => e.id === lastWatched.episodeId,
-                    );
+                    const ep =
+                      episodes.find((e) => e.id === lastWatched.episodeId) ??
+                      detail.episodes.find((e) => e.id === lastWatched.episodeId);
                     if (ep) {
+                      if (ep.upstreamTempId != null && seasons.length > 1) {
+                        const targetIdx = seasons.findIndex(
+                          (s) => s.upstreamTid === ep.upstreamTempId,
+                        );
+                        if (targetIdx >= 0 && targetIdx !== seasonIdx) {
+                          setManualSeason({ pref: audioPref, idx: targetIdx });
+                        }
+                      }
                       const resumeAt = isWatched(lastWatched)
                         ? 0
                         : lastWatched.position;
@@ -342,6 +391,11 @@ function AnimeDetailContent({
                         epId: ep.id,
                         mode: "primary",
                         quality: "HD",
+                      });
+                      nav.replaceCurrent({
+                        t: "anime-detail",
+                        cid: anime.upstreamCid,
+                        epId: ep.id,
                       });
                       scrollToPlayer();
                     }
@@ -370,12 +424,12 @@ function AnimeDetailContent({
             anime={anime}
             ep={playing.ep}
             startAt={playing.startAt}
-            seasonIdx={seasonIdx}
+            seasonNumber={seasonNumber}
             quality={activeQuality}
             mode={activeMode}
             media={media}
             anizip={anizip}
-            audioPref={audioPref}
+            audioPref={effectiveAudioPref}
             sfhdPick={sfhdPick}
             tomatoPick={tomatoPick}
             onQualityChange={(q) =>
@@ -404,6 +458,7 @@ function AnimeDetailContent({
           onSelect={(i) => {
             setManualSeason({ pref: audioPref, idx: i });
             setEpSelection({ kind: "cleared" });
+            nav.replaceCurrent({ t: "anime-detail", cid: anime.upstreamCid });
           }}
         />
       ) : (
@@ -425,8 +480,15 @@ function AnimeDetailContent({
         entryFor={olEntryFor}
         showCompactAudioPref={seasons.length <= 1}
         onSelectEpisode={(ep) => {
-          setEpSelection({ kind: "picked", ep, startAt: 0 });
+          const saved = olEntryFor(ep.id);
+          const resumeAt = saved && !isWatched(saved) ? saved.position : 0;
+          setEpSelection({ kind: "picked", ep, startAt: resumeAt });
           setPlayerControl({ epId: ep.id, mode: "primary", quality: "HD" });
+          nav.replaceCurrent({
+            t: "anime-detail",
+            cid: anime.upstreamCid,
+            epId: ep.id,
+          });
           scrollToPlayer();
         }}
       />

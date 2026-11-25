@@ -28,6 +28,7 @@ export type StackItem =
 
 export interface Nav {
   push: (item: StackItem) => void;
+  replaceCurrent: (item: StackItem) => void;
   back: () => void;
   replaceAll: (item: StackItem) => void;
   canBack: boolean;
